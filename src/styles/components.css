@@ -718,6 +718,53 @@
   text-transform: uppercase;
   color: var(--text-3);
 }
+
+/* ── Ownership section in service panel ────────────────────── */
+.lc-owner-row { display: flex; align-items: center; gap: 8px; }
+.lc-owner-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent),
+              0 0 10px 1px currentColor;
+  flex-shrink: 0;
+}
+.lc-owner-team {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.lc-owner-tag {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lc-owner-line {
+  display: flex;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.lc-owner-key {
+  flex-shrink: 0;
+  width: 78px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+.lc-owner-val { color: var(--text-2); word-break: break-word; }
+.lc-owner-muted { color: var(--text-3); }
+.lc-owner-link {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-std);
+}
+.lc-owner-link:hover { color: var(--text-1); text-decoration: underline; }
 .lc-map-panel-edges {
   list-style: none;
   margin: 0; padding: 0;

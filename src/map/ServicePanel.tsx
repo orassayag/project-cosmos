@@ -1,17 +1,28 @@
 import type { Service } from '../scenarios/types';
 import { TechChip } from '../components/TechIcon';
 import { BRAND } from '../scenarios/brand';
+import { resolveOwner } from '../scenarios/owners';
 
 interface ServicePanelProps {
   service: Service;
 }
 
+/** `astromart/team-shopping` → https://github.com/orgs/astromart/teams/team-shopping */
+function githubTeamUrl(githubTeam: string): string | null {
+  const [org, slug] = githubTeam.split('/');
+  if (!org || !slug) return null;
+  return `https://github.com/orgs/${org}/teams/${slug}`;
+}
+
 export function ServicePanel({ service }: ServicePanelProps) {
+  const owner = resolveOwner(service);
+  const teamUrl = owner.githubTeam ? githubTeamUrl(owner.githubTeam) : null;
+
   return (
     <>
       <div className="lc-map-panel-head">
         <div className="lc-map-panel-eyebrow" style={{ color: service.color }}>
-          SERVICE{service.team && <span style={{ opacity: 0.6 }}> · {service.team}</span>}
+          SERVICE<span style={{ opacity: 0.6 }}> · {owner.label}</span>
         </div>
         <div className="lc-map-panel-title-row">
           <span className="lc-map-panel-dot" style={{ background: service.color, color: service.color }} />
@@ -38,6 +49,51 @@ export function ServicePanel({ service }: ServicePanelProps) {
       </div>
 
       <p className="lc-map-panel-desc">{service.desc}</p>
+
+      <div className="lc-map-panel-section">
+        <div className="lc-map-panel-sec-label">Ownership</div>
+        <div className="lc-owner-row">
+          <span className="lc-owner-dot" style={{ background: owner.hex, color: owner.hex }} />
+          <span className="lc-owner-team">{owner.label}</span>
+          {owner.source === 'fallback' && <span className="lc-owner-tag">unowned</span>}
+          {owner.source === 'override' && <span className="lc-owner-tag">override</span>}
+        </div>
+        {owner.githubTeam && (
+          <div className="lc-owner-line">
+            <span className="lc-owner-key">Team</span>
+            {teamUrl ? (
+              <a className="lc-owner-val lc-owner-link" href={teamUrl} target="_blank" rel="noopener noreferrer">
+                @{owner.githubTeam}
+              </a>
+            ) : (
+              <span className="lc-owner-val">@{owner.githubTeam}</span>
+            )}
+          </div>
+        )}
+        <div className="lc-owner-line">
+          <span className="lc-owner-key">Code owners</span>
+          {owner.reviewers.length > 0 ? (
+            <span className="lc-owner-val">
+              {owner.reviewers.map((handle, i) => (
+                <span key={handle}>
+                  {i > 0 && ', '}
+                  <a className="lc-owner-link" href={`https://github.com/${handle}`} target="_blank" rel="noopener noreferrer">
+                    @{handle}
+                  </a>
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="lc-owner-val lc-owner-muted">@{owner.githubTeam} (team default)</span>
+          )}
+        </div>
+        {owner.slack && (
+          <div className="lc-owner-line">
+            <span className="lc-owner-key">Slack</span>
+            <span className="lc-owner-val">{owner.slack}</span>
+          </div>
+        )}
+      </div>
 
       {service.tech.length > 0 && (
         <div className="lc-map-panel-section">

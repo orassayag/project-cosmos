@@ -13,6 +13,7 @@ npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok
 ## Layout
 
 - `src/scenarios/` — the entire universe as typed data: `services.ts`, `topics.ts`, `scenarios.ts` (domains + scenarios), `owners.ts` (teams), `steps/<domain>.ts`, barrel in `data.ts`. **Most changes belong here.**
+- `src/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/data.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
 - `src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
 - `src/components/` — UI shell: intro, playback controls, step panel, tech icons.
 - `drift-sync/` — the nightly honesty pipeline (its own README).

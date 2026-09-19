@@ -12,6 +12,8 @@ interface DomainBarProps {
   activeScenarioId: string | null;
   onPickDomain: (domainId: string) => void;
   onPickScenario: (scenarioId: string) => void;
+  /** Bumped by a galaxy reset ("Cosmos" title / global Esc) to close the menu. */
+  resetNonce?: number;
 }
 
 /**
@@ -26,11 +28,18 @@ export function DomainBar({
   activeScenarioId,
   onPickDomain,
   onPickScenario,
+  resetNonce = 0,
 }: DomainBarProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [anchor, setAnchor] = useState<{ left: number; minWidth: number } | null>(null);
+
+  // A galaxy reset collapses any open scenarios dropdown so no tab stays expanded.
+  useEffect(() => {
+    if (resetNonce === 0) return;
+    setOpen(false);
+  }, [resetNonce]);
 
   // Recompute the dropdown's left position based on the active tab.
   useLayoutEffect(() => {

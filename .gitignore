@@ -31,3 +31,6 @@ coverage/
 
 # local Claude settings
 .claude/settings.local.json
+docs/pre-plans/
+.vercel
+.env*

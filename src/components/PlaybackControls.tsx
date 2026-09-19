@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RunnerApi } from '../scenarios/runner';
 import type { Step } from '../scenarios/types';
 
@@ -25,7 +26,20 @@ export function PlaybackControls({
   runner, steps, onPlay, onPrev, onNext, onJump, onRestart,
 }: PlaybackControlsProps) {
   const { state, scenario, pause, setSpeed } = runner;
+  const [copyState, setCopyState] = useState<'idle' | 'ok' | 'fail'>('idle');
   const disabled = !scenario || steps.length === 0;
+
+  async function copyShareLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopyState('ok');
+    } catch {
+      // Clipboard API is unavailable in insecure contexts — surface it
+      // in the button label rather than failing silently.
+      setCopyState('fail');
+    }
+    setTimeout(() => setCopyState('idle'), 1800);
+  }
   const atStart = state.idx <= 0;
   const atEnd = state.idx >= steps.length - 1;
   // We're "finished" when playback hit the last step and stopped on its own.
@@ -82,6 +96,17 @@ export function PlaybackControls({
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          className="lc-pb-share"
+          data-state={copyState}
+          onClick={copyShareLink}
+          title="Copy a link to this scenario at the current step"
+          aria-label="Copy share link"
+        >
+          {copyState === 'ok' ? 'Copied!' : copyState === 'fail' ? 'Failed' : 'Copy link'}
+        </button>
       </div>
 
       {/* Step dots — evenly spaced across the panel width. */}

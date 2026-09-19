@@ -1,5 +1,5 @@
 {
-  "name": "cosmos-os",
+  "name": "project-cosmos",
   "description": "The Cosmos — a living map of your architecture. Skills that grow and maintain it.",
   "owner": { "name": "Omer Sher" },
   "plugins": [

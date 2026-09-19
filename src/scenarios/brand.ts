@@ -14,4 +14,6 @@ export const BRAND = {
   helpTitle: 'A live map of the AstroMart platform.',
   /** Base URL for `Service.repo` links (no trailing slash). */
   repoBaseUrl: 'https://github.com/astromart',
+  /** Link to the nightly Drift Sync workflow runs (the "last run" summary). */
+  driftSyncUrl: 'https://github.com/orassayag/project-cosmos/actions/workflows/cosmos-sync.yml',
 };

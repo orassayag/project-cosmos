@@ -17,7 +17,7 @@ export function ScenarioStatus({ domainId, activeScenarioId }: ScenarioStatusPro
   const scenarios = scenariosForDomain(domainId);
   const label = isActiveInDomain
     ? active!.label
-    : scenarios.length === 0
+    : domainId && scenarios.length === 0
       ? 'No scenarios yet'
       : 'No scenario selected';
   const swatch = isActiveInDomain ? active!.color : 'var(--text-3)';

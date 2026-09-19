@@ -13,7 +13,12 @@ gsap.registerPlugin(MotionPathPlugin);
 interface AmbientPacketsProps {
   /** When true, the layer continuously fires dim packets along random edges. */
   active: boolean;
+  /** Traffic-density multiplier. 1 = default; higher spawns more concurrent packets at the same flight speed. */
+  density?: number;
 }
+
+const BASE_CONCURRENT_FLIGHTS = 5;
+const MAX_CONCURRENT_FLIGHTS = 20;
 
 interface Flight {
   group: SVGGElement;
@@ -34,11 +39,15 @@ const PROTO_DURATION: Record<Protocol, number> = {
  * packets can be in flight concurrently. The whole system is alive
  * even when nobody's playing anything.
  */
-export function AmbientPackets({ active }: AmbientPacketsProps) {
+export function AmbientPackets({ active, density = 1 }: AmbientPacketsProps) {
   const registry = useEdgeRegistry();
   const layerRef = useRef<SVGGElement>(null);
   const flightsRef = useRef<Flight[]>([]);
   const cancelledRef = useRef(false);
+  // Live-read so changing the density doesn't tear down and restart the loop
+  // (which would kill every in-flight packet).
+  const densityRef = useRef(density);
+  densityRef.current = density;
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -53,8 +62,13 @@ export function AmbientPackets({ active }: AmbientPacketsProps) {
 
     const fire = () => {
       if (cancelledRef.current || !layer) return;
-      // Cap concurrent flights so the canvas doesn't get busy.
-      if (flightsRef.current.length >= 6) return;
+      // Cap concurrent flights so the canvas doesn't get busy — the cap
+      // scales with density, which is what the +/- panel actually drives.
+      const cap = Math.min(
+        MAX_CONCURRENT_FLIGHTS,
+        Math.max(1, Math.round(BASE_CONCURRENT_FLIGHTS * densityRef.current)),
+      );
+      if (flightsRef.current.length >= cap) return;
 
       // Pick a random non-internal step (internal hops have weird self-loops).
       const candidates = STEPS.filter((s) => s.type !== 'internal');
@@ -115,7 +129,7 @@ export function AmbientPackets({ active }: AmbientPacketsProps) {
     // Spawn loop — randomised gap so it doesn't feel like a metronome.
     let timer = 0;
     const schedule = () => {
-      const delay = 280 + Math.random() * 620; // 280–900ms
+      const delay = (280 + Math.random() * 620) / densityRef.current; // 280–900ms at 1×
       timer = window.setTimeout(() => {
         fire();
         schedule();

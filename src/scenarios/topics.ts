@@ -42,7 +42,7 @@ export const TOPICS: Topic[] = [
   },
   {
     id: 'inventory.back-in-stock',
-    x: 2053, y: 834, labelSide: 'above', pinned: true,
+    x: 2053, y: 912, labelSide: 'above', pinned: true,
     name: 'inventory.back-in-stock', color: TOPIC_COLOR, hex: TOPIC_HEX,
     desc: `Kafka topic. Published by inventory's restock watcher when a SKU's sellable count crosses zero → positive (a restock delivery was scanned in). Carries skuId, warehouse, and the new count. Consumer: notifications, which emails everyone with the SKU wishlisted. inventory also broadcasts the same moment to live browsing sessions via hub.broadcasts.`,
   },

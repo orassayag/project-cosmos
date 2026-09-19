@@ -1,12 +1,20 @@
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { Service, SubService } from '../scenarios/types';
+import type { DriftKind } from '../scenarios/drift';
+import { DRIFT_KIND_META } from '../scenarios/drift';
+import { Planet } from './Planet';
+import { planetRadius } from './planetMorphology';
 
 interface ServiceNodeProps {
   service: Service;
   selected?: boolean;
   dimmed?: boolean;
   expanded?: boolean;
+  /** When set, the node was touched by the latest drift run — glows in the kind's color. */
+  driftKind?: DriftKind | null;
+  /** Generic halo color for the blast-radius / health overlays (a hex, or null). */
+  accentRing?: string | null;
   /** When this service's ecosystem is expanded, which sub is currently selected. */
   selectedSubId?: string | null;
   /**
@@ -27,15 +35,17 @@ export function ServiceNode({
   selected = false,
   dimmed = false,
   expanded = false,
+  driftKind = null,
+  accentRing = null,
   selectedSubId = null,
   activeSubs = null,
   topicCount = null,
   onClick,
   onSubServiceClick,
 }: ServiceNodeProps) {
-  const w = n.width;
-  const h = n.height;
   const hasEcosystem = !!(n.subServices && n.subServices.length > 0);
+  const r = planetRadius(n.id);
+  const labelY = r + 30;
 
   return (
     <g
@@ -54,25 +64,41 @@ export function ServiceNode({
             exit={{ opacity: 0, scale: 0.45 }}
             transition={{ type: 'spring', stiffness: 280, damping: 24, mass: 0.6 }}
           >
-            {/* outer aura */}
-            <ellipse
-              cx={0}
-              cy={0}
-              rx={w / 2 + 18}
-              ry={h / 2 + 18}
-              fill={`url(#cosmos-star-${n.id})`}
-              opacity={0.6}
-              onClick={(e) => { e.stopPropagation(); onClick(n.id); }}
-              style={{ cursor: 'pointer' }}
-            />
+            {driftKind && (
+              <circle
+                cx={0}
+                cy={0}
+                r={r + 7}
+                fill="none"
+                stroke={DRIFT_KIND_META[driftKind].color}
+                strokeWidth={2.4}
+                pointerEvents="none"
+                style={{ filter: 'url(#cosmos-packet-glow)' }}
+              >
+                <animate attributeName="stroke-opacity" values="0.9;0.35;0.9" dur="1.8s" repeatCount="indefinite" />
+              </circle>
+            )}
+
+            {accentRing && (
+              <circle
+                cx={0}
+                cy={0}
+                r={r + 7}
+                fill="none"
+                stroke={accentRing}
+                strokeWidth={2.4}
+                pointerEvents="none"
+                style={{ filter: 'url(#cosmos-packet-glow)' }}
+              >
+                <animate attributeName="stroke-opacity" values="0.95;0.4;0.95" dur="2s" repeatCount="indefinite" />
+              </circle>
+            )}
 
             {selected && (
-              <rect
-                x={-w / 2 - 4}
-                y={-h / 2 - 4}
-                width={w + 8}
-                height={h + 8}
-                rx={(h + 8) / 2}
+              <circle
+                cx={0}
+                cy={0}
+                r={r + 4}
                 fill="none"
                 stroke={n.color}
                 strokeWidth={1.25}
@@ -80,41 +106,36 @@ export function ServiceNode({
                 pointerEvents="none"
               >
                 <animate attributeName="stroke-opacity" values="0.95;0.4;0.95" dur="2.4s" repeatCount="indefinite" />
-              </rect>
+              </circle>
             )}
 
-            <rect
-              x={-w / 2}
-              y={-h / 2}
-              width={w}
-              height={h}
-              rx={h / 2}
-              fill="oklch(from var(--bg-surface) l c h / 0.95)"
-              stroke={n.color}
-              strokeOpacity={0.75}
-              strokeWidth={1.4}
-              onClick={(e) => { e.stopPropagation(); onClick(n.id); }}
-              style={{ cursor: 'pointer' }}
-            />
+            {/* The world itself. */}
+            <Planet service={n} onClick={(e) => { e.stopPropagation(); onClick(n.id); }} />
 
+            {/* Title — sits below the sphere with a stroke halo so the
+                name stays legible over the map behind it. */}
             <text
               x={0}
-              y={6}
+              y={labelY}
               textAnchor="middle"
               fontFamily="var(--font-display)"
-              fontSize={18}
-              fontWeight={500}
+              fontSize={27}
+              fontWeight={600}
               fill="var(--text-1)"
+              stroke="var(--bg-app)"
+              strokeWidth={4.5}
+              strokeLinejoin="round"
               letterSpacing="-0.014em"
+              paintOrder="stroke"
               pointerEvents="none"
             >
               {n.name}
             </text>
 
-            {/* Kafka-topics indicator — a tiny orbital badge on the capsule
-                edge. Zooming in fans the topics out around the card. */}
+            {/* Kafka-topics indicator — a tiny orbital badge on the disc
+                edge. Zooming in fans the topics out around the world. */}
             {topicCount != null && topicCount > 0 && (
-              <g transform={`translate(${w / 2 - h / 4}, ${-h / 2 + 4})`} pointerEvents="none">
+              <g transform={`translate(${r * 0.72}, ${-r * 0.72})`} pointerEvents="none">
                 <circle r={10} fill="oklch(from var(--bg-surface) l c h / 0.95)" stroke="var(--svc-orange)" strokeOpacity={0.9} strokeWidth={1} strokeDasharray="3 2.5" />
                 <text
                   y={3}

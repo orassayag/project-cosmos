@@ -1,5 +1,15 @@
 import { useEffect, useRef } from 'react';
 
+import { readParallaxPan } from './parallaxPan';
+
+// How far a star shifts per unit of map-pan, at max depth (near stars).
+// Scaled per-star by `depth` (0 = far, 1 = near) so the field feels like a
+// tunnel: the back plane barely drifts, the front plane leads the motion.
+const PARALLAX_STRENGTH = 0.07;
+// The nebula wash is the deepest plane of all — it trails at a fraction of
+// even the faintest stars, anchoring the sense of distance.
+const NEBULA_PARALLAX = 0.015;
+
 // Four-point sparkle star, drawn in a 55×57 box (center ≈ 27.5, 28.5)
 // so the transform math below can scale it uniformly by size/55.
 const STAR_PATH =
@@ -15,6 +25,7 @@ interface FloatingStar {
   vrot: number;
   alpha: number;        // base opacity (0..1)
   twinkle: number;      // twinkle phase
+  depth: number;        // 0 = far, 1 = near — drives parallax shift on pan
   hue: 'blue' | 'cyan' | 'violet' | 'white';
 }
 
@@ -75,6 +86,17 @@ export function BrandStarfield({
     let tPrev = performance.now();
     let nextShootAt = performance.now() + shootingEvery * 1000 * (0.5 + Math.random());
 
+    // Parallax bookkeeping. The map publishes an absolute pan; we track the
+    // delta from the first observed value (so the field never jumps on load)
+    // and ease a smoothed offset toward it, so panning feels weighty rather
+    // than rigidly locked to the pointer.
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    let panBaseX: number | null = null;
+    let panBaseY = 0;
+    let smoothPanX = 0;
+    let smoothPanY = 0;
+
     const seed = () => {
       // Multiplier was 18, which made density values feel insensitive at
       // the low end. Bumped to 72 so each `density` step actually moves
@@ -108,6 +130,7 @@ export function BrandStarfield({
         // the rare near ones pop at ~0.58α peak twinkle (~+20% brightness).
         alpha: 0.072 + z * z * 0.504,
         twinkle: Math.random() * Math.PI * 2,
+        depth: z,
         hue,
       };
     };
@@ -163,10 +186,24 @@ export function BrandStarfield({
       const dt = Math.min(0.05, (now - tPrev) / 1000);
       tPrev = now;
 
+      // Ease the parallax offset toward the map's current pan delta.
+      if (!prefersReducedMotion) {
+        const { x: rawPanX, y: rawPanY } = readParallaxPan();
+        if (panBaseX == null) { panBaseX = rawPanX; panBaseY = rawPanY; }
+        const targetX = (rawPanX - panBaseX) * PARALLAX_STRENGTH;
+        const targetY = (rawPanY - panBaseY) * PARALLAX_STRENGTH;
+        const k = Math.min(1, dt * 6);
+        smoothPanX += (targetX - smoothPanX) * k;
+        smoothPanY += (targetY - smoothPanY) * k;
+      }
+
       ctx.clearRect(0, 0, w, h);
 
       // Soft nebula wash so the stars sit on a graded sky, not flat black.
-      const grad = ctx.createRadialGradient(w * 0.55, h * 0.45, 0, w * 0.55, h * 0.45, Math.max(w, h) * 0.7);
+      // Shifted by the deepest parallax factor — the back of the tunnel.
+      const nebulaX = w * 0.55 + smoothPanX * (NEBULA_PARALLAX / PARALLAX_STRENGTH);
+      const nebulaY = h * 0.45 + smoothPanY * (NEBULA_PARALLAX / PARALLAX_STRENGTH);
+      const grad = ctx.createRadialGradient(nebulaX, nebulaY, 0, nebulaX, nebulaY, Math.max(w, h) * 0.7);
       grad.addColorStop(0, 'rgba(60, 50, 160, 0.10)');
       grad.addColorStop(0.5, 'rgba(20, 60, 140, 0.04)');
       grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -190,8 +227,11 @@ export function BrandStarfield({
         const tw = (Math.sin(l.twinkle) + 1) * 0.5;
         const a = l.alpha * (0.6 + 0.4 * tw);
         const scale = l.size / 55;
+        // Parallax: near stars (depth→1) lead the pan, far ones lag.
+        const drawX = l.x + smoothPanX * l.depth;
+        const drawY = l.y + smoothPanY * l.depth;
         ctx.save();
-        ctx.translate(l.x, l.y);
+        ctx.translate(drawX, drawY);
         ctx.rotate(l.rot);
         ctx.scale(scale, scale);
         ctx.translate(-27.5, -28.5);

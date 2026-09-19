@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 import { Starfield } from './Starfield';
 import { BRAND } from '../scenarios/brand';
@@ -11,7 +11,7 @@ interface IntroOverlayProps {
   onExitComplete: () => void;
 }
 
-const stagger = {
+const stagger: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -19,7 +19,7 @@ const stagger = {
   },
 };
 
-const child = {
+const child: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.2, 0.9, 0.3, 1.1] } },
 };

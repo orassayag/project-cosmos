@@ -124,7 +124,7 @@ export function HelpButton() {
                     <li><span className="lc-help-kbd">Drag</span> the background to pan.</li>
                     <li><span className="lc-help-kbd">Scroll</span> to zoom around the cursor.</li>
                     <li><span className="lc-help-kbd">+ / −</span> zoom from keyboard, <span className="lc-help-kbd">0</span> resets.</li>
-                    <li><span className="lc-help-kbd">Esc</span> clears the active scenario.</li>
+                    <li><span className="lc-help-kbd">Esc</span> resets the galaxy.</li>
                   </ul>
                 </section>
               </div>

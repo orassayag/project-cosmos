@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { SCENARIOS_BY_ID, stepsForScenario } from './data';
+import { PLAYABLE_BY_ID, stepsForScenario } from './data';
 import type { Scenario, Step } from './types';
 
 export interface Shot {
@@ -98,7 +98,7 @@ export function useScenarioRunner(): RunnerApi {
   const tokenRef = useRef(0);
   const listenersRef = useRef<Set<ShotListener>>(new Set());
 
-  const scenario = state.scenarioId ? SCENARIOS_BY_ID[state.scenarioId] ?? null : null;
+  const scenario = state.scenarioId ? PLAYABLE_BY_ID[state.scenarioId] ?? null : null;
   const steps = useMemo<Step[]>(() => (scenario ? stepsForScenario(scenario) : []), [scenario]);
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
