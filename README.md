@@ -13,8 +13,9 @@
 > incident replay (curated production incidents replayed on the map), blast-radius analysis,
 > a service health heat map with on-call cards, an ownership view, a "what changed last night"
 > drift overlay with a status footer pill, a browsable architecture changelog, an
-> "Ask the agent" natural-language question panel, and a richer visual layer
-> (planet morphology, nebula fields, parallax panning, and star explosions).
+> "Ask the agent" natural-language question panel, a presentation mode for talks,
+> an on-map step stepper, and a richer visual layer (planet morphology, nebula
+> fields, parallax panning, and star explosions).
 
 **A living map of your architecture.** Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. And a nightly AI agent keeps the whole map honest against your actual code.
 
@@ -42,11 +43,14 @@ Every architecture diagram starts dying the moment it's born. The wiki page is f
 - 🗺️ **The map** — an animated SVG cosmos of your services (capsules), Kafka topics (orbitals), and protocol-colored connections (HTTP amber, WebSocket cyan, Kafka orange).
 - 🎬 **Scenario player** — named end-to-end flows play as comets along real curved paths, with a step panel showing the actual request/response payloads at every hop. Deep-linkable (`?domain=…&scenario=…&step=…`).
 - 🚨 **Incident replay** — pick a past production incident from the **Incidents** list and press play. The map replays the exact path the failing request (or cascade) took, with the real (redacted) payloads captured at the time, a red comet, and a banner so it never reads as live traffic. No AI — just human-curated recordings. Deep-linkable (`?incident=…&step=…`).
+- 🔎 **Quick search** — press `/` anywhere and start typing: services, topics and scenarios rank together in one palette, and picking a result warps the map straight to it.
+- 📜 **Live activity log** — a running `LIVE · ACTIVITY` feed of every step as it fires during playback, so you can read the whole path at once instead of one step at a time.
 - 🔍 **Service passports** — click any star: owner team, repo link, stack, databases, and why it exists.
 - 🪐 **Service ecosystems** — umbrella services expand into a mini solar system of sub-services; packets re-route through the internals during playback.
 - 🔦 **Blast radius** — click a service or topic and the map ranks everything that would break if you changed it, HIGH → MED → LOW. It walks the real dependency graph, which reverses direction for synchronous calls versus Kafka hand-offs, so the answer is genuine impact, not just "what's connected."
 - 🌡️ **Service health heat map** — stars tint by commit age and open-PR backlog (fresh → warm → hot); click one for its on-call card: who's holding the pager, until when, and which Slack channel to escalate in.
 - 👥 **Ownership view** — an ownership legend that isolates everything a team owns with one click, so a crowded galaxy collapses to just one team's surface.
+- 📽️ **Presentation mode** — `P` strips the UI back to the bare map and fattens the comets so a scenario reads from the back of the room; the arrow keys and space still drive playback with the controls hidden.
 - ✏️ **Layout edit mode** — hit `Edit layout` (or press `L`), drag stars and topics where you want them, then `Copy coords` and paste the values into the data files. Try it in the [live demo](https://project-cosmos-six.vercel.app/) — your rearrangement stays in your browser only.
 - 🤖 **Two Claude skills** — `/add-service` and `/add-scenario` teach [Claude Code](https://claude.com/claude-code) to interrogate your repos and grow the map for you: who do you call, what do you produce, to which topic, what database are you hiding.
 - 🌙 **Drift Sync** — the nightly honesty robot. Diffs every tracked repo against a baseline SHA, filters noise with cheap regexes, asks an AI agent "does the map still tell the truth?", and opens one tidy PR per team with file:line evidence. A footer status pill links straight to the latest run on GitHub Actions.
@@ -66,6 +70,27 @@ npm run dev
 ```
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
+
+### Driving it from the keyboard
+
+Everything the map does is reachable without the mouse:
+
+| Key | What it does |
+|---|---|
+| `/` | Quick search — jump to any service, topic or scenario |
+| `Space` | Play / pause the current scenario |
+| `←` `→` | Previous / next step |
+| `P` | Presentation mode — hide the chrome for a talk |
+| `B` | Blast radius |
+| `H` | Service health heat map |
+| `O` | Ownership view |
+| `C` | What changed last night (only once a drift run has landed) |
+| `L` | Layout edit mode |
+| `+` `−` | Zoom in / out |
+| `0` | Reset the zoom |
+| `Esc` | Reset the galaxy — clears the scenario, filters, selection and URL |
+
+Mouse equivalents: drag the background to pan, scroll to zoom around the cursor, click any star or topic to open its panel.
 
 ## Make it your cosmos
 
@@ -108,7 +133,7 @@ You can also install the skills into any environment as a plugin, no clone neede
 
 The skills make Claude read your actual source — call sites, producers, consumers, schemas — and write verified entries. No guessing allowed; the skill files are the guardrails.
 
-**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything.
+**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, and that capsules keep their minimum spacing. Both run in CI on every PR (the **Validate** badge above), alongside `npm run lint`.
 
 Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the numbers back into `services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
 
@@ -186,7 +211,7 @@ Merging the PR bumps the baseline inside the same PR — merge means caught-up, 
 
 ## Tech notes
 
-- Vite + React 18 + TypeScript (strict). One build, no server, ~13 KB gzipped of data.
+- Vite 8 + React 19 + TypeScript (strict). One build, no server, no database — the whole universe is ~22 KB gzipped of scenario and incident data.
 - Comets glide on the **real rendered SVG paths** (GSAP MotionPath + `getPointAtLength()`), not approximations.
 - The hyperspace intro is a plain `<canvas>` and one perspective formula — no 3D library.
 - OKLCH color tokens, themeable (`cosmos`, `light`, `minimal`, `dark`).
