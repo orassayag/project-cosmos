@@ -61,7 +61,7 @@ verdicts: drift / no_drift / inconclusive  (+ confidence + file:line evidence)
 bucket by team (Service.team from the map)
       │
       ▼
-apply-edits (per team): Claude agent edits src/scenarios/*,
+apply-edits (per team): Claude agent edits client/src/scenarios/*,
       runs `npm run validate` in-loop until it passes
       │
       ▼
@@ -99,7 +99,7 @@ cp drift-sync/config.example.json drift-sync/config.json
 
 Precedence everywhere: **env var > config.json > default** — so CI can inject values without touching the file.
 
-Team ownership (who reviews each team's PRs) is part of the map itself: `src/scenarios/owners.ts`.
+Team ownership (who reviews each team's PRs) is part of the map itself: `client/src/scenarios/owners.ts`.
 
 ### 2. Bootstrap the baseline
 
@@ -107,12 +107,12 @@ Team ownership (who reviews each team's PRs) is part of the map itself: `src/sce
 
 ```bash
 # Clone (or already have) your source repos as siblings of this repo,
-# make sure the map (src/scenarios/) reflects reality as of today, then:
+# make sure the map (client/src/scenarios/) reflects reality as of today, then:
 npm run sync:bootstrap            # snapshots origin/<defaultBranch> HEAD per repo
 npm run sync:bootstrap -- --dry-run   # preview without writing
 ```
 
-The repo list is derived from the map (`Service.repo` + `SubService.repo` in `src/scenarios/services.ts`) — there is no second list to maintain. Commit the resulting `state.json`. See `state.example.json` for the shape.
+The repo list is derived from the map (`Service.repo` + `SubService.repo` in `client/src/scenarios/services.ts`) — there is no second list to maintain. Commit the resulting `state.json`. See `state.example.json` for the shape.
 
 ### 3. Secrets (GitHub Actions)
 
@@ -194,7 +194,7 @@ The core invariant: **a drift finding keeps re-surfacing until a human acts on i
 - **New commits but no drift** → the baseline advances via a single separate chore PR (`[cosmos-sync] chore: advance N no-drift baselines`) that enables auto-merge on itself — no human action, and the next run skips re-analyzing those repos. Low-confidence no-drift verdicts are deliberately *not* advanced; they get re-checked the next night.
 - **PR titles**: `[cosmos-sync] <team> domain · N services drifted`. PRs open as **drafts** by design — a human marks them ready after verifying the evidence.
 
-One PR per team, driven by `Service.team` in the map; reviewers come from `src/scenarios/owners.ts`.
+One PR per team, driven by `Service.team` in the map; reviewers come from `client/src/scenarios/owners.ts`.
 
 ---
 

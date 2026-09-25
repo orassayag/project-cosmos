@@ -5,7 +5,7 @@
  *
  *   npm run fresh
  *
- * Overwrites src/scenarios/{services,topics,scenarios,owners}.ts and
+ * Overwrites client/src/scenarios/{services,topics,scenarios,owners}.ts and
  * steps/, and rewrites the data.ts barrel. Irreversible except via git.
  */
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dir = (p) => resolve(root, 'src/scenarios', p);
+const dir = (p) => resolve(root, 'client/src/scenarios', p);
 
 writeFileSync(dir('services.ts'), `import type { Service } from './types';
 
@@ -177,6 +177,6 @@ export function stepsForScenario(scenario: Scenario): Step[] {
 
 console.log(`✦ Fresh cosmos ready: 2 services, 1 scenario ("Hello, cosmos").
   Next:
-    src/scenarios/brand.ts  # name your universe + set your GitHub org
+    client/src/scenarios/brand.ts  # name your universe + set your GitHub org
     npm run dev             # see your minimal galaxy
     /add-service <name>     # grow it with Claude Code`);

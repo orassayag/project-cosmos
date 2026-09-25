@@ -4,11 +4,11 @@
  * prompt so Claude knows what to compare the source diff against.
  */
 
-import { SERVICES } from '../../../src/scenarios/services.js';
-import { TOPICS_BY_ID } from '../../../src/scenarios/topics.js';
-import { STEPS } from '../../../src/scenarios/data.js';
-import { resolveOwner } from '../../../src/scenarios/owners.js';
-import type { Service, Step, SubService, Topic } from '../../../src/scenarios/types.js';
+import { SERVICES } from '../../../client/src/scenarios/services.js';
+import { TOPICS_BY_ID } from '../../../client/src/scenarios/topics.js';
+import { STEPS } from '../../../client/src/scenarios/data.js';
+import { resolveOwner } from '../../../client/src/scenarios/owners.js';
+import type { Service, Step, SubService, Topic } from '../../../client/src/scenarios/types.js';
 
 export interface ProjectCosmosRepoSlice {
   /** Services whose repo (or subService repo) equals the target. */

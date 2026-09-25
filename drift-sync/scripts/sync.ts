@@ -47,10 +47,10 @@ import { fileURLToPath } from 'node:url';
     process.env.ANTHROPIC_API_KEY = process.env.VITE_ANTHROPIC_API_KEY;
   }
 }
-import { SERVICES, SERVICES_BY_ID } from '../../src/scenarios/services.js';
-import { TOPICS, TOPICS_BY_ID } from '../../src/scenarios/topics.js';
-import { STEPS } from '../../src/scenarios/data.js';
-import type { Service, Step, SubService, Topic } from '../../src/scenarios/types.js';
+import { SERVICES, SERVICES_BY_ID } from '../../client/src/scenarios/services.js';
+import { TOPICS, TOPICS_BY_ID } from '../../client/src/scenarios/topics.js';
+import { STEPS } from '../../client/src/scenarios/data.js';
+import type { Service, Step, SubService, Topic } from '../../client/src/scenarios/types.js';
 import { loadDriftSyncConfig, topicRegistryLocalPath } from './lib/config.js';
 
 const config = loadDriftSyncConfig();
@@ -254,7 +254,7 @@ When you have enough evidence (typically after 3-8 tool calls), output ONE JSON 
   "actual_producers": [...],          // service ids or repo names
   "actual_consumers": [...],
   "proposed_cosmos_edits": [          // empty array if no edits needed
-    { "file": "src/scenarios/topics.ts", "change": "rename Topic.name from X to Y", "rationale": "..." }
+    { "file": "client/src/scenarios/topics.ts", "change": "rename Topic.name from X to Y", "rationale": "..." }
   ],
   "evidence": [                        // file:line refs that back the verdict
     "<repo>/path/to/file.ts:42 — producer.send('orders.order-created')"

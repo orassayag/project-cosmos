@@ -27,8 +27,8 @@ import { loadEnv } from './lib/agent.js';
 loadEnv();
 
 import { loadSyncState } from './lib/git.js';
-import { TEAM_OWNERS, FALLBACK_OWNER } from '../../src/scenarios/owners.js';
-import type { TeamOwner } from '../../src/scenarios/owners.js';
+import { TEAM_OWNERS, FALLBACK_OWNER } from '../../client/src/scenarios/owners.js';
+import type { TeamOwner } from '../../client/src/scenarios/owners.js';
 import { buildHtmlReport } from './lib/report-html.js';
 import { sumUsage, estimateCost } from './lib/agent.js';
 import { loadDriftSyncConfig, slackGroupIdForTeam } from './lib/config.js';
@@ -210,7 +210,7 @@ for (const r of [...drifts, ...inconclusives]) {
 // subprocess spawned with cwd: projectCosmosRoot) ran against the wrong root and the
 // WRITABLE_PATHS pathspecs never matched the real files.
 const projectCosmosRoot = path.resolve(here, '..', '..');
-const WRITABLE_PATHS = ['src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
+const WRITABLE_PATHS = ['client/src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
 
 /**
  * Force the applier-writable surface back to a pristine state: revert tracked

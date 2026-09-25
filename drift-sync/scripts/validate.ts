@@ -23,12 +23,12 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
-import { SERVICES, SERVICES_BY_ID } from '../../src/scenarios/services.js';
-import { TOPICS, TOPICS_BY_ID } from '../../src/scenarios/topics.js';
-import { SCENARIOS } from '../../src/scenarios/scenarios.js';
-import { STEPS } from '../../src/scenarios/data.js';
-import { resolveOwner } from '../../src/scenarios/owners.js';
-import type { Service, Step, SubService, Topic } from '../../src/scenarios/types.js';
+import { SERVICES, SERVICES_BY_ID } from '../../client/src/scenarios/services.js';
+import { TOPICS, TOPICS_BY_ID } from '../../client/src/scenarios/topics.js';
+import { SCENARIOS } from '../../client/src/scenarios/scenarios.js';
+import { STEPS } from '../../client/src/scenarios/data.js';
+import { resolveOwner } from '../../client/src/scenarios/owners.js';
+import type { Service, Step, SubService, Topic } from '../../client/src/scenarios/types.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
 // ──────────────────────────────────────────────────────────────────

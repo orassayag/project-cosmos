@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SERVICES } from '../../src/scenarios/services.js';
+import { SERVICES } from '../../client/src/scenarios/services.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
 const config = loadDriftSyncConfig();

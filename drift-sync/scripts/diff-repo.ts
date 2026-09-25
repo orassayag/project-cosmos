@@ -261,7 +261,7 @@ Output ONE JSON object in a single markdown code block tagged 'json'. Schema:
       "evidence": ["repo/path/to/file.ts:NN — quoted line or summary"],
       "proposed_cosmos_edits": [
         {
-          "file": "src/scenarios/topics.ts",
+          "file": "client/src/scenarios/topics.ts",
           "rationale": "...",
           "patch_hint": "rename Topic.name 'X' → 'Y'"
         }

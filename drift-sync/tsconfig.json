@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.json",
+  "extends": "../client/tsconfig.json",
   "compilerOptions": { "noEmit": true, "module": "esnext", "moduleResolution": "bundler" },
   "include": ["scripts"]
 }
