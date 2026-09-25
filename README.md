@@ -71,6 +71,25 @@ npm run dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
+### Run with AI locally
+
+`npm run dev:client` is the zero-setup path: the map works, with no AI. To run the client and the AI server together on one origin, use the [Vercel CLI](https://vercel.com/docs/cli). Link the project and pull its environment variables:
+
+```bash
+vercel link
+vercel env pull
+vercel dev
+```
+
+To run without logging in to Vercel, copy the example env file, fill in the keys by hand, and start local-only mode:
+
+```bash
+cp server/.env.example server/.env
+vercel dev -L
+```
+
+Both keys are optional. Without `AI_COOKIE_SECRET` the AI routes report "not configured", and without `AI_GATEWAY_API_KEY` question matching falls back to a local heuristic.
+
 ### Driving it from the keyboard
 
 Everything the map does is reachable without the mouse:

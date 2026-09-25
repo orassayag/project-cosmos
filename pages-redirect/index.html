@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project Cosmos has moved</title>
+    <link rel="canonical" href="https://project-cosmos-six.vercel.app/" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="3; url=https://project-cosmos-six.vercel.app/" />
+    <script>
+      (function () {
+        var target = 'https://project-cosmos-six.vercel.app';
+        var repoBase = '/project-cosmos';
+        var path = location.pathname;
+        if (path === repoBase || path.indexOf(repoBase + '/') === 0) path = path.slice(repoBase.length);
+        path = path.replace(/(^|\/)(index|404)\.html$/, '$1');
+        if (path.charAt(0) !== '/') path = '/' + path;
+        location.replace(target + path + location.search + location.hash);
+      })();
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
+        background: #0b1020;
+        color: #e6e9f2;
+        font: 16px/1.5 system-ui, -apple-system, sans-serif;
+        text-align: center;
+      }
+      a { color: #8ab4ff; }
+    </style>
+  </head>
+  <body>
+    <p>Project Cosmos has moved to <a href="https://project-cosmos-six.vercel.app/">project-cosmos-six.vercel.app</a>.</p>
+  </body>
+</html>

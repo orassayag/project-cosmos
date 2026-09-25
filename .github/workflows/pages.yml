@@ -1,5 +1,5 @@
-# Builds the demo and deploys it to GitHub Pages on every push to main.
-name: Deploy demo to Pages
+# The app now lives on Vercel. Pages only serves a redirect page so old deep links keep working.
+name: Deploy Pages redirect
 
 on:
   push:
@@ -23,17 +23,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+      # Pages serves 404.html for unknown paths, so nested deep links redirect too.
+      - run: cp pages-redirect/index.html pages-redirect/404.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages-redirect
       - id: deployment
         uses: actions/deploy-pages@v4

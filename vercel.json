@@ -2,5 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "services": {
+    "client": {
+      "root": "client",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    },
+    "server": { "root": "server" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "server" } },
+    { "source": "/(.*)", "destination": { "service": "client" } }
+  ]
 }
