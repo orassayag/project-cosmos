@@ -19,7 +19,7 @@ Supporting this needs a server, so the repo is reorganised into stand-alone `cli
 - The agent: LangChain + LangGraph, with map data as its knowledge and two map-action tools.
 - JEV classification: on-topic check, intent, and target scenario. A free keyword fallback runs when JEV is unavailable.
 - Clear error messages for out-of-credit, rate-limited, and invalid-key cases.
-- Streaming answers, starter question chips, and a per-answer token count (accepted additions A1–A4).
+- Streaming answers, starter question chips, and a per-answer token count (round-1 additions A1–A4, accepted).
 - A Vitest test harness in both workspaces, run in CI.
 
 **Out of scope**
@@ -33,16 +33,18 @@ Supporting this needs a server, so the repo is reorganised into stand-alone `cli
 
 | Dimension | Value | Evidence |
 |---|---|---|
-| Kind | Demo / portfolio app | `README.md` "Live demo"; `src/components/AskPanel.tsx:12-13` ("portfolio demo with no live model"); `CLAUDE.md` "Demo data is fictional (AstroMart)" |
-| Audience & traffic | Public visitors to the live demo, low traffic, each bringing their own AI key | `README.md:4` (public Vercel URL); plan items 5–6 (user pastes own credentials) — traffic `ASSUMED` |
-| Surfaces | Today: static site only, no server, no accounts, no persistence. After this plan: a server that receives and stores **other people's API keys** — a real trust boundary | `vercel.json`, `.github/workflows/pages.yml` (static build); plan items 5, 7, 10 |
-| Lifetime | Maintained by one person, long-lived portfolio piece | git history, `versions/2026.md` |
-| Team | Solo | git log author, `package.json` repository |
-| Constraints | Two deploy targets (GitHub Pages + manual Vercel); mobile-first, one-panel-at-a-time and close-button invariants; `npm run build` is the gate; no test runner exists | `CLAUDE.md`, `.github/workflows/pages.yml`, `vercel.json` (`deploymentEnabled: false`), `package.json` scripts |
+| Kind | Demo / portfolio app getting a real AI feature | `docs/pre-plans/add-ai.txt` item 1; `README.md` "Live demo"; `CLAUDE.md` "Demo data is fictional (AstroMart)" |
+| Audience & traffic | Public visitors to the live demo, each bringing their own AI key; low traffic `ASSUMED` | `add-ai.txt` items 5–7; `package.json` `homepage` |
+| Surfaces | After this plan: one Vercel origin with a stateless server holding **visitors' API keys** in an encrypted cookie, and spending the **owner's** AI Gateway key on classification. No accounts, no database | `add-ai.txt` items 6, 7, 10; plan §2, §3, §5 |
+| Lifetime | Long-lived, maintained by one person | git history, `versions/2026.md` |
+| Team | Solo | git log author |
+| Constraints | Mobile-first, one-panel-at-a-time (`OverlayManager`) and close-button invariants; manual `vercel deploy`; `npm run build` + `npm run validate` gate CI; the client/server reorg is the developer's recorded decision (round 1, I2) | `CLAUDE.md`, `src/overlays/OverlayManager.tsx:5-19`, `.github/workflows/validate-on-pr.yml`, `docs/plans/add-ai.md` Issue Resolutions |
 
-No original plan supplied — yardstick inferred.
+Original plan: `docs/pre-plans/add-ai.txt`.
 
 ## Issue Resolutions
+
+**Round 1**
 
 | ID | Title | Detected by | Resolution | Notes |
 |----|-------|------------|------------|-------|
@@ -58,6 +60,16 @@ No original plan supplied — yardstick inferred.
 | I10 | "No tokens left" is several different errors | Claude | Fixed | Three-way provider error mapping on the server. Design §7. |
 | I11 | "Test it" has nowhere to run | Claude | Fixed | Vitest in both workspaces, wired into CI. Tests are named per task below. |
 | I12 | Server imports must end in `.js` on Vercel (see L016) | bank | Fixed | `.js` on every relative import under `server/`, enforced by the server's `moduleResolution: NodeNext`. Design §3. |
+
+**Round 2** (review of this plan; IDs restart)
+
+| ID | Title | Detected by | Resolution | Notes |
+|----|-------|------------|------------|-------|
+| I1 | A missing gateway key crashes the server instead of using the free fallback | Claude | Fixed | Only `AI_COOKIE_SECRET` is required, and only by the cookie routes; a missing gateway key falls back to `localRelevance`. `server/.env.example` + README local setup. Design §2, §3, §5. |
+| I2 | The map can only light up one star, but the agent sends several | Claude (adversarial) | Fixed | `Map` takes `askFocusIds: string[]`. Design §6; acceptance step 7 tightened. |
+| I3 | Making `validate` run "per workspace" can quietly skip the map checker | Claude (adversarial) | Fixed | Root `validate` stays the root drift-sync script; only `build`/`lint`/`typecheck`/`test` fan out; no `--if-present` on gates. Design §1. |
+| I4 | A dead key found mid-answer can't be logged out in that same response | Claude (adversarial) | Fixed | The client calls `POST /api/ai/disconnect` on an `INVALID_KEY` event. Design §7. |
+| I5 | The connect window must join the app's panel manager, not only the CSS rule | Claude | Fixed | Registered as `OVERLAY.connect` in `OverlayManager`, plus the CSS priority entry. Design §4. |
 
 ## Design
 
@@ -98,7 +110,7 @@ project-cosmos/
 - `.github/workflows/cosmos-sync.yml`: any `src/scenarios` path in its steps.
 - `.claude/skills/add-service`, `.claude/skills/add-scenario`, `skills/add-service`, `skills/add-scenario` (56 `src/` references in total).
 - `CLAUDE.md` (Layout, Commands, invariants' paths), `README.md`, `CONTRIBUTING.md`.
-- Root `package.json`: `dev` runs `vercel dev` (both services). `dev:client` keeps plain Vite on :5173. `build`, `lint`, `typecheck`, `test`, and `validate` fan out with `--workspaces`. Dependencies move into the workspace that uses them. `@anthropic-ai/sdk` stays at root for drift-sync.
+- Root `package.json`: `dev` runs `vercel dev` (both services). `dev:client` keeps plain Vite on :5173. `build`, `lint`, `typecheck`, and `test` fan out with `--workspaces`. `validate` is **not** fanned out: it stays the root script `tsx drift-sync/scripts/validate.ts` (repointed at `client/src/scenarios`), and the snapshot-freshness check lives inside it. No workspace has a `validate` script, so fanning it out would either fail or, with `--if-present`, silently run nothing. **Never use `--if-present` on a gate script.** Dependencies move into the workspace that uses them. `@anthropic-ai/sdk` stays at root for drift-sync.
 - `.gitignore`: `client/dist/`, `server/dist/`, `**/tsconfig.tsbuildinfo`.
 - `CLAUDE.md` warning about emitted `.js` shadowing `.tsx` still applies to `client/`, so keep it.
 
@@ -107,6 +119,7 @@ project-cosmos/
 **Verification (the "re-test and re-verify" the developer asked for)**
 - Gate: `grep -rn "src/scenarios\|src/incidents" --exclude-dir={node_modules,client,dist} .` returns only `client/…`-prefixed hits. This proves no stale path survived.
 - `npm run build`, `npm run lint`, `npx tsc -p drift-sync --noEmit`, and `npm run validate` all pass.
+- `validate` is proven live, not vacuous: temporarily corrupt one step's `from` id in `client/src/scenarios/steps/` and confirm `npm run validate` exits non-zero naming the bad id, then revert. Repeat once with a hand-edited `cosmos-map.json` to see the stale-snapshot failure. *Protects: CI's "Validate Project Cosmos" step can never turn green without checking anything.*
 - `npm run sync -- --dry-run` against one repo (per `drift-sync/README.md`) completes. This proves drift-sync can still read and resolve the map.
 - Runtime: `npm run dev:client`, then drive the map with the `browser-drive` skill: play a scenario, open an incident, open the inspector, use a deep link. Do it at 390px first, then desktop, and compare against screenshots of `main` taken before the move.
 - The milestone ships with no behaviour change. The screenshots are the proof.
@@ -136,7 +149,10 @@ project-cosmos/
 - The server receives the full path (`/api/ai/…`), so its routes are declared with the `/api` prefix.
 - The client and the API share one origin, so the key cookie is first-party and survives refresh. The client calls relative `/api/ai/*` URLs, which also makes preview deployments self-consistent.
 - Local development uses `vercel dev`, which runs both services and serves `/api` on the same origin.
-- Environment variables (Vercel project, Production + Preview): `AI_GATEWAY_API_KEY` (already held), and `AI_COOKIE_SECRET` (32 random bytes, base64; generate with `openssl rand -base64 32`). The server fails fast at boot with a named error when either is missing.
+- Environment variables (Vercel project, Production + Preview): `AI_GATEWAY_API_KEY` (already held), and `AI_COOKIE_SECRET` (32 random bytes, base64; generate with `openssl rand -base64 32`). Neither variable stops the server from starting — the map needs no AI:
+  - `AI_COOKIE_SECRET` is required only by the routes that read or write the cookie (`connect`, `status`, `ask`). When it is missing they return `503 { errorCode: 'AI_NOT_CONFIGURED' }` and log one error; `disconnect` still clears the cookie. The client treats `AI_NOT_CONFIGURED` from `status` as disconnected and hides the Connect button.
+  - `AI_GATEWAY_API_KEY` missing → classification uses the free `localRelevance` fallback (§5) with a single `JEV_UNAVAILABLE` warning at first use, not per request.
+- **Local setup:** `server/.env.example` lists both keys with a one-line comment each (no values). README gets a "Run with AI locally" block: `vercel link` → `vercel env pull` → `npm run dev` (or `vercel dev -L` to run without logging in to Vercel, using a hand-filled `server/.env`). `npm run dev:client` stays the zero-setup, no-AI path.
 - **GitHub Pages redirect:** `pages.yml` stops building the app. It publishes a single `pages-redirect/index.html` that forwards to `https://project-cosmos-six.vercel.app` + `location.pathname` (minus the repo base) + `search` + `hash`, so deep links keep working. It uses a `<meta http-equiv="refresh">` fallback and `<link rel="canonical">`. Verify by opening an old Pages deep link and landing on the same view on Vercel.
 - Deploys stay manual (`vercel deploy --prod`), as today.
 
@@ -161,6 +177,7 @@ project-cosmos/
 - `cookieCrypto.test.ts`: encrypt → decrypt round-trip. A flipped byte in the ciphertext or auth tag is rejected. A wrong secret is rejected. *Protects: a forged or tampered cookie can never be read as a valid key.*
 - `connectRoute.test.ts`, with the provider `fetch` stubbed: a valid key sets a cookie with all four attributes; a 401 returns `INVALID_KEY` and sets no cookie; a bad body returns a named validation error. *Protects: only working keys get stored, and the cookie is always locked down.*
 - `statusRoute.test.ts`: a revoked key (stub returns 401) clears the cookie and reports disconnected. *Protects: the light never stays green on a dead key (I9).*
+- `config.test.ts`: the app module imports with neither env var set; `status`/`connect`/`ask` return `503 AI_NOT_CONFIGURED` without `AI_COOKIE_SECRET`; `disconnect` still returns 200. *Protects: a missing secret disables AI only, never the whole site (round-2 I1).*
 
 ### §4 — Milestone 1: Client UI (built mobile-first at 390px, then desktop)
 
@@ -178,7 +195,8 @@ project-cosmos/
 - A "Get a key" link per provider (`https://console.anthropic.com/settings/keys` or `https://platform.openai.com/api-keys`).
 - A Connect button with a busy state, and inline errors ("That key didn't work — check it and try again").
 - It closes on success. One provider at a time: connecting a second provider replaces the first, and the modal says so.
-- **Mobile contract:** it has its own top-right header close button. It joins the "One card at a time" block in `client/src/styles/responsive.css`, so opening it hides the ask/inspector/step panels on phone-class viewports. It is laid out at 390px first and in short landscape (`max-height:480px`).
+- **Overlay registration:** add `connect: 'connect-agent'` to `OVERLAY` in `client/src/overlays/OverlayManager.tsx`. The modal's visibility is `overlay.isOpen(OVERLAY.connect)`, and every open/close goes through `overlay.open` / `overlay.close` — no private `open` boolean. So on desktop opening it closes whatever was open, and on phones it stacks and closing it brings back the buried panel (e.g. the answer panel) intact.
+- **Mobile contract:** it has its own top-right header close button. It also joins the "One card at a time" block in `client/src/styles/responsive.css` (kept alongside the manager registration), so it hides the context panels on phone-class viewports. It is laid out at 390px first and in short landscape (`max-height:480px`).
 
 **Disconnected behaviour:** `AskPanel` keeps `DEMO_ANSWERS`, with one extra line under the joke: "Connect an AI agent for real answers." That line is a button that opens the modal.
 
@@ -187,7 +205,7 @@ project-cosmos/
 **Tests**
 - Vitest + React Testing Library + jsdom in `client/`, under `client/src/components/__tests__/`:
   - `AskAgent.test.tsx`: shows "Search" (not "Go!"); shows Connect when disconnected and Disconnect when connected; the status dot class follows the connection state. *Protects: the button labels and the light always match reality.*
-  - `ConnectAgentModal.test.tsx`: a failed connect shows the inline error and keeps the modal open; success closes it. *Protects: a visitor always knows whether their key was accepted.*
+  - `ConnectAgentModal.test.tsx`: a failed connect shows the inline error and keeps the modal open; success closes it. Rendered inside `OverlayProvider`: opening it from the open answer panel makes `OVERLAY.connect` active; with the phone viewport mocked, closing it makes `OVERLAY.ask` active again. *Protects: a visitor always knows whether their key was accepted, and the modal never stacks on or loses another panel (round-2 I5).*
 - Visual: drive with `browser-drive` at 390×844 and 844×390, then desktop 1440×900. Screenshot the modal over an open answer panel on a phone to prove no stacking, and confirm the close button is visible.
 
 ### §5 — Classification with JEV (the free gate before any paid call)
@@ -234,13 +252,14 @@ const classification = await evaluate({
 - `intent = playScenario` **and** `targetScenario ≠ none` with probability ≥ 0.6 → a **direct action**: stream a short templated line ("Playing *Checkout* for you ▶") and a `playScenario` action. The visitor's model is not called.
 - Otherwise → **agent** (§6), with `intent` and `targetScenario` passed in as hints.
 
-**Fallback when JEV is unavailable** (gateway error, timeout > 3s, or missing key): run `localRelevance(question, snapshot)`. This is a free check that is on-topic when the question contains any service, topic, domain, team, or scenario name, or an architecture word from a short fixed list. Off-topic → funny reply; on-topic → agent. **The fallback never calls the visitor's model to classify.** That is the I6 guarantee, and a warning log (`JEV_UNAVAILABLE`) makes spikes visible.
+**Fallback when JEV is unavailable** (gateway error, timeout > 3s, or `AI_GATEWAY_API_KEY` not set — the last one skips the `evaluate` call entirely): run `localRelevance(question, snapshot)`. This is a free check that is on-topic when the question contains any service, topic, domain, team, or scenario name, or an architecture word from a short fixed list. Off-topic → funny reply; on-topic → agent. **The fallback never calls the visitor's model to classify.** That is the I6 guarantee, and a warning log (`JEV_UNAVAILABLE`) makes spikes visible.
 
 **Abuse guard (proportionate):** `/api/ai/ask` returns `401 NOT_CONNECTED` before calling JEV when there is no valid cookie, so the owner's gateway key is only spent for visitors who have already proved they own a working provider key. Set a monthly budget on the AI Gateway key in the Vercel dashboard. That is a one-time manual step, listed in the hand-off.
 
 **Tests** — `server/src/agent/__tests__/`
 - `route.test.ts`: a table of classification results mapped to decisions, covering the threshold edges (0.34 / 0.35, 0.59 / 0.6). *Protects: the off-topic and direct-action rules never drift.*
 - `classify.test.ts`, with `evaluate` stubbed to throw: the question falls back to `localRelevance`, the visitor-model stub is **never called** for an off-topic question, and a `JEV_UNAVAILABLE` warning is logged. *Protects: the zero-visitor-token promise holds without JEV (I6's adversarial case).*
+- `classify.test.ts` also covers `AI_GATEWAY_API_KEY` unset: `evaluate` is never called, `localRelevance` decides, and the warning is logged once across two questions.
 - `localRelevance.test.ts`: "what's the weather" → off; "what does payments-gateway do" → on.
 
 ### §6 — Milestone 3: The agent (LangChain + LangGraph)
@@ -261,11 +280,15 @@ const classification = await evaluate({
 
 Each tool returns a short confirmation to the model and emits an `action` event onto the response stream.
 
-**Client side of actions:** `App.tsx`'s `handleAsk` currently picks a random `askFocusId` (`App.tsx:376`). Replace that with the ids received from `highlight` actions, and route `playScenario` through the same selection path the deep-link hook uses (`client/src/hooks/useDeepLink.ts`) to start a scenario.
+**Client side of actions:**
+- `client/src/map/Map.tsx`: the prop `askFocusId?: string | null` (`Map.tsx:126`, default at `:160`) becomes `askFocusIds?: string[]` (default `[]`). `askTouches` (`Map.tsx:700-711`) seeds its set with every id and adds the neighbours of each; it returns `null` when the list is empty.
+- `client/src/App.tsx`: `askFocusId` state (`App.tsx:371`) becomes `askFocusIds: string[]`. When disconnected, `handleAsk` keeps today's behaviour as a one-element list with the random id. When connected, it starts empty and each `highlight` action replaces it with the received `serviceIds`. The prop passed at `App.tsx:625` becomes `askFocusIds={askAnswering ? askFocusIds : []}`.
+- `playScenario` goes through the same selection path the deep-link hook uses (`client/src/hooks/useDeepLink.ts`) to start a scenario.
 
 **Tests**
 - `graph.test.ts`, with a fake chat model (LangChain's fake tool-calling model from `@langchain/core` testing utilities) that emits a `play_scenario` tool call: the stream contains an `action` event with that scenario id, and an unknown id is dropped. *Protects: the agent can only ever point at things that exist on the map.*
 - `context.test.ts`: the digest includes every service id from the snapshot. *Protects: the agent never answers from a partial map.*
+- `client/src/map/__tests__/askTouches.test.ts` (extract `askTouches` into a pure `computeAskTouches(ids, edges)` in `client/src/map/` so it is testable without rendering the SVG): two ids yield both ids plus both neighbourhoods; `[]` yields `null`. *Protects: every service the agent names glows, not just the first (round-2 I2).*
 
 ### §7 — Streaming protocol, errors, and usage
 
@@ -290,12 +313,14 @@ Each tool returns a short confirmation to the model and emits an `action` event 
 |---|---|---|
 | Anthropic 400 whose message contains "credit balance is too low"; OpenAI 429 with `code: 'insufficient_quota'` | `OUT_OF_CREDIT` | "Your AI account is out of credit — top it up with your provider, then ask again." |
 | Any other 429 | `RATE_LIMITED` | "Too many questions at once — try again in a moment." |
-| 401 | `INVALID_KEY` | "Your key no longer works." The server clears the cookie in the same response, and the client flips the light red. |
+| 401 | `INVALID_KEY` | "Your key no longer works." The response headers are already sent by then, so the server can't clear the cookie here; the client calls `POST /api/ai/disconnect` (which clears it) and then flips the light red. |
 | Anything else | `PROVIDER_ERROR` | "The AI agent hit a problem — please try again." |
 
 Errors thrown inside the server use a typed `ProviderError(message, { errorCode, cause })`.
 
 **Tests** — `providerErrors.test.ts`: one case per table row, including an OpenAI 429 *without* `insufficient_quota` → `RATE_LIMITED`. *Protects: a visitor who is just going too fast is never told they're out of credit (I10).*
+
+Client — `client/src/components/__tests__/AskPanel.test.tsx`: a stubbed stream that emits `{"type":"error","errorCode":"INVALID_KEY"}` triggers exactly one `POST /api/ai/disconnect` and leaves `useAiConnection` in `disconnected`. *Protects: a key found dead mid-answer is logged out before the next question (round-2 I4).*
 
 ### Final acceptance
 
@@ -307,9 +332,10 @@ Errors thrown inside the server use a typed `ProviderError(message, { errorCode,
   4. Refresh: the light is still green.
   5. Ask "what's the weather?" and get a funny reply with no usage line.
   6. Ask "play the checkout flow": the scenario plays with no usage line.
-  7. Ask "what happens when a payment fails?": the answer streams, services light up, and a usage line appears.
+  7. Ask "what happens when a payment fails?": the answer streams, **at least two named services glow**, and a usage line appears.
   8. Disconnect: the light turns red.
   9. Open an old GitHub Pages deep link and land on the same view on Vercel.
+  10. Locally, on a fresh clone with no `.env`: `npm run dev:client` loads the map, and `vercel dev` starts with the map working and AI reported as not configured.
 - Manual, one-time: set `AI_COOKIE_SECRET` on Vercel, and set a budget on the AI Gateway key.
 
 ## Open Questions
