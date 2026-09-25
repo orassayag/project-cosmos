@@ -29,8 +29,9 @@ Read `git diff`, `git diff --cached`, and any untracked files from `git status`.
 files that look like secrets (`.env*`, keys) or debris you didn't create — list them and ask
 before including them.
 
-If the diff touched code, run `npm run build` (and `npm run validate` if `src/scenarios/` or
-`src/incidents/` changed). A failure is a stop condition — report the output, don't commit.
+If the diff touched code, run `npm run build` (and `npm run snapshot` then `npm run validate` if
+`client/src/scenarios/` or `client/src/incidents/` changed; include the regenerated
+`server/src/generated/cosmos-map.json`). A failure is a stop condition — report the output, don't commit.
 
 ## 3. Write the version note
 

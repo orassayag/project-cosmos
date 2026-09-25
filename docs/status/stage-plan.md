@@ -13,7 +13,7 @@ snapshot JSON) → 20 stages at ≤250 LOC / ≤6 files each. The per-stage ceil
 - Stage 1: COMMITTED — M0: git mv Vite app into client/ + npm workspaces root, client/package.json, vite versions path, .gitignore ⚠ oversized by file count (~86 pure renames), cannot split further
 - Stage 2: COMMITTED — M0: repoint drift-sync (imports, WRITABLE_PATHS, prompts, tsconfig, README) + scripts/fresh-start.mjs to client/src
 - Stage 3: COMMITTED — M0: server/ workspace skeleton + snapshot-map.ts + committed cosmos-map.json + validate freshness check + apply-edits snapshot hook ⚠ generated JSON oversized, cannot split further
-- Stage 4: PLANNED — M0: repoint skills (.claude/skills + skills/ add-service, add-scenario) to client/src
+- Stage 4: COMMITTED — M0: repoint skills (.claude/skills + skills/ add-service, add-scenario) to client/src
 - Stage 5: PLANNED — M0: repoint CLAUDE.md, README, CONTRIBUTING, cosmos-sync.yml; run the M0 verification gate (grep, build/lint/validate, corruption proof, sync dry-run, 390px + desktop screenshots)
 - Stage 6: PLANNED — Hosting: vercel.json Services, Pages redirect page + pages.yml, server/.env.example, README "Run with AI locally"
 - Stage 7: PLANNED — Vitest harness in client + server, root test fan-out, CI npm test step
