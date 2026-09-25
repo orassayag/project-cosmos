@@ -1,13 +1,16 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const VERSIONS_DIRECTORY = fileURLToPath(new URL('../versions/', import.meta.url));
+
 // The ledger lists newest first, so the first table row of the newest year file is the current version.
 function readLatestVersion(): string {
-  const ledgerFiles = readdirSync('versions').filter((fileName) => /^\d{4}\.md$/.test(fileName)).sort();
+  const ledgerFiles = readdirSync(VERSIONS_DIRECTORY).filter((fileName) => /^\d{4}\.md$/.test(fileName)).sort();
   const newestLedger = ledgerFiles.at(-1);
   if (!newestLedger) return 'dev';
-  const versionMatch = readFileSync(`versions/${newestLedger}`, 'utf8').match(/^\|\s*(\d+\.\d+\.\d+)\s*\|/m);
+  const versionMatch = readFileSync(`${VERSIONS_DIRECTORY}${newestLedger}`, 'utf8').match(/^\|\s*(\d+\.\d+\.\d+)\s*\|/m);
   return versionMatch?.[1] ?? 'dev';
 }
 

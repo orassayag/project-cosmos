@@ -3,11 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "client"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit",
+    "dev": "npm run dev --workspace client",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
     "sync": "tsx drift-sync/scripts/sync.ts",
     "sync:bootstrap": "tsx drift-sync/scripts/bootstrap-state.ts",
@@ -15,28 +19,17 @@
     "sync:nightly": "tsx drift-sync/scripts/sync-nightly.ts",
     "sync:apply": "tsx drift-sync/scripts/apply-edits.ts",
     "sync:clone-repos": "tsx drift-sync/scripts/clone-repos.ts",
-    "fresh": "node scripts/fresh-start.mjs",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "framer-motion": "^13.1.1",
-    "gsap": "^3.15.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "fresh": "node scripts/fresh-start.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.4.0",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
-    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.68.0",
-    "vite": "^8.2.2"
+    "typescript-eslint": "^8.68.0"
   },
   "engines": {
     "node": ">=20"

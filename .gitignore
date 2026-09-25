@@ -3,9 +3,12 @@ node_modules/
 
 # build output
 dist/
+client/dist/
+server/dist/
 
 # TypeScript
 tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
 *.js.map
 
 # env

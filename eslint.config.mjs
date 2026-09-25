@@ -3,11 +3,11 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/', 'drift-sync/dry-runs/'] },
+  { ignores: ['**/dist/', 'node_modules/', 'drift-sync/dry-runs/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['client/src/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     // Just the classic pair — the newer compiler-era rules flag this
     // codebase's deliberate ref-sync / rAF animation idioms.
