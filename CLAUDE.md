@@ -19,6 +19,24 @@ npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok
 - `drift-sync/` — the nightly honesty pipeline (its own README).
 - `.claude/skills/` — `add-service` and `add-scenario`: THE documented procedures for growing the map. Follow them rather than improvising.
 
+## Versioning (local change ledger)
+
+Every commit is auto-versioned by a local `.git/hooks/post-commit` hook
+(`scripts/version-bump.sh`): it derives a semver bump from the commit type
+(Conventional Commits — `feat`→minor, `!`/`BREAKING CHANGE`→major, else patch),
+prepends a plain-English row to the per-year ledger `versions/<year>.md`, and tags the
+commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo to.
+
+- **Claude writes the version note automatically as the final step of every task, before
+  committing** — this is not a manual step for the developer. Summarize the task's real
+  changes as one plain-language bullet each, understandable by a non-developer (no jargon,
+  no file lists), and pipe them to `scripts/version-note.sh write`. The hook then consumes
+  `.git/version-note.md` on the commit. If a row ever lands without a note, restore it with
+  `scripts/version-note.sh amend`.
+- The ledger is generated — **never edit `versions/*.md` by hand.**
+- The hook is local (not tracked). On a fresh clone, install it once with
+  `bash scripts/install-hooks.sh`.
+
 ## Invariants
 
 - `phaseId` global, unique, never reused; every step's `phase` equals its scenario's `phaseId`.
