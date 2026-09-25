@@ -17,7 +17,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs', 'drift-sync/**/*.ts'],
+    files: ['scripts/**/*.mjs', 'drift-sync/**/*.ts', 'server/**/*.ts'],
     languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
   },
   {

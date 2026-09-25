@@ -7,6 +7,7 @@
  *  - Every step.via (kafka) resolves to a known topic id
  *  - Every step.phase matches a Scenario.phaseId
  *  - Every service has a resolvable owner
+ *  - server/src/generated/cosmos-map.json matches a fresh in-memory snapshot
  *
  * External checks (greps source repos):
  *  - Every service.repo exists locally
@@ -29,6 +30,7 @@ import { SCENARIOS } from '../../client/src/scenarios/scenarios.js';
 import { STEPS } from '../../client/src/scenarios/data.js';
 import { resolveOwner } from '../../client/src/scenarios/owners.js';
 import type { Service, Step, SubService, Topic } from '../../client/src/scenarios/types.js';
+import { COSMOS_MAP_PATH, serializeCosmosMap } from '../../server/scripts/snapshot-map.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
 // ──────────────────────────────────────────────────────────────────
@@ -299,6 +301,17 @@ function checkServiceOwners(): void {
   }
 }
 
+function checkSnapshotFreshness(): void {
+  const committedSnapshot = existsSync(COSMOS_MAP_PATH) ? readFileSync(COSMOS_MAP_PATH, 'utf8') : null;
+  if (committedSnapshot === serializeCosmosMap()) return;
+  add({
+    severity: 'error',
+    code: 'stale-snapshot',
+    message: 'cosmos-map.json is stale — run npm run snapshot',
+    context: { path: path.relative(process.cwd(), COSMOS_MAP_PATH), missing: committedSnapshot === null },
+  });
+}
+
 // ──────────────────────────────────────────────────────────────────
 //  External checks (require source repo access)
 // ──────────────────────────────────────────────────────────────────
@@ -407,6 +420,7 @@ function run(): void {
   // Internal checks — always run, fast, no source-repo dependency.
   checkStepReferences();
   checkServiceOwners();
+  checkSnapshotFreshness();
   // Cross-repo checks — require the tracked source repos cloned at reposRoot.
   // Skipped by default; opt in with --source-check for the deeper sweep.
   if (sourceCheck) {

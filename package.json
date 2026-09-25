@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "client"
+    "client",
+    "server"
   ],
   "scripts": {
     "dev": "npm run dev --workspace client",
@@ -13,6 +14,7 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
+    "snapshot": "npm run snapshot --workspace server",
     "sync": "tsx drift-sync/scripts/sync.ts",
     "sync:bootstrap": "tsx drift-sync/scripts/bootstrap-state.ts",
     "sync:diff-repo": "tsx drift-sync/scripts/diff-repo.ts",

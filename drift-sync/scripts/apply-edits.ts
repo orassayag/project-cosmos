@@ -13,8 +13,9 @@
  * substantive change.
  *
  * Pre-conditions:
- *   - Project Cosmos working tree must be clean under client/src/scenarios/ and
- *     drift-sync/cosmos-confirmed.json (the applier-writable surface).
+ *   - Project Cosmos working tree must be clean under client/src/scenarios/,
+ *     drift-sync/cosmos-confirmed.json and server/src/generated/cosmos-map.json
+ *     (the applier-writable surface).
  *     Otherwise the applier refuses to run.
  */
 
@@ -84,7 +85,11 @@ if (items.length === 0) {
 // ──────────────────────────────────────────────────────────────────
 //  Pre-check: cosmos repo must be clean on writable surface
 // ──────────────────────────────────────────────────────────────────
-const WRITABLE_PATHS = ['client/src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
+const WRITABLE_PATHS = [
+  'client/src/scenarios/',
+  'drift-sync/cosmos-confirmed.json',
+  'server/src/generated/cosmos-map.json',
+];
 
 function gitStatusWritable(): string {
   try {
@@ -156,7 +161,7 @@ If you accidentally try to write outside the writable surface, write_file will r
    b. read_file to see the current content.
    c. Apply the smallest possible edit that satisfies the verdict.
    d. write_file with the full new content. Preserve exact formatting (indentation, quotes, trailing commas).
-3. After applying ALL edits, run \`npm run validate\` via run_command.
+3. After applying ALL edits, run \`npm run snapshot\` and then \`npm run validate\` via run_command (validate fails on a stale server/src/generated/cosmos-map.json until the snapshot is regenerated — never write that file by hand).
 4. If validator fails (errors > 0): inspect the output, fix, re-run.
 5. When validator passes, emit the final JSON report.
 
@@ -210,7 +215,7 @@ const result = await runAgent({
   tools: APPLIER_TOOL_DEFS,
   writeRoot: projectCosmosRoot,
   runCommandRoot: projectCosmosRoot,
-  runCommandAllowed: ['npm run validate'],
+  runCommandAllowed: ['npm run snapshot', 'npm run validate'],
   requireJsonReport: true,
   // Applier writes full-file content via write_file — Project Cosmos files can be
   // 200+ lines, well above the default 4096-token budget. 16k is the
@@ -218,6 +223,15 @@ const result = await runAgent({
   maxTokens: 16_000,
   verbose,
 });
+
+// ──────────────────────────────────────────────────────────────────
+//  Regenerate the server's map snapshot from the edited data
+// ──────────────────────────────────────────────────────────────────
+try {
+  execFileSync('npm', ['run', 'snapshot'], { cwd: projectCosmosRoot, stdio: 'ignore' });
+} catch (err) {
+  console.error(`Failed to regenerate cosmos-map.json (npm run snapshot): ${String(err)}`);
+}
 
 // ──────────────────────────────────────────────────────────────────
 //  Capture diff

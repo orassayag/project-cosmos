@@ -210,7 +210,11 @@ for (const r of [...drifts, ...inconclusives]) {
 // subprocess spawned with cwd: projectCosmosRoot) ran against the wrong root and the
 // WRITABLE_PATHS pathspecs never matched the real files.
 const projectCosmosRoot = path.resolve(here, '..', '..');
-const WRITABLE_PATHS = ['client/src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
+const WRITABLE_PATHS = [
+  'client/src/scenarios/',
+  'drift-sync/cosmos-confirmed.json',
+  'server/src/generated/cosmos-map.json',
+];
 
 /**
  * Force the applier-writable surface back to a pristine state: revert tracked
