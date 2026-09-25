@@ -6,10 +6,10 @@
  * Space Grotesk + Instrument Serif fonts) used by docs/drift-sync.html.
  */
 
-interface CosmosEdit { file: string; rationale: string; patch_hint?: string; }
+interface ProjectCosmosEdit { file: string; rationale: string; patch_hint?: string; }
 interface Change {
   kind: string; description: string; evidence: string[];
-  proposed_cosmos_edits: CosmosEdit[];
+  proposed_cosmos_edits: ProjectCosmosEdit[];
 }
 interface Verdict {
   verdict: 'drift' | 'no_drift' | 'inconclusive';
@@ -376,7 +376,7 @@ export function buildHtmlReport(data: ReportData): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cosmos Sync — ${dateFormatted}</title>
+<title>Project Cosmos Sync — ${dateFormatted}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -390,7 +390,7 @@ export function buildHtmlReport(data: ReportData): string {
 <div class="shell">
 
   <section>
-    <div class="eyebrow">Cosmos Sync · Nightly Report</div>
+    <div class="eyebrow">Project Cosmos Sync · Nightly Report</div>
     <h1>${isZeroDrift ? 'All clear.' : `Drift caught.`}<br><em>${dateFormatted}</em></h1>
     <p class="lead">
       ${results.length} repos swept in ${(durationMs / 1000).toFixed(1)}s
@@ -426,7 +426,7 @@ export function buildHtmlReport(data: ReportData): string {
   <section>
     <div class="banner-ok">
       <div class="big">No PRs would be opened.</div>
-      <div class="small">Every tracked repo is at its baseline — Cosmos is in sync.</div>
+      <div class="small">Every tracked repo is at its baseline — Project Cosmos is in sync.</div>
     </div>
   </section>
   ` : ''}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface AskAgentProps {
   onAsk: (question: string) => void;
-  /** Bumped by the "Cosmos" reset / global Esc — clears the typed question. */
+  /** Bumped by the "Project Cosmos" reset / global Esc — clears the typed question. */
   resetNonce?: number;
 }
 
@@ -18,7 +18,7 @@ export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // A galaxy reset ("Cosmos" title / global Esc) wipes the field too.
+  // A galaxy reset ("Project Cosmos" title / global Esc) wipes the field too.
   useEffect(() => {
     if (resetNonce === 0) return;
     setQuestion('');
@@ -74,7 +74,7 @@ export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
         <textarea
           ref={areaRef}
           className="lc-ask-field"
-          placeholder="Explore the cosmos"
+          placeholder="Explore Project Cosmos"
           rows={1}
           value={question}
           spellCheck={false}

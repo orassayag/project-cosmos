@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { CosmosMap } from './map/Map';
+import { ProjectCosmosMap } from './map/Map';
 import { DomainBar } from './components/DomainBar';
 import { ScenarioStatus } from './components/ScenarioStatus';
 import { PlaybackControls } from './components/PlaybackControls';
@@ -9,17 +9,20 @@ import { ActivityLog } from './components/ActivityLog';
 import { IntroOverlay } from './components/IntroOverlay';
 import { WarpTransition } from './components/WarpTransition';
 import { HelpButton } from './components/HelpButton';
+import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
 import { AskAgent } from './components/AskAgent';
 import { AskPanel } from './components/AskPanel';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
-import { ChangelogPanel, cosmosStateFor } from './components/ChangelogPanel';
-import type { ChangelogActivation, CosmosState } from './components/ChangelogPanel';
+import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
+import type { ChangelogActivation, ProjectCosmosState } from './components/ChangelogPanel';
 import { Spotlight } from './components/Spotlight';
 import type { SpotlightTarget } from './components/Spotlight';
 import { BrandStarfield } from './map/BrandStarfield';
+import { MobileMenu } from './components/MobileMenu';
 import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overlays/OverlayManager';
+import { useViewport } from './hooks/useViewport';
 
 import { DOMAINS, SCENARIOS_BY_ID, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
 import type { Incident, DriftEntry } from './scenarios/data';
@@ -27,7 +30,6 @@ import type { Step } from './scenarios/types';
 import { useScenarioRunner } from './scenarios/runner';
 import type { Shot } from './scenarios/runner';
 import { readInitialDeepLink, useDeepLink } from './hooks/useDeepLink';
-import { BRAND } from './scenarios/brand';
 
 interface ActivityEntry { idx: number; step: Step }
 
@@ -81,18 +83,19 @@ export function App() {
   // whenever the user navigates (next/prev/dot/play) or picks a new scenario.
   const [panelOpen, setPanelOpen] = useState(true);
 
-  // Single-slot manager so no modal/overlay ever overrides another.
+  // Single-slot manager so no modal/overlay ever overrides another (a stack on phones).
   const overlay = useOverlayManager();
+  const { isMobile } = useViewport();
   // A changelog item warps to its affected node: play the hyperspace effect,
   // then land the map on the node once the warp finishes.
   const [warp, setWarp] = useState<ChangelogActivation | null>(null);
   // The commit/branch the map is currently framed on (set after a warp), shown
   // beside the title so you always know which state you're looking at.
-  const [cosmosState, setCosmosState] = useState<CosmosState | null>(null);
+  const [projectCosmosState, setProjectCosmosState] = useState<ProjectCosmosState | null>(null);
   // The run date currently in view — the shared cursor the Changelog and the
   // Changes panel both write, so a pick in one filters and stamps the other.
   const [driftDate, setDriftDate] = useState<string | null>(null);
-  // Bumped by the "Cosmos" title to force the map back to its initial state.
+  // Bumped by the "Project Cosmos" title to force the map back to its initial state.
   const [resetNonce, setResetNonce] = useState(0);
 
   useEffect(() => {
@@ -162,10 +165,10 @@ export function App() {
   // hyperspace warp toward the item's affected node.
   const handleActivateChangelogItem = useCallback(
     (activation: ChangelogActivation) => {
-      overlay.close(OVERLAY.changelog);
+      if (!isMobile) overlay.close(OVERLAY.changelog);
       setWarp(activation);
     },
-    [overlay],
+    [overlay, isMobile],
   );
 
   // Warp finished — land the map on the node the item pointed at and record
@@ -173,7 +176,7 @@ export function App() {
   const handleWarpDone = useCallback(() => {
     if (warp) {
       setSpotlightTarget(warp.target);
-      setCosmosState(warp.state);
+      setProjectCosmosState(warp.state);
       setDriftDate(warp.date);
     }
     setWarp(null);
@@ -188,14 +191,14 @@ export function App() {
       ? { id: nodeId, kind: TOPICS_BY_ID[nodeId] ? 'topic' : 'service' }
       : null;
     if (target) {
-      setWarp({ target, state: cosmosStateFor(entry), date: entry.date });
+      setWarp({ target, state: projectCosmosStateFor(entry), date: entry.date });
     } else {
-      setCosmosState(cosmosStateFor(entry));
+      setProjectCosmosState(projectCosmosStateFor(entry));
       setDriftDate(entry.date);
     }
   }, []);
 
-  // The "Cosmos" title resets the galaxy to its initial state: no scenario,
+  // The "Project Cosmos" title resets the galaxy to its initial state: no scenario,
   // no domain tab selected, cleared history/URL params, every overlay closed,
   // map reframed.
   const handleResetGalaxy = useCallback(() => {
@@ -206,7 +209,7 @@ export function App() {
     setActiveDomain('');
     setSpotlightTarget(null);
     setWarp(null);
-    setCosmosState(null);
+    setProjectCosmosState(null);
     setDriftDate(null);
     overlay.reset();
     setResetNonce((n) => n + 1);
@@ -254,7 +257,7 @@ export function App() {
 
   return (
     <OverlayProvider value={overlay}>
-      <CosmosShell
+      <ProjectCosmosShell
         activeDomain={activeDomain}
         runner={runner}
         state={state}
@@ -280,7 +283,7 @@ export function App() {
         onWarpDone={handleWarpDone}
         onActivateChangelogItem={handleActivateChangelogItem}
         onResetGalaxy={handleResetGalaxy}
-        cosmosState={cosmosState}
+        projectCosmosState={projectCosmosState}
         driftDate={driftDate}
         onSelectDrift={handleSelectDrift}
         resetNonce={resetNonce}
@@ -290,7 +293,7 @@ export function App() {
   );
 }
 
-interface CosmosShellProps {
+interface ProjectCosmosShellProps {
   activeDomain: string;
   runner: ReturnType<typeof useScenarioRunner>;
   state: ReturnType<typeof useScenarioRunner>['state'];
@@ -316,14 +319,14 @@ interface CosmosShellProps {
   onWarpDone: () => void;
   onActivateChangelogItem: (activation: ChangelogActivation) => void;
   onResetGalaxy: () => void;
-  cosmosState: CosmosState | null;
+  projectCosmosState: ProjectCosmosState | null;
   driftDate: string | null;
   onSelectDrift: (entry: DriftEntry) => void;
   resetNonce: number;
   activeIncident: Incident | null;
 }
 
-function CosmosShell(p: CosmosShellProps) {
+function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   // The first ~2.6s after the CTA we run the "ignite" sequence.
   const [revealing, setRevealing] = useState(true);
   useEffect(() => {
@@ -336,13 +339,21 @@ function CosmosShell(p: CosmosShellProps) {
     panelOpen, setPanelOpen, handlePickDomain, handlePickScenario,
     handleShotComplete, isolate, setHistory, navPlay, navPrev, navNext, navJump, navRestart,
     spotlightTarget, setSpotlightTarget,
-    warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, cosmosState, resetNonce,
+    warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, projectCosmosState, resetNonce,
     driftDate, onSelectDrift,
     activeIncident,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
   const [presentation, setPresentation] = useState(false);
+
+  // On phone-class viewports the topbar's secondary chrome collapses into a
+  // slide-over drawer toggled from a hamburger.
+  const { isMobile } = useViewport();
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Close the drawer whenever navigation moves the app to a new surface.
+  useEffect(() => { setMenuOpen(false); }, [state.scenarioId, presentation]);
+  useEffect(() => { if (!isMobile) setMenuOpen(false); }, [isMobile]);
 
   // Every mutually-exclusive surface (changelog + the map overlays) flows
   // through this single-slot manager so none can override another.
@@ -367,6 +378,7 @@ function CosmosShell(p: CosmosShellProps) {
     overlay.open(OVERLAY.ask);
   }, [overlay]);
   const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
+  const closeHelp = useCallback(() => overlay.close(OVERLAY.help), [overlay]);
 
   // The current step, exposed to the incident panel so its body tracks playback.
   const currentStep =
@@ -391,6 +403,19 @@ function CosmosShell(p: CosmosShellProps) {
   const [explodedStarId, setExplodedStarId] = useState<string | null>(null);
   useEffect(() => { setExplodedStarId(null); }, [explodeTargetId]);
   const handleStarHit = useCallback((nodeId: string) => setExplodedStarId(nodeId), []);
+
+  // Esc leaves presentation mode and does nothing else — captured on window
+  // ahead of the bubble-phase Esc handlers (galaxy reset, map deselect).
+  useEffect(() => {
+    if (!presentation) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      setPresentation(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [presentation]);
 
   // Keyboard: P toggles presentation; arrows / space drive playback so the
   // deck is navigable once the on-screen controls are hidden.
@@ -425,16 +450,16 @@ function CosmosShell(p: CosmosShellProps) {
       {/* Brief radial flash that washes the scene during the reveal. */}
       {revealing && <div className="lc-reveal-flash" aria-hidden="true" />}
 
-      <header className="lc-topbar">
-        <div className="lc-topbar-row">
-          <div className="lc-topbar-side lc-topbar-side--left">
+      {(() => {
+        const brandBlock = (
+          <>
             <button
               type="button"
               className="lc-topbar-brand lc-topbar-brand--reset"
               onClick={onResetGalaxy}
               title="Reset the galaxy — clear the current scenario, filters and URL"
             >
-              Cosmos
+              Project Cosmos
               <span
                 style={{
                   marginLeft: 10,
@@ -442,18 +467,17 @@ function CosmosShell(p: CosmosShellProps) {
                   fontSize: '0.62em',
                   letterSpacing: '0.18em',
                   opacity: 0.55,
-                  textTransform: 'uppercase',
                 }}
               >
-                {BRAND.badge}
+                v{__APP_VERSION__}
               </span>
             </button>
-            {(cosmosState || driftDate) && (
+            {(projectCosmosState || driftDate) && (
               <span
                 className="lc-cosmos-state"
                 title={
-                  cosmosState
-                    ? `Viewing ${cosmosState.title} — ${cosmosState.repo}@${cosmosState.sha} on ${cosmosState.branch}`
+                  projectCosmosState
+                    ? `Viewing ${projectCosmosState.title} — ${projectCosmosState.repo}@${projectCosmosState.sha} on ${projectCosmosState.branch}`
                     : 'Current point in the drift history'
                 }
               >
@@ -466,47 +490,59 @@ function CosmosShell(p: CosmosShellProps) {
                     {driftRunDateTime(driftDate)}
                   </span>
                 )}
-                {cosmosState && (
+                {projectCosmosState && (
                   <span className="lc-cosmos-state-commit">
                     <svg className="lc-cosmos-state-icon" width={12} height={12} viewBox="0 0 12 12" aria-hidden="true">
                       <path d="M3 1.5 v9 M3 4 a2.5 2.5 0 0 0 2.5 2.5 h1.5 M9 1.5 a1.5 1.5 0 1 1 0 3 a1.5 1.5 0 0 1 0 -3 Z M3 1.5 a1.5 1.5 0 1 1 0 0.01 Z M3 10.5 a1.5 1.5 0 1 1 0 0.01 Z"
                         fill="none" stroke="currentColor" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span className="lc-cosmos-state-branch">{cosmosState.branch}</span>
+                    <span className="lc-cosmos-state-branch">{projectCosmosState.branch}</span>
                     <span className="lc-cosmos-state-sep">·</span>
-                    <span className="lc-cosmos-state-sha">{cosmosState.repo}@{cosmosState.sha}</span>
-                    {cosmosState.owner && (
-                      <span className="lc-cosmos-state-owner">@{cosmosState.owner}</span>
+                    <span className="lc-cosmos-state-sha">{projectCosmosState.repo}@{projectCosmosState.sha}</span>
+                    {projectCosmosState.owner && (
+                      <span className="lc-cosmos-state-owner">@{projectCosmosState.owner}</span>
                     )}
                   </span>
                 )}
               </span>
             )}
+          </>
+        );
+
+        // On mobile, picking a scenario from the drawer dismisses it; picking a
+        // domain only expands its scenario list, same as the desktop sub-menu.
+        const pickScenarioAndClose = isMobile
+          ? (id: string) => { handlePickScenario(id); setMenuOpen(false); }
+          : handlePickScenario;
+
+        const domainNav = (
+          <>
             <DomainBar
               active={activeDomain}
               activeScenarioId={state.scenarioId}
+              inline={isMobile}
               onPickDomain={handlePickDomain}
-              onPickScenario={handlePickScenario}
+              onPickScenario={pickScenarioAndClose}
               resetNonce={resetNonce}
             />
             <IncidentBar
               activeScenarioId={state.scenarioId}
-              onPickIncident={handlePickScenario}
+              onPickIncident={pickScenarioAndClose}
               resetNonce={resetNonce}
             />
-          </div>
+          </>
+        );
 
-          <div className="lc-topbar-center">
-            <ScenarioStatus domainId={activeDomain} activeScenarioId={state.scenarioId} />
-          </div>
+        const askAgent = <AskAgent onAsk={handleAsk} resetNonce={resetNonce} />;
 
-          <div className="lc-topbar-side lc-topbar-side--right">
-            <AskAgent onAsk={handleAsk} resetNonce={resetNonce} />
+        const secondaryActions = (
+          <>
+            {!isMobile && askAgent}
             <DriftFooter />
             <button
               type="button"
               className="lc-present-btn"
-              onClick={() => overlay.open(OVERLAY.changelog)}
+              onClick={() => { overlay.open(OVERLAY.changelog); setMenuOpen(false); }}
               title="Architecture changelog — what Drift Sync has caught"
             >
               Changelog
@@ -519,13 +555,63 @@ function CosmosShell(p: CosmosShellProps) {
             >
               Present
             </button>
-            <HelpButton />
-          </div>
-        </div>
-      </header>
+            <HelpButton onOpen={() => { overlay.open(OVERLAY.help); setMenuOpen(false); }} />
+          </>
+        );
+
+        if (isMobile) {
+          return (
+            <header className="lc-topbar lc-topbar--mobile">
+              <div className="lc-topbar-row">
+                <div className="lc-topbar-side lc-topbar-side--left">{brandBlock}</div>
+                <div className="lc-topbar-side lc-topbar-side--right">
+                  <ScenarioStatus domainId={activeDomain} activeScenarioId={state.scenarioId} />
+                  <button
+                    type="button"
+                    className="lc-menu-toggle"
+                    aria-label="Open menu"
+                    aria-expanded={menuOpen}
+                    onClick={() => setMenuOpen(true)}
+                  >
+                    <span /><span /><span />
+                  </button>
+                </div>
+              </div>
+              <div className="lc-topbar-search">{askAgent}</div>
+              <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
+                <div className="lc-mobile-menu-section">
+                  <div className="lc-mobile-menu-label">Explore</div>
+                  <div className="lc-mobile-menu-nav">{domainNav}</div>
+                </div>
+                <div className="lc-mobile-menu-section">
+                  <div className="lc-mobile-menu-label">Tools</div>
+                  <div className="lc-mobile-menu-actions">{secondaryActions}</div>
+                </div>
+              </MobileMenu>
+            </header>
+          );
+        }
+
+        return (
+          <header className="lc-topbar">
+            <div className="lc-topbar-row">
+              <div className="lc-topbar-side lc-topbar-side--left">
+                {brandBlock}
+                {domainNav}
+              </div>
+              <div className="lc-topbar-center">
+                <ScenarioStatus domainId={activeDomain} activeScenarioId={state.scenarioId} />
+              </div>
+              <div className="lc-topbar-side lc-topbar-side--right">
+                {secondaryActions}
+              </div>
+            </div>
+          </header>
+        );
+      })()}
 
       <div className="lc-stage">
-        <CosmosMap
+        <ProjectCosmosMap
           activeScenarioId={state.scenarioId}
           shot={shot}
           speed={state.speed}
@@ -551,6 +637,7 @@ function CosmosShell(p: CosmosShellProps) {
           step={activeIncident ? currentStep : null}
           stepIndex={state.idx}
           stepCount={steps.length}
+          onClose={onResetGalaxy}
         />
 
         <StepPanel
@@ -569,10 +656,11 @@ function CosmosShell(p: CosmosShellProps) {
           onClear={() => setHistory([])}
         />
 
-        {overlay.isOpen(OVERLAY.ask) && askQuestion !== null && (
+        {overlay.isStacked(OVERLAY.ask) && askQuestion !== null && (
           <AskPanel
             key={askNonce}
             question={askQuestion}
+            hidden={!overlay.isOpen(OVERLAY.ask)}
             onClose={() => overlay.close(OVERLAY.ask)}
             onAnswerStart={handleAnswerStart}
           />
@@ -610,10 +698,17 @@ function CosmosShell(p: CosmosShellProps) {
         onSelectNode={setSpotlightTarget}
       />
 
+      <HelpModal open={overlay.isOpen(OVERLAY.help)} onClose={closeHelp} />
+
       <ChangelogPanel
-        open={overlay.isOpen(OVERLAY.changelog)}
+        open={overlay.isOpen(OVERLAY.changelog) && !warping}
+        stacked={overlay.isStacked(OVERLAY.changelog)}
         onClose={() => overlay.close(OVERLAY.changelog)}
-        onSelectNode={(target) => { setSpotlightTarget(target); overlay.close(OVERLAY.changelog); }}
+        onSelectNode={(target) => {
+          setSpotlightTarget(target);
+          // On phones the inspector stacks on top; closing it returns to the search.
+          if (!isMobile) overlay.close(OVERLAY.changelog);
+        }}
         onActivateItem={onActivateChangelogItem}
       />
 
@@ -622,14 +717,22 @@ function CosmosShell(p: CosmosShellProps) {
       {warping && <WarpTransition duration={1600} onDone={onWarpDone} />}
 
       {presentation && (
-        <button
-          type="button"
-          className="lc-present-hint"
-          onClick={() => setPresentation(false)}
-          title="Exit presentation mode"
-        >
-          Presenting · <kbd>P</kbd> to exit · <kbd>←</kbd> <kbd>→</kbd> steps
-        </button>
+        <>
+          <button
+            type="button"
+            className="lc-present-exit"
+            onClick={() => setPresentation(false)}
+            aria-label="Exit presentation mode"
+            title="Exit presentation mode (Esc)"
+          >
+            <svg width={14} height={14} viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+            </svg>
+          </button>
+          <div className="lc-present-hint">
+            <kbd>Esc</kbd> exit · <kbd>←</kbd> <kbd>→</kbd> steps
+          </div>
+        </>
       )}
     </div>
   );

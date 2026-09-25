@@ -1,10 +1,10 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cosmos drift-sync agent — Phase 0.5
+ * Project Cosmos drift-sync agent — Phase 0.5
  *
- * Lets Claude investigate a specific Cosmos topic by reading source repos
+ * Lets Claude investigate a specific Project Cosmos topic by reading source repos
  * and grepping for constants/env vars. Outputs a structured report:
- * verdict, evidence, and proposed Cosmos edits.
+ * verdict, evidence, and proposed Project Cosmos edits.
  *
  * Usage:
  *   npm run sync -- investigate-topic <topic-id>
@@ -85,7 +85,7 @@ if (!topic) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-//  Gather context: which services Cosmos says produce/consume this topic
+//  Gather context: which services Project Cosmos says produce/consume this topic
 // ──────────────────────────────────────────────────────────────────
 function reposForService(serviceId: string): string[] {
   const svc = SERVICES_BY_ID[serviceId] as Service | undefined;
@@ -228,7 +228,7 @@ The Kafka topic registry at ${registryPath} lists every topic that exists in pro
   : '';
 
 const registrySteps = config.topicRegistry
-  ? `1. FIRST grep the registry for the Cosmos topic name. If it appears${config.topicRegistry.topicPrefix ? ` as '${config.topicRegistry.topicPrefix}<cosmos-name>'` : ''} → topic exists, naming is correct.
+  ? `1. FIRST grep the registry for the Project Cosmos topic name. If it appears${config.topicRegistry.topicPrefix ? ` as '${config.topicRegistry.topicPrefix}<cosmos-name>'` : ''} → topic exists, naming is correct.
 2. If naming differs, grep the registry for similar names to find the real name.
 3. Some services reference event/topic classes from shared internal npm packages that are NOT in the workspace. For these: registry confirmation + a matching class name in the producer source is sufficient evidence. Do NOT spend iterations searching for literal topic strings that live in node_modules.
 4. Some consumer repos may not be cloned locally. If the registry confirms the topic and the consumer service is named in the topic's prefix, that's enough evidence the consumer exists.
@@ -238,9 +238,9 @@ const registrySteps = config.topicRegistry
 3. Some services reference event/topic classes from shared internal npm packages that are NOT in the workspace — a matching class name in the producer source is acceptable evidence. Do NOT spend iterations searching node_modules for literal topic strings.
 4. Stop investigating once you can produce a verdict.`;
 
-const systemPrompt = `You are a drift-detection agent for Cosmos — your architecture map: a visualization of the services, Kafka topics, and event flows across your organization's platform.
+const systemPrompt = `You are a drift-detection agent for Project Cosmos — your architecture map: a visualization of the services, Kafka topics, and event flows across your organization's platform.
 
-Source repos live at ${reposRoot}/<repo-name>/. The Cosmos map's claims about this topic (producers, consumers, steps) are provided in the task below.
+Source repos live at ${reposRoot}/<repo-name>/. Project Cosmos map's claims about this topic (producers, consumers, steps) are provided in the task below.
 ${registrySection}
 ## Investigation strategy (be efficient — aim for ≤10 iterations)
 ${registrySteps}
@@ -264,13 +264,13 @@ When you have enough evidence (typically after 3-8 tool calls), output ONE JSON 
 
 Do NOT modify any files. Only investigate and report.`;
 
-const userPrompt = `Investigate this Cosmos topic for drift:
+const userPrompt = `Investigate this Project Cosmos topic for drift:
 
 Topic id:    ${topic.id}
 Topic name:  ${topic.name}
 Description: ${topic.desc}
 
-Cosmos says the following services interact with it:
+Project Cosmos says the following services interact with it:
   Producers (step.from):  ${producerIds.join(', ') || '(none)'}
   Consumers (step.to):    ${consumerIds.join(', ') || '(none)'}
   Producer repos:         ${producerRepos.join(', ') || '(none)'}

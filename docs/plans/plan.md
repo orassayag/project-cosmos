@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let anyone open Cosmos, pick a past production incident, and press play.  
+Let anyone open Project Cosmos, pick a past production incident, and press play.  
 The map then shows the exact path the failing request (or cascade) took, with the real payloads that were captured at the time.
 
 No AI is used at any point. Everything is based on human-curated, structured files.
@@ -51,7 +51,7 @@ That’s it. No smart analysis, no automatic summarization, no AI.
 4. They save the file under `src/incidents/`.
 5. That’s the whole process. It can be done in 10–30 minutes for a typical incident.
 
-No special tooling is required beyond a text editor and the existing Cosmos type-checking.
+No special tooling is required beyond a text editor and the existing Project Cosmos type-checking.
 
 ---
 
@@ -78,7 +78,7 @@ Everything else stays familiar.
 
 ---
 
-## Technical fit with existing Cosmos
+## Technical fit with existing Project Cosmos
 
 - Reuses the exact same player, path drawing, and step panel that already exist.
 - Incidents are just another data source that the runner can load.
@@ -143,7 +143,7 @@ Because the player and path system already exist, this is mostly “new data + s
 
 ## Success criteria
 
-- A person can open Cosmos, click an incident, and watch the real path play with the real payloads.
+- A person can open Project Cosmos, click an incident, and watch the real path play with the real payloads.
 - Creating a new incident recording takes less than 30 minutes for someone who already has the logs.
 - No AI is involved at any stage.
 - The feature feels like a natural extension of the existing scenario player, not a separate tool.

@@ -37,7 +37,7 @@ export interface DriftEntry {
   nodeIds: string[];
   /** file:line evidence quotes, exactly as the pipeline records them. */
   evidence?: string[];
-  /** Draft PR the pipeline opened on the Cosmos repo for this run's team. */
+  /** Draft PR the pipeline opened on the Project Cosmos repo for this run's team. */
   prNumber?: number;
   /** Title of the draft PR — falls back to `title` when absent. */
   prTitle?: string;
@@ -101,12 +101,12 @@ export function driftEntryMatches(entry: DriftEntry, query: string): boolean {
   return haystack.includes(q);
 }
 
-/** Base URL of the Cosmos repo, derived from the Drift Sync workflow link. */
-const COSMOS_REPO_URL = BRAND.driftSyncUrl.replace(/\/actions\/.*$/, '');
+/** Base URL of the Project Cosmos repo, derived from the Drift Sync workflow link. */
+const PROJECT_COSMOS_REPO_URL = BRAND.driftSyncUrl.replace(/\/actions\/.*$/, '');
 
 /** Link to the draft PR the pipeline opened for an entry, if any. */
 export function driftPrUrl(entry: DriftEntry): string | null {
-  return entry.prNumber == null ? null : `${COSMOS_REPO_URL}/pull/${entry.prNumber}`;
+  return entry.prNumber == null ? null : `${PROJECT_COSMOS_REPO_URL}/pull/${entry.prNumber}`;
 }
 
 /** Link to the source-repo commit the drift was detected in, if any. */

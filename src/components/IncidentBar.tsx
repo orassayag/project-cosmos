@@ -6,7 +6,7 @@ interface IncidentBarProps {
   /** Currently selected playable id — highlights the active incident. */
   activeScenarioId: string | null;
   onPickIncident: (incidentId: string) => void;
-  /** Bumped by a galaxy reset ("Cosmos" title / global Esc) to close the menu. */
+  /** Bumped by a galaxy reset ("Project Cosmos" title / global Esc) to close the menu. */
   resetNonce?: number;
 }
 

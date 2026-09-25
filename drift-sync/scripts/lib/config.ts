@@ -72,9 +72,9 @@ interface ConfigFile {
 /** Repo root (this repository), derived from this file's location. */
 const here = path.dirname(fileURLToPath(import.meta.url));
 // here = drift-sync/scripts/lib → repo root is three levels up.
-export const cosmosRoot = path.resolve(here, '..', '..', '..');
+export const projectCosmosRoot = path.resolve(here, '..', '..', '..');
 
-const configPath = path.join(cosmosRoot, 'drift-sync', 'config.json');
+const configPath = path.join(projectCosmosRoot, 'drift-sync', 'config.json');
 
 /** Read an env var, treating empty/whitespace values as unset. */
 function env(name: string): string | undefined {
@@ -110,8 +110,8 @@ export function loadDriftSyncConfig(): DriftSyncConfig {
 
   const reposRootRaw = env('REPOS_ROOT') ?? file.reposRoot;
   const reposRoot = reposRootRaw
-    ? path.resolve(cosmosRoot, reposRootRaw) // relative values resolve against the repo root
-    : path.resolve(cosmosRoot, '..');
+    ? path.resolve(projectCosmosRoot, reposRootRaw) // relative values resolve against the repo root
+    : path.resolve(projectCosmosRoot, '..');
 
   cached = {
     githubOrg,

@@ -45,7 +45,7 @@ const SOURCE_EXTENSIONS = /\.(ts|tsx|js|jsx|mjs|cjs|go|py|java|kt|cpp|h|hpp|prot
 const RELEVANT_YAML_OR_SH = /(values(-[\w-]+)?\.ya?ml|\.env\.ya?ml|Chart\.ya?ml|loadEnv\.sh|setup-env\.sh|topics\.ya?ml)$/i;
 
 /** True if this file is the kind we want to inspect in a diff. */
-export function isCosmosRelevantFile(filepath: string): boolean {
+export function isProjectCosmosRelevantFile(filepath: string): boolean {
   if (PATH_EXCLUDE_PATTERNS.some(p => p.test(filepath))) return false;
   if (SOURCE_EXTENSIONS.test(filepath)) return true;
   if (RELEVANT_YAML_OR_SH.test(filepath)) return true;
@@ -70,7 +70,7 @@ export function definesPayloadShape(filepath: string): boolean {
 }
 
 /**
- * Content patterns that indicate a change Cosmos might care about.
+ * Content patterns that indicate a change Project Cosmos might care about.
  * Applied to changed lines only (additions/deletions from --unified=0).
  */
 const CONTENT_PATTERNS: RegExp[] = [
@@ -141,7 +141,7 @@ export function prefilterDecision(
   changedFiles: string[],
   diffUnifiedZero: string,
 ): PrefilterDecision {
-  const relevantFiles = changedFiles.filter(isCosmosRelevantFile);
+  const relevantFiles = changedFiles.filter(isProjectCosmosRelevantFile);
   if (relevantFiles.length === 0) {
     return { skip: true, reason: 'no source files changed', files: [], contentHits: [] };
   }

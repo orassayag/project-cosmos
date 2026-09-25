@@ -1,6 +1,7 @@
 import type { BlastResult } from './blast-radius';
 import { BLAST_LEVEL_META } from './blast-radius';
 import { SERVICES_BY_ID, TOPICS_BY_ID } from '../scenarios/data';
+import { PanelCloseButton } from '../components/PanelCloseButton';
 
 interface BlastLegendProps {
   /** Result for the current source, or null when nothing is selected yet. */
@@ -11,6 +12,8 @@ interface BlastLegendProps {
   onFocus: (nodeId: string) => void;
   /** Clear the selected source. */
   onClear: () => void;
+  /** Close the overlay (mobile corner ×). */
+  onClose?: () => void;
 }
 
 /**
@@ -19,9 +22,10 @@ interface BlastLegendProps {
  * LOW, each row flying the map to that node. The nodes themselves ring in the
  * matching severity color while this overlay is active.
  */
-export function BlastLegend({ result, sourceName, onFocus, onClear }: BlastLegendProps) {
+export function BlastLegend({ result, sourceName, onFocus, onClear, onClose }: BlastLegendProps) {
   return (
     <div className="lc-blast-legend" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
+      {onClose && <PanelCloseButton onClose={onClose} label="Close blast radius" />}
       <div className="lc-blast-legend-title">Blast radius</div>
 
       {!result || !sourceName ? (

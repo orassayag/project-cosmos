@@ -1,4 +1,5 @@
 import type { TeamGroup } from '../scenarios/owners';
+import { PanelCloseButton } from '../components/PanelCloseButton';
 
 /** Stable key for a group — its team id, or a sentinel for the unowned bucket. */
 export function groupKey(group: TeamGroup): string {
@@ -10,11 +11,14 @@ interface OwnershipLegendProps {
   /** Key of the currently highlighted team, or null when none is filtered. */
   activeKey: string | null;
   onToggle: (key: string) => void;
+  /** Close the overlay (mobile corner ×). */
+  onClose?: () => void;
 }
 
-export function OwnershipLegend({ groups, activeKey, onToggle }: OwnershipLegendProps) {
+export function OwnershipLegend({ groups, activeKey, onToggle, onClose }: OwnershipLegendProps) {
   return (
     <div className="lc-owner-legend" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
+      {onClose && <PanelCloseButton onClose={onClose} label="Close ownership" />}
       <div className="lc-owner-legend-title">Ownership</div>
       <div className="lc-owner-legend-hint">
         {activeKey ? 'Click again to clear' : 'Click a team to isolate it'}

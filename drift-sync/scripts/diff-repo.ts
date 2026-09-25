@@ -1,10 +1,10 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cosmos drift-sync agent — diff-repo mode (Phase 1)
+ * Project Cosmos drift-sync agent — diff-repo mode (Phase 1)
  *
  * Given a source repo, compares its baseline sha (from drift-sync/state.json)
  * against the current origin HEAD. Runs the prefilter; if any cosmos-relevant
- * changes are present, invokes Claude with the diff + the Cosmos slice for
+ * changes are present, invokes Claude with the diff + the Project Cosmos slice for
  * that repo. Outputs a structured verdict.
  *
  * Usage:
@@ -183,17 +183,17 @@ if (decision.skip) {
 log(`  ↳ ${decision.files.length} cosmos-relevant files, ${decision.contentHits.length} content hits`);
 
 // ──────────────────────────────────────────────────────────────────
-//  Build the Cosmos slice + diff payload
+//  Build the Project Cosmos slice + diff payload
 // ──────────────────────────────────────────────────────────────────
 const slice = buildRepoSlice(repo);
 const sliceText = formatSliceForPrompt(slice);
 
 if (slice.services.length === 0) {
-  log(`  ⚠ this repo is not referenced by any Cosmos service. Skipping agent.`);
+  log(`  ⚠ this repo is not referenced by any Project Cosmos service. Skipping agent.`);
   if (jsonOnly) {
     console.log(JSON.stringify({
       verdict: 'inconclusive', confidence: 'low', service: repo, from_sha: fromSha, to_sha: toSha,
-      changes: [], summary: 'Repo is not referenced by any Cosmos service.',
+      changes: [], summary: 'Repo is not referenced by any Project Cosmos service.',
     }));
   }
   process.exit(0);
@@ -216,18 +216,18 @@ The Kafka topic registry at ${registryPath} lists every topic that exists in pro
 `
   : '';
 
-const systemPrompt = `You are a drift-detection agent for Cosmos — your architecture map: a visualization of the services, Kafka topics, and event flows across your organization's platform.
+const systemPrompt = `You are a drift-detection agent for Project Cosmos — your architecture map: a visualization of the services, Kafka topics, and event flows across your organization's platform.
 
-Source repos live at ${reposRoot}/<repo-name>/. The relevant slice of the Cosmos map (services, steps, topics for this repo) is provided below — you do not need to read the map's own repository.
+Source repos live at ${reposRoot}/<repo-name>/. The relevant slice of the Project Cosmos map (services, steps, topics for this repo) is provided below — you do not need to read the map's own repository.
 ${registrySection}
 ## Your job
-A source repo has changed between two shas. You will be given the diff (filtered to cosmos-relevant files) plus the slice of Cosmos that depends on this repo. Determine whether any of the changes would invalidate or extend Cosmos.
+A source repo has changed between two shas. You will be given the diff (filtered to cosmos-relevant files) plus the slice of Project Cosmos that depends on this repo. Determine whether any of the changes would invalidate or extend Project Cosmos.
 
 Look specifically for:
 1. **Topic identity drift**: renamed/added/removed Kafka topics
 2. **Producer/consumer flow drift**: new \`@EventPattern\` / new \`kafkaService.produce\` calls / removed handlers
-3. **HTTP route drift**: route handlers added/removed that match a Cosmos step's described endpoint
-4. **Payload shape drift**: event payload class fields changed in ways that would invalidate Cosmos's step.payload examples
+3. **HTTP route drift**: route handlers added/removed that match a Project Cosmos step's described endpoint
+4. **Payload shape drift**: event payload class fields changed in ways that would invalidate Project Cosmos's step.payload examples
 5. **Service identity drift**: service moved/renamed; tech stack changed; service no longer exists
 
 ## Investigation strategy
@@ -237,7 +237,7 @@ Look specifically for:
 - Use \`read_file\` / \`grep\` / \`list_dir\` to dig further when the diff alone is ambiguous.
 
 ## Calibration (IMPORTANT)
-Bias toward \`inconclusive\` when evidence is incomplete. Reserve \`drift\` + \`confidence: high\` for cases where you can quote a specific file:line that proves the drift. Reserve deletions of Cosmos elements for \`confidence: high\` only — when in doubt, propose an edit/add, not a delete.
+Bias toward \`inconclusive\` when evidence is incomplete. Reserve \`drift\` + \`confidence: high\` for cases where you can quote a specific file:line that proves the drift. Reserve deletions of Project Cosmos elements for \`confidence: high\` only — when in doubt, propose an edit/add, not a delete.
 
 ## Output
 Output ONE JSON object in a single markdown code block tagged 'json'. Schema:

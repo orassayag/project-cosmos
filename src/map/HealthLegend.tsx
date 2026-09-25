@@ -1,16 +1,23 @@
 import type { HealthStatus } from '../scenarios/health';
 import { HEALTH_STATUS_META, HEALTH_STATUS_COUNTS } from '../scenarios/health';
+import { PanelCloseButton } from '../components/PanelCloseButton';
 
 const ORDER: HealthStatus[] = ['fresh', 'warm', 'hot'];
+
+interface HealthLegendProps {
+  /** Close the overlay (mobile corner ×). */
+  onClose?: () => void;
+}
 
 /**
  * Heat-map key (F17). Explains what each star tint means and how many services
  * sit in each bucket. Read-only — the map does the talking; clicking a star
  * opens the on-call card.
  */
-export function HealthLegend() {
+export function HealthLegend({ onClose }: HealthLegendProps) {
   return (
     <div className="lc-health-legend" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
+      {onClose && <PanelCloseButton onClose={onClose} label="Close health" />}
       <div className="lc-health-legend-title">Service health</div>
       <div className="lc-health-legend-hint">Tint = commit age + PR backlog</div>
       <ul className="lc-health-legend-list">

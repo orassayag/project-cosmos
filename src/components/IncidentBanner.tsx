@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import type { Incident } from '../scenarios/data';
 import type { Step } from '../scenarios/types';
+import { PanelCloseButton } from './PanelCloseButton';
 
 interface IncidentBannerProps {
   /** The active incident, or null when a normal scenario (or nothing) plays. */
@@ -12,6 +13,8 @@ interface IncidentBannerProps {
   stepIndex: number;
   /** Total steps in the incident, for the counter. */
   stepCount: number;
+  /** Close / dismiss the incident replay (mobile corner ×). */
+  onClose?: () => void;
 }
 
 /**
@@ -21,7 +24,7 @@ interface IncidentBannerProps {
  * beside the incident title; the body is the current step's narrative and
  * crossfades as playback advances; the source links sit along the bottom.
  */
-export function IncidentBanner({ incident, step, stepIndex, stepCount }: IncidentBannerProps) {
+export function IncidentBanner({ incident, step, stepIndex, stepCount, onClose }: IncidentBannerProps) {
   return (
     <AnimatePresence>
       {incident && (
@@ -34,6 +37,7 @@ export function IncidentBanner({ incident, step, stepIndex, stepCount }: Inciden
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.24, ease: [0.2, 0.9, 0.3, 1.1] }}
         >
+          {onClose && <PanelCloseButton onClose={onClose} label="Close incident" />}
           <header className="lc-incident-panel-head">
             <span className="lc-incident-panel-badge">INCIDENT</span>
             <h3 className="lc-incident-panel-title">{incident.label}</h3>

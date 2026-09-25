@@ -932,6 +932,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   animation: lc-panel-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .lc-ask-panel-close { top: 12px; right: 12px; }
+.lc-ask-panel[hidden] { display: none; }
 .lc-ask-panel-head { display: flex; flex-direction: column; gap: 8px; padding-right: 28px; }
 .lc-ask-panel-question {
   margin: 0;
@@ -1010,11 +1011,33 @@ body:has(.lc-map-stage[data-panning='true']) * {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
-  cursor: pointer;
+  white-space: nowrap;
+  pointer-events: none;
   opacity: 0.55;
+}
+.lc-present-exit {
+  position: absolute;
+  top: calc(14px + var(--safe-top, 0px));
+  right: calc(14px + var(--safe-right, 0px));
+  z-index: 31;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0.7;
   transition: opacity var(--dur-fast) var(--ease-std);
 }
-.lc-present-hint:hover { opacity: 1; }
+.lc-present-exit:hover,
+.lc-present-exit:focus-visible { opacity: 1; color: var(--text-1); }
 .lc-present-hint kbd {
   padding: 1px 4px;
   border: 1px solid var(--border);
@@ -2426,8 +2449,8 @@ body:has(.lc-map-stage[data-panning='true']) * {
   padding: 1px 5px;
 }
 
-/* ── Cosmos chat ────────────────────────────────────────────── */
-/* ── Cosmos chat trigger ─────────────────────────────────────── */
+/* ── Project Cosmos chat ────────────────────────────────────────────── */
+/* ── Project Cosmos chat trigger ─────────────────────────────────────── */
 .lc-chat-trigger {
   position: absolute;
   right: 58px;
@@ -2451,7 +2474,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   box-shadow: 0 0 20px -4px color-mix(in srgb, var(--svc-magenta) 65%, transparent);
 }
 
-/* ── Cosmos chat panel ───────────────────────────────────────── */
+/* ── Project Cosmos chat panel ───────────────────────────────────────── */
 .lc-chat-panel {
   position: absolute;
   right: 58px;

@@ -1,6 +1,6 @@
 ---
 name: Feature / idea
-about: A problem the Cosmos should solve, or a mechanic it should have
+about: A problem Project Cosmos should solve, or a mechanic it should have
 labels: enhancement
 ---
 

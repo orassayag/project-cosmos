@@ -1,10 +1,10 @@
-# Cosmos Drift Sync
+# Project Cosmos Drift Sync
 
-> AI-driven nightly check that keeps your Cosmos map honest with reality.
+> AI-driven nightly check that keeps your Project Cosmos map honest with reality.
 
-Cosmos is a living map of your services, Kafka topics, and event flows. The moment reality drifts from the map — a topic renamed, a new producer added, a handler deleted — this system detects it overnight, drafts the fix, and opens a per-team draft PR. Optionally, Slack lights up. The map stays true.
+Project Cosmos is a living map of your services, Kafka topics, and event flows. The moment reality drifts from the map — a topic renamed, a new producer added, a handler deleted — this system detects it overnight, drafts the fix, and opens a per-team draft PR. Optionally, Slack lights up. The map stays true.
 
-It works against **your** GitHub org and repos: everything company-specific lives in `drift-sync/config.json` (plus CI secrets), and the tracked-repo list is derived from your Cosmos map itself.
+It works against **your** GitHub org and repos: everything company-specific lives in `drift-sync/config.json` (plus CI secrets), and the tracked-repo list is derived from your Project Cosmos map itself.
 
 ---
 
@@ -33,7 +33,7 @@ drift-sync/
         ├── agent.ts                Claude tool-use loop (read_file, write_file, grep, run_command)
         ├── prefilter.ts            path + content regex applied to diffs
         ├── git.ts                  git + state-file helpers
-        ├── cosmos-context.ts       per-repo Cosmos slice extractor
+        ├── cosmos-context.ts       per-repo Project Cosmos slice extractor
         └── report-html.ts          generator for the dry-run HTML report
 ```
 
@@ -151,7 +151,7 @@ gh workflow run cosmos-sync.yml --field mode=live         # full loop: edits + P
 gh workflow run cosmos-sync.yml --field mode=dry-run --field only_repo=<repo>
 ```
 
-Or via the GitHub UI: Actions → "Cosmos Drift Sync" → Run workflow.
+Or via the GitHub UI: Actions → "Project Cosmos Drift Sync" → Run workflow.
 
 Every run writes a condensed report (bucket counts, per-team breakdown with PR links, estimated API cost) to the run's **Summary** panel, and uploads the full `.md` + `.html` reports as an artifact (`cosmos-sync-dry-run-<run-id>`, retained 10 days).
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cosmos drift validator — Phase 0 deterministic checks.
+ * Project Cosmos drift validator — Phase 0 deterministic checks.
  *
  * Internal checks (no source-repo access):
  *  - Every step.from / step.to / step.through resolves to a known service or topic id
@@ -39,7 +39,7 @@ const jsonOut = args.includes('--json');
 const reposRootIdx = args.indexOf('--repos-root');
 const reposRoot =
   reposRootIdx >= 0 ? args[reposRootIdx + 1] : loadDriftSyncConfig().reposRoot;
-// Cross-repo checks (greps every Cosmos topic.name across the source
+// Cross-repo checks (greps every Project Cosmos topic.name across the source
 // workspace) only make sense when those repos are cloned locally. CI
 // validators don't have them — so default to internal-only and let
 // users opt-in to the deeper sweep via --source-check.
@@ -435,7 +435,7 @@ if (jsonOut) {
   const byCode = groupBy(findings, f => f.code);
 
   console.log('═'.repeat(78));
-  console.log(' Cosmos drift validator');
+  console.log(' Project Cosmos drift validator');
   console.log('═'.repeat(78));
   console.log(` mode:       ${sourceCheck ? 'internal + source-check (cross-repo grep)' : 'internal-only (use --source-check for deeper sweep)'}`);
   if (sourceCheck) console.log(` repos-root: ${reposRoot}`);

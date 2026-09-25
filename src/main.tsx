@@ -5,6 +5,7 @@ import './styles/tokens.css';
 import './styles/global.css';
 import './styles/components.css';
 import './styles/app.css';
+import './styles/responsive.css';
 
 import { App } from './App';
 

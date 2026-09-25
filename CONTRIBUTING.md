@@ -1,4 +1,4 @@
-# Contributing to The Cosmos
+# Contributing to Project Cosmos
 
 Thanks for wanting to make the galaxy bigger. Two rules of the universe before you start:
 

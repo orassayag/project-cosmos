@@ -171,8 +171,8 @@ interface PlanetProps {
  * A service rendered as a shaded celestial body: an atmosphere halo, a
  * lit sphere with a type-specific surface, a terminator shadow, a rim
  * highlight, and — for ringed worlds — a tilted ring whose near arc
- * crosses in front of the disc. Only the sphere is a click target; the
- * title is drawn separately by the caller so it stays legible.
+ * crosses in front of the disc. The sphere is a click target; the title
+ * is drawn separately by the caller, which also owns the wider hit area.
  */
 export function Planet({ service: n, onClick }: PlanetProps) {
   const R = planetRadius(n.id);

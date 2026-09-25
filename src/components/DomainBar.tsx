@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import {
   DOMAINS,
@@ -12,8 +12,10 @@ interface DomainBarProps {
   activeScenarioId: string | null;
   onPickDomain: (domainId: string) => void;
   onPickScenario: (scenarioId: string) => void;
-  /** Bumped by a galaxy reset ("Cosmos" title / global Esc) to close the menu. */
+  /** Bumped by a galaxy reset ("Project Cosmos" title / global Esc) to close the menu. */
   resetNonce?: number;
+  /** Render the scenarios list in-flow directly under the tapped tab (mobile drawer accordion). */
+  inline?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function DomainBar({
   onPickDomain,
   onPickScenario,
   resetNonce = 0,
+  inline = false,
 }: DomainBarProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -43,11 +46,11 @@ export function DomainBar({
 
   // Recompute the dropdown's left position based on the active tab.
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const btn = tabRefs.current[active];
     if (!btn) return;
     setAnchor({ left: btn.offsetLeft, minWidth: Math.max(280, btn.offsetWidth) });
-  }, [open, active]);
+  }, [open, active, inline]);
 
   // Outside click + ESC → close
   useEffect(() => {
@@ -78,6 +81,55 @@ export function DomainBar({
 
   const scenarios = scenariosForDomain(active);
 
+  const scenarioMenu = open && (inline || anchor) && (
+    <div
+      className="lc-domain-menu"
+      role="menu"
+      style={inline || !anchor ? undefined : { left: anchor.left, minWidth: anchor.minWidth }}
+    >
+      <div className="lc-picker-menu-hdr">
+        {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'}
+      </div>
+      {scenarios.length === 0 && (
+        <div className="lc-picker-menu-empty">
+          No flows authored yet for this domain.
+        </div>
+      )}
+      {scenarios.map((s) => {
+        const isReady = s.status === 'ready';
+        const stepCount = isReady ? stepsForScenario(s).length : 0;
+        const isActiveScenario = s.id === activeScenarioId;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            className="lc-picker-item"
+            data-ready={isReady ? 'true' : 'false'}
+            data-active={isActiveScenario ? 'true' : 'false'}
+            disabled={!isReady}
+            style={{ ['--c' as string]: s.color } as React.CSSProperties}
+            onClick={() => {
+              if (!isReady) return;
+              onPickScenario(s.id);
+              setOpen(false);
+            }}
+          >
+            <span className="lc-picker-item-swatch" />
+            <span className="lc-picker-item-body">
+              <span className="lc-picker-item-label">{s.label}</span>
+              <span className="lc-picker-item-sub">
+                {isReady
+                  ? `${stepCount} step${stepCount === 1 ? '' : 's'}`
+                  : (s.short ?? 'Coming soon')}
+              </span>
+            </span>
+            {!isReady && <span className="lc-picker-item-badge">SOON</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="lc-domain-bar" ref={wrapRef}>
       <div className="lc-domain-tabs" role="tablist">
@@ -85,75 +137,30 @@ export function DomainBar({
           const total = scenariosForDomain(d.id).length;
           const isActive = active === d.id;
           return (
-            <button
-              key={d.id}
-              ref={(el) => { tabRefs.current[d.id] = el; }}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-haspopup="menu"
-              aria-expanded={isActive && open}
-              data-active={isActive ? 'true' : 'false'}
-              data-empty={total === 0 ? 'true' : 'false'}
-              data-open={isActive && open ? 'true' : 'false'}
-              className="lc-domain-tab"
-              onClick={() => handleTabClick(d.id)}
-            >
-              <span className="lc-domain-tab-label">{d.label}</span>
-              <span className="lc-domain-tab-caret" aria-hidden="true">▾</span>
-            </button>
+            <Fragment key={d.id}>
+              <button
+                ref={(el) => { tabRefs.current[d.id] = el; }}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-haspopup="menu"
+                aria-expanded={isActive && open}
+                data-active={isActive ? 'true' : 'false'}
+                data-empty={total === 0 ? 'true' : 'false'}
+                data-open={isActive && open ? 'true' : 'false'}
+                className="lc-domain-tab"
+                onClick={() => handleTabClick(d.id)}
+              >
+                <span className="lc-domain-tab-label">{d.label}</span>
+                <span className="lc-domain-tab-caret" aria-hidden="true">▾</span>
+              </button>
+              {inline && isActive && scenarioMenu}
+            </Fragment>
           );
         })}
       </div>
 
-      {open && anchor && (
-        <div
-          className="lc-domain-menu"
-          role="menu"
-          style={{ left: anchor.left, minWidth: anchor.minWidth }}
-        >
-          <div className="lc-picker-menu-hdr">
-            {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'}
-          </div>
-          {scenarios.length === 0 && (
-            <div className="lc-picker-menu-empty">
-              No flows authored yet for this domain.
-            </div>
-          )}
-          {scenarios.map((s) => {
-            const isReady = s.status === 'ready';
-            const stepCount = isReady ? stepsForScenario(s).length : 0;
-            const isActiveScenario = s.id === activeScenarioId;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                className="lc-picker-item"
-                data-ready={isReady ? 'true' : 'false'}
-                data-active={isActiveScenario ? 'true' : 'false'}
-                disabled={!isReady}
-                style={{ ['--c' as string]: s.color } as React.CSSProperties}
-                onClick={() => {
-                  if (!isReady) return;
-                  onPickScenario(s.id);
-                  setOpen(false);
-                }}
-              >
-                <span className="lc-picker-item-swatch" />
-                <span className="lc-picker-item-body">
-                  <span className="lc-picker-item-label">{s.label}</span>
-                  <span className="lc-picker-item-sub">
-                    {isReady
-                      ? `${stepCount} step${stepCount === 1 ? '' : 's'}`
-                      : (s.short ?? 'Coming soon')}
-                  </span>
-                </span>
-                {!isReady && <span className="lc-picker-item-badge">SOON</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {!inline && scenarioMenu}
     </div>
   );
 }

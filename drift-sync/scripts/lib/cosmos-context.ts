@@ -1,5 +1,5 @@
 /**
- * Extract the Cosmos slice for a given source repo — the set of services,
+ * Extract the Project Cosmos slice for a given source repo — the set of services,
  * steps, and topics that touch this repo. Fed into the diff-repo agent
  * prompt so Claude knows what to compare the source diff against.
  */
@@ -10,7 +10,7 @@ import { STEPS } from '../../../src/scenarios/data.js';
 import { resolveOwner } from '../../../src/scenarios/owners.js';
 import type { Service, Step, SubService, Topic } from '../../../src/scenarios/types.js';
 
-export interface CosmosRepoSlice {
+export interface ProjectCosmosRepoSlice {
   /** Services whose repo (or subService repo) equals the target. */
   services: { id: string; service: Service; subServices: SubService[] }[];
   /** Steps where any of the above services is from / to / through. */
@@ -23,9 +23,9 @@ export interface CosmosRepoSlice {
   teams: { team: string; githubTeam?: string; slack?: string; reviewers: string[] }[];
 }
 
-export function buildRepoSlice(repo: string): CosmosRepoSlice {
+export function buildRepoSlice(repo: string): ProjectCosmosRepoSlice {
   // Services whose repo == this repo (top-level OR sub-service).
-  const services: CosmosRepoSlice['services'] = [];
+  const services: ProjectCosmosRepoSlice['services'] = [];
   for (const svc of SERVICES) {
     if (svc.repo === repo) {
       services.push({ id: svc.id, service: svc, subServices: [] });
@@ -60,7 +60,7 @@ export function buildRepoSlice(repo: string): CosmosRepoSlice {
     .filter((t): t is Topic => Boolean(t));
 
   // Producer/consumer role per topic for this repo's services.
-  const topicRoles: CosmosRepoSlice['topicRoles'] = [];
+  const topicRoles: ProjectCosmosRepoSlice['topicRoles'] = [];
   for (const topic of topics) {
     let isProducer = false;
     let isConsumer = false;
@@ -83,7 +83,7 @@ export function buildRepoSlice(repo: string): CosmosRepoSlice {
   }
 
   // Teams + owner resolution.
-  const teamMap = new Map<string, CosmosRepoSlice['teams'][number]>();
+  const teamMap = new Map<string, ProjectCosmosRepoSlice['teams'][number]>();
   for (const s of services) {
     const owner = resolveOwner(s.service);
     const team = s.service.team ?? '(unknown)';
@@ -101,10 +101,10 @@ export function buildRepoSlice(repo: string): CosmosRepoSlice {
 }
 
 /** Compact textual summary of the slice for the agent's user prompt. */
-export function formatSliceForPrompt(slice: CosmosRepoSlice): string {
+export function formatSliceForPrompt(slice: ProjectCosmosRepoSlice): string {
   const parts: string[] = [];
 
-  parts.push('## Cosmos services backed by this repo');
+  parts.push('## Project Cosmos services backed by this repo');
   for (const s of slice.services) {
     parts.push(`  - id: ${s.id}  team: ${s.service.team ?? '(none)'}  role: ${s.service.role}`);
     parts.push(`    desc: ${s.service.desc.replace(/\s+/g, ' ').slice(0, 200)}…`);
@@ -114,7 +114,7 @@ export function formatSliceForPrompt(slice: CosmosRepoSlice): string {
   }
 
   parts.push('');
-  parts.push(`## Cosmos steps involving this repo (${slice.steps.length})`);
+  parts.push(`## Project Cosmos steps involving this repo (${slice.steps.length})`);
   for (const step of slice.steps) {
     const via = step.via ? ` via '${step.via}'` : '';
     const through = step.through ? ` through ${step.through}` : '';

@@ -1,4 +1,4 @@
-name: Cosmos Drift Sync
+name: Project Cosmos Drift Sync
 
 # Nightly cron that:
 #   1. Clones every source repo referenced by drift-sync/state.json
@@ -6,7 +6,7 @@ name: Cosmos Drift Sync
 #      - per repo: diffs baseline-sha → current origin HEAD
 #      - prefilter + AI agent verdict
 #      - buckets by team
-#      - applier writes real Cosmos edits + runs validator in-loop
+#      - applier writes real Project Cosmos edits + runs validator in-loop
 #      - opens one draft PR per team
 #      - posts to the single cosmos Slack channel, tagging the team
 #        via @-mention; on a fully clean run posts an all-clear heartbeat

@@ -1,11 +1,11 @@
 ---
 name: add-service
-description: Add a service capsule (or Kafka topic node) to the Cosmos map. Use when the user says "add service X to the cosmos", "wire X into the map", or "add a topic node for Y". Researches the service from source, maps all its connections, then adds SERVICES/TOPICS entries to src/scenarios/ with correct position, color, and tech tags. Does not add scenario steps — that's add-scenario.
+description: Add a service capsule (or Kafka topic node) to the Project Cosmos map. Use when the user says "add service X to Project Cosmos", "wire X into the map", or "add a topic node for Y". Researches the service from source, maps all its connections, then adds SERVICES/TOPICS entries to src/scenarios/ with correct position, color, and tech tags. Does not add scenario steps — that's add-scenario.
 ---
 
-# Add a service (or topic) to the Cosmos
+# Add a service (or topic) to Project Cosmos
 
-Use this skill when the user says "add X to the cosmos", "wire service X into the map", or "add a topic node for Y". This covers adding a standalone capsule — it does **not** add scenario steps (use the `add-scenario` skill for that).
+Use this skill when the user says "add X to Project Cosmos", "wire service X into the map", or "add a topic node for Y". This covers adding a standalone capsule — it does **not** add scenario steps (use the `add-scenario` skill for that).
 
 ---
 
@@ -46,19 +46,19 @@ Before writing any entry, build a connection table. This is the most important s
 
 For every connection the new service has, fill in this table:
 
-| Direction | Protocol | Counterpart | Counterpart in cosmos? | Topic in cosmos? |
+| Direction | Protocol | Counterpart | Counterpart in Project Cosmos? | Topic in Project Cosmos? |
 |---|---|---|---|---|
 | → outbound | HTTP | `payments` | ✅ `payments` | n/a |
 | ← inbound | Kafka (consume) | `orders` | ✅ `orders` | `orders.created` ❌ missing |
 
 Rules:
-- **Counterpart in cosmos?** — `grep -n "id: 'svc-id'" src/scenarios/services.ts` for each one
-- **Topic in cosmos?** — `grep -n "id: 'topic-name'" src/scenarios/topics.ts` for Kafka hops
+- **Counterpart in Project Cosmos?** — `grep -n "id: 'svc-id'" src/scenarios/services.ts` for each one
+- **Topic in Project Cosmos?** — `grep -n "id: 'topic-name'" src/scenarios/topics.ts` for Kafka hops
 - For anything ❌: either add it now (if it's a known service) or flag it in the **Connection summary** below
 
 After filling the table, for each ❌:
 
-- **Missing service** → add it using this skill, OR note it as "not yet in cosmos" in `desc`
+- **Missing service** → add it using this skill, OR note it as "not yet in Project Cosmos" in `desc`
 - **Missing topic** → add a `TOPICS` entry if it will be used in a scenario step `via:`; otherwise just document it in the `desc` of both producer and consumer
 - **Existing service whose `desc` is now stale** → update its `desc` to mention the new connection
 
@@ -97,7 +97,7 @@ Append to the `SERVICES` array in `src/scenarios/services.ts`, near logically re
   role: 'One-line role label',
   desc: `Full description. Cover: what it owns, what triggers it,
   what it produces, AND which other services it connects to (with protocol).
-  Call out any connections to services not yet in the cosmos explicitly.
+  Call out any connections to services not yet in Project Cosmos explicitly.
   2–5 sentences.`,
   tech: ['typescript', 'nestjs', 'postgres', 'kafka'],
   repo: 'my-service',             // repo name in your org; omit for non-repo nodes (object storage etc.)
@@ -165,12 +165,12 @@ Go back to the connection table from Step 2. For every ✅ counterpart whose `de
 ## Step 7 — Connection summary (always output this)
 
 ```
-### Connections wired into cosmos
+### Connections wired into Project Cosmos
 - my-service ←HTTP— api-gateway  (api-gateway.desc updated)
 - my-service —Kafka→ orders  (orders.created topic added)
 
-### Connections NOT yet in cosmos
-- my-service —HTTP→ legacy-billing  (service not in cosmos — noted in desc)
+### Connections NOT yet in Project Cosmos
+- my-service —HTTP→ legacy-billing  (service not in Project Cosmos — noted in desc)
 ```
 
 ---

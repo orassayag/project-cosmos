@@ -1,4 +1,4 @@
-# The Cosmos
+# Project Cosmos
 
 [![Validate](https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml/badge.svg)](https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-6f42c1)](https://project-cosmos-six.vercel.app/)
@@ -27,12 +27,12 @@
 </p>
 
 <p align="center">
-  <img src="images/demo.png" alt="The Cosmos map playing the Place an order scenario — services as stars, Kafka topics as orbitals, the step panel showing the real request payload, and the Incidents, Changelog, Ownership, Blast radius and Health controls" width="100%">
+  <img src="images/demo.png" alt="The Project Cosmos map playing the Place an order scenario — services as stars, Kafka topics as orbitals, the step panel showing the real request payload, and the Incidents, Changelog, Ownership, Blast radius and Health controls" width="100%">
 </p>
 
 ## Why
 
-Every architecture diagram starts dying the moment it's born. The wiki page is from two reorgs ago, the Lucidchart link is stale, and the only reliable documentation is a senior engineer with a whiteboard. Cosmos takes a different bet:
+Every architecture diagram starts dying the moment it's born. The wiki page is from two reorgs ago, the Lucidchart link is stale, and the only reliable documentation is a senior engineer with a whiteboard. Project Cosmos takes a different bet:
 
 1. **The map is the source, not a mirror.** Everything you see — services, topics, flows — is one set of plain TypeScript files. No backend, no database, no sync job to a diagramming SaaS.
 2. **Flows are playable, not drawn.** A scenario is a real request traced hop-by-hop: URL, headers, payload, what got produced to which topic, what got written to which database. Press play and watch it fly.
@@ -199,7 +199,7 @@ The three incidents that ship with AstroMart (`src/incidents/*.ts`) are working 
 
 ## Drift Sync
 
-The map you can't trust is worthless — so Cosmos ships with its own lie detector. Every night:
+The map you can't trust is worthless — so Project Cosmos ships with its own lie detector. Every night:
 
 ```
 clone tracked repos → diff vs baseline SHA → regex prefilter (~95% exit free)
@@ -219,7 +219,7 @@ Merging the PR bumps the baseline inside the same PR — merge means caught-up, 
 ## Origin
 
 This repository is a fork of [ludeo-labs/cosmos-os](https://github.com/ludeo-labs/cosmos-os).
-Cosmos began as an internal tool at [Ludeo](https://ludeo.com), built to answer "wait, what happens after the client sends this?" without archaeology. The open-source version is the same map with a fictional universe on it. The full story: [Your architecture diagram is already wrong — so I built a galaxy instead](https://medium.com/@omersher_79552/your-architecture-diagram-is-already-wrong-so-i-built-a-galaxy-instead-d4cf6c62ade9).
+Cosmos OS began as an internal tool at [Ludeo](https://ludeo.com), built to answer "wait, what happens after the client sends this?" without archaeology. The open-source version is the same map with a fictional universe on it. The full story: [Your architecture diagram is already wrong — so I built a galaxy instead](https://medium.com/@omersher_79552/your-architecture-diagram-is-already-wrong-so-i-built-a-galaxy-instead-d4cf6c62ade9).
 
 ## Contributing
 

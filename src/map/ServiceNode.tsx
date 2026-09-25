@@ -1,10 +1,17 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import type { MouseEvent } from 'react';
 
 import type { Service, SubService } from '../scenarios/types';
 import type { DriftKind } from '../scenarios/drift';
 import { DRIFT_KIND_META } from '../scenarios/drift';
 import { Planet } from './Planet';
 import { planetRadius } from './planetMorphology';
+
+const LABEL_FONT_SIZE = 27;
+// Rough average glyph width of the display font, as a fraction of font size.
+const LABEL_CHAR_WIDTH = 0.58;
+const LABEL_DESCENT = 8;
+const HIT_PADDING = 12;
 
 interface ServiceNodeProps {
   service: Service;
@@ -46,6 +53,8 @@ export function ServiceNode({
   const hasEcosystem = !!(n.subServices && n.subServices.length > 0);
   const r = planetRadius(n.id);
   const labelY = r + 30;
+  const hitHalfWidth = Math.max(r, (n.name.length * LABEL_FONT_SIZE * LABEL_CHAR_WIDTH) / 2) + HIT_PADDING;
+  const handleClick = (e: MouseEvent) => { e.stopPropagation(); onClick(n.id); };
 
   return (
     <g
@@ -109,8 +118,23 @@ export function ServiceNode({
               </circle>
             )}
 
+            {/* Invisible hit area spanning the sphere and its title, so a tap
+                anywhere on the star opens it — the sphere alone is too small
+                a target on phones. */}
+            <rect
+              x={-hitHalfWidth}
+              y={-r - HIT_PADDING}
+              width={hitHalfWidth * 2}
+              height={labelY + LABEL_DESCENT + r + HIT_PADDING * 2}
+              rx={HIT_PADDING}
+              fill="transparent"
+              pointerEvents="all"
+              style={{ cursor: 'pointer' }}
+              onClick={handleClick}
+            />
+
             {/* The world itself. */}
-            <Planet service={n} onClick={(e) => { e.stopPropagation(); onClick(n.id); }} />
+            <Planet service={n} onClick={handleClick} />
 
             {/* Title — sits below the sphere with a stroke halo so the
                 name stays legible over the map behind it. */}
@@ -119,7 +143,7 @@ export function ServiceNode({
               y={labelY}
               textAnchor="middle"
               fontFamily="var(--font-display)"
-              fontSize={27}
+              fontSize={LABEL_FONT_SIZE}
               fontWeight={600}
               fill="var(--text-1)"
               stroke="var(--bg-app)"

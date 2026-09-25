@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cosmos drift applier — takes a verdict bundle and produces real edits
- * to Cosmos files, with the validator running in-loop as a safety net.
+ * Project Cosmos drift applier — takes a verdict bundle and produces real edits
+ * to Project Cosmos files, with the validator running in-loop as a safety net.
  *
  * Usage:
  *   npm run sync:apply -- --input <verdicts.json> --team <team>            # apply for real
@@ -9,11 +9,11 @@
  *
  * Reads a verdict bundle (JSON array of Verdict objects), filters by team,
  * invokes Claude with read_file / write_file / run_command tools, applies
- * the proposed Cosmos edits, and runs `npm run validate` after each
+ * the proposed Project Cosmos edits, and runs `npm run validate` after each
  * substantive change.
  *
  * Pre-conditions:
- *   - The Cosmos working tree must be clean under src/scenarios/ and
+ *   - Project Cosmos working tree must be clean under src/scenarios/ and
  *     drift-sync/cosmos-confirmed.json (the applier-writable surface).
  *     Otherwise the applier refuses to run.
  */
@@ -56,7 +56,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // were all rooted there, the applier could never read or edit src/scenarios,
 // and it skipped every edit (empty diff, no PR). reposRoot is then the
 // workspace dir that holds all repos.
-const cosmosRoot = path.resolve(here, '..', '..');
+const projectCosmosRoot = path.resolve(here, '..', '..');
 
 // ──────────────────────────────────────────────────────────────────
 //  Load verdicts
@@ -89,7 +89,7 @@ const WRITABLE_PATHS = ['src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
 function gitStatusWritable(): string {
   try {
     return execFileSync('git', ['status', '--porcelain', '--', ...WRITABLE_PATHS], {
-      cwd: cosmosRoot, encoding: 'utf8',
+      cwd: projectCosmosRoot, encoding: 'utf8',
     }).trim();
   } catch (err) {
     return `ERR: ${String(err)}`;
@@ -98,7 +98,7 @@ function gitStatusWritable(): string {
 
 const initialStatus = gitStatusWritable();
 if (initialStatus.length > 0) {
-  console.error('Cosmos working tree has uncommitted changes on the applier-writable surface:');
+  console.error('Project Cosmos working tree has uncommitted changes on the applier-writable surface:');
   console.error(initialStatus);
   console.error('\nCommit or stash these before running the applier.');
   process.exit(2);
@@ -107,9 +107,9 @@ if (initialStatus.length > 0) {
 // ──────────────────────────────────────────────────────────────────
 //  Prompts
 // ──────────────────────────────────────────────────────────────────
-const systemPrompt = `You are the Cosmos Applier — your job is to translate drift findings into actual Cosmos file edits.
+const systemPrompt = `You are the Project Cosmos Applier — your job is to translate drift findings into actual Project Cosmos file edits.
 
-You will receive a bundle of "drift" verdicts for one team's services. For each verdict, apply the suggested edits (proposed_cosmos_edits) to the actual Cosmos files using read_file + write_file.
+You will receive a bundle of "drift" verdicts for one team's services. For each verdict, apply the suggested edits (proposed_cosmos_edits) to the actual Project Cosmos files using read_file + write_file.
 
 ## Working directory
 All paths (read_file, write_file, list_dir, grep, run_command) are relative to the COSMOS REPO ROOT (the repository that holds the map). So use \`src/scenarios/topics.ts\`, NOT \`<repo-name>/src/scenarios/topics.ts\`.
@@ -152,7 +152,7 @@ If you accidentally try to write outside the writable surface, write_file will r
 ## Process
 1. Read types.ts to confirm field shapes.
 2. For each verdict in the bundle:
-   a. Identify the target Cosmos file(s) from proposed_cosmos_edits.
+   a. Identify the target Project Cosmos file(s) from proposed_cosmos_edits.
    b. read_file to see the current content.
    c. Apply the smallest possible edit that satisfies the verdict.
    d. write_file with the full new content. Preserve exact formatting (indentation, quotes, trailing commas).
@@ -181,7 +181,7 @@ Output a single JSON object in a markdown code block tagged 'json':
 
 const userPrompt = `# Verdict bundle (team: ${team ?? 'any'})
 
-${items.length} drift verdict(s) to apply. Apply each one to Cosmos files, then run \`npm run validate\` to confirm.
+${items.length} drift verdict(s) to apply. Apply each one to Project Cosmos files, then run \`npm run validate\` to confirm.
 
 \`\`\`json
 ${JSON.stringify(items, null, 2)}
@@ -204,15 +204,15 @@ const result = await runAgent({
   userPrompt,
   model,
   maxIter,
-  // All paths resolve relative to cosmosRoot for the applier — same root
+  // All paths resolve relative to projectCosmosRoot for the applier — same root
   // for read_file, grep, list_dir, AND write_file. Removes path confusion.
-  reposRoot: cosmosRoot,
+  reposRoot: projectCosmosRoot,
   tools: APPLIER_TOOL_DEFS,
-  writeRoot: cosmosRoot,
-  runCommandRoot: cosmosRoot,
+  writeRoot: projectCosmosRoot,
+  runCommandRoot: projectCosmosRoot,
   runCommandAllowed: ['npm run validate'],
   requireJsonReport: true,
-  // Applier writes full-file content via write_file — Cosmos files can be
+  // Applier writes full-file content via write_file — Project Cosmos files can be
   // 200+ lines, well above the default 4096-token budget. 16k is the
   // largest budget the SDK allows without switching to streaming mode.
   maxTokens: 16_000,
@@ -225,7 +225,7 @@ const result = await runAgent({
 let diffOutput = '';
 try {
   diffOutput = execFileSync('git', ['diff', '--', ...WRITABLE_PATHS], {
-    cwd: cosmosRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+    cwd: projectCosmosRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
   });
 } catch (err) {
   console.error(`Failed to capture diff: ${String(err)}`);
@@ -236,7 +236,7 @@ try {
 // ──────────────────────────────────────────────────────────────────
 if (dryRun) {
   try {
-    execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: cosmosRoot, stdio: 'ignore' });
+    execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: projectCosmosRoot, stdio: 'ignore' });
   } catch (err) {
     console.error(`(warn) revert failed: ${String(err)}`);
   }

@@ -1,6 +1,6 @@
 # Security Policy
 
-The Cosmos is a static, client-side app with no backend — but drift-sync runs in CI with real credentials (a GitHub PAT and an Anthropic API key), so configuration mistakes can have teeth.
+Project Cosmos is a static, client-side app with no backend — but drift-sync runs in CI with real credentials (a GitHub PAT and an Anthropic API key), so configuration mistakes can have teeth.
 
 ## Reporting a vulnerability
 

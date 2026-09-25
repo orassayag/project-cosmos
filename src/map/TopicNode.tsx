@@ -2,6 +2,12 @@ import type { Topic } from '../scenarios/types';
 import type { DriftKind } from '../scenarios/drift';
 import { DRIFT_KIND_META } from '../scenarios/drift';
 
+const LABEL_FONT_SIZE = 13;
+// Monospace glyph width plus the label's 0.16em letter-spacing, as a fraction of font size.
+const LABEL_CHAR_WIDTH = 0.76;
+const HIT_RADIUS = 30;
+const HIT_PADDING = 8;
+
 interface TopicNodeProps {
   topic: Topic;
   selected?: boolean;
@@ -26,6 +32,8 @@ export function TopicNode({ topic: t, selected = false, dimmed = false, showLabe
     : t.labelSide === 'below' ? false
     : t.y >= 510;
   const labelY1 = labelAbove ? -20 : 30;
+  const isLabelVisible = selected || showLabel;
+  const labelHalfWidth = (t.name.length * LABEL_FONT_SIZE * LABEL_CHAR_WIDTH) / 2 + HIT_PADDING;
 
   return (
     <g
@@ -35,6 +43,20 @@ export function TopicNode({ topic: t, selected = false, dimmed = false, showLabe
       className="lc-topic-node"
       onClick={(e) => { e.stopPropagation(); onClick(t.id); }}
     >
+      {/* Invisible hit area — the star plus, while shown, its label — so a
+          tap near the star opens it instead of needing to land on the core. */}
+      <circle r={HIT_RADIUS} fill="transparent" pointerEvents="all" />
+      {isLabelVisible && (
+        <rect
+          x={-labelHalfWidth}
+          y={labelY1 - LABEL_FONT_SIZE - HIT_PADDING / 2}
+          width={labelHalfWidth * 2}
+          height={LABEL_FONT_SIZE + HIT_PADDING * 1.5}
+          fill="transparent"
+          pointerEvents="all"
+        />
+      )}
+
       {/* outer aura */}
       <circle r={22} fill={`url(#cosmos-star-${t.id})`} opacity={0.5} />
 
@@ -80,7 +102,7 @@ export function TopicNode({ topic: t, selected = false, dimmed = false, showLabe
           scenario path, or when zoomed into this topic's viewport region. */}
       <g
         style={{
-          opacity: selected || showLabel ? 1 : 0,
+          opacity: isLabelVisible ? 1 : 0,
           transition: 'opacity 320ms ease',
           pointerEvents: 'none',
         }}
@@ -89,7 +111,7 @@ export function TopicNode({ topic: t, selected = false, dimmed = false, showLabe
             y={labelY1}
             textAnchor="middle"
             fontFamily="var(--font-mono)"
-            fontSize={13}
+            fontSize={LABEL_FONT_SIZE}
             fontWeight={600}
             fill={t.color}
             fillOpacity={0.95}

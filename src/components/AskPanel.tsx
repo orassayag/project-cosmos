@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface AskPanelProps {
   question: string;
+  /** Buried under another surface on a phone — stays mounted so the answer keeps streaming. */
+  hidden?: boolean;
   onClose: () => void;
   /** Fired once when the "thinking" phase ends and the answer starts typing. */
   onAnswerStart?: () => void;
@@ -29,7 +31,7 @@ type Phase = 'loading' | 'typing' | 'done';
  * "thinking" for a random 3–4s, then reveals a canned answer word by word
  * the way a chat UI streams tokens.
  */
-export function AskPanel({ question, onClose, onAnswerStart }: AskPanelProps) {
+export function AskPanel({ question, hidden = false, onClose, onAnswerStart }: AskPanelProps) {
   const answer = useMemo(() => DEMO_ANSWERS[Math.floor(Math.random() * DEMO_ANSWERS.length)], []);
   const words = useMemo(() => answer.split(' '), [answer]);
 
@@ -64,7 +66,7 @@ export function AskPanel({ question, onClose, onAnswerStart }: AskPanelProps) {
   const revealed = words.slice(0, wordCount).join(' ');
 
   return (
-    <div className="lc-ask-panel" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
+    <div className="lc-ask-panel" data-no-pan="true" hidden={hidden} onClick={(e) => e.stopPropagation()}>
       <button className="lc-map-panel-close lc-ask-panel-close" onClick={onClose} aria-label="Close">
         <svg width={14} height={14} viewBox="0 0 14 14">
           <path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
@@ -72,7 +74,7 @@ export function AskPanel({ question, onClose, onAnswerStart }: AskPanelProps) {
       </button>
 
       <div className="lc-ask-panel-head">
-        <span className="lc-map-panel-eyebrow">Explore the Cosmos</span>
+        <span className="lc-map-panel-eyebrow">Explore Project Cosmos</span>
         <p className="lc-ask-panel-question">{question}</p>
       </div>
 

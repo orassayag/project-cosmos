@@ -2,7 +2,7 @@
 /**
  * Bootstrap drift-sync/state.json
  *
- * Iterates every repo referenced by Cosmos (Service.repo + SubService.repo),
+ * Iterates every repo referenced by Project Cosmos (Service.repo + SubService.repo),
  * fetches origin, fast-forwards if safe (clean + on main), and records the
  * origin/main HEAD sha as the baseline. The recorded sha is always
  * origin/<main-branch> — independent of local working state — so the
@@ -39,7 +39,7 @@ if (existsSync(confirmedPath)) {
   for (const r of data.repos_not_in_workspace ?? []) notInWorkspace.add(r);
 }
 
-// Enumerate every repo referenced by Cosmos.
+// Enumerate every repo referenced by Project Cosmos.
 const repos = new Set<string>();
 for (const svc of SERVICES) {
   if (svc.repo) repos.add(svc.repo);

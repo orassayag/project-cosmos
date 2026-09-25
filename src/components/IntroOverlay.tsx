@@ -36,7 +36,7 @@ const RING_COLORS = [
 ];
 
 /**
- * Cosmos welcome — animated starfield + a slowly-rotating orbital
+ * Project Cosmos welcome — animated starfield + a slowly-rotating orbital
  * constellation as the centerpiece. Three orbital rings, each carrying
  * a few "service stars" that drift around their orbit. The whole thing
  * sits behind the wordmark so it feels like the cosmos is already
@@ -153,11 +153,11 @@ export function IntroOverlay({ onStart, onExitComplete }: IntroOverlayProps) {
       <div className="lc-intro-vignette" aria-hidden="true" />
 
       <motion.div className="lc-intro-inner" variants={stagger} initial="hidden" animate="visible">
-        <motion.span className="lc-intro-eyebrow" variants={child}>COSMOS · {BRAND.badge.toUpperCase()} · 0.1</motion.span>
+        <motion.span className="lc-intro-eyebrow" variants={child}>PROJECT COSMOS · {BRAND.badge.toUpperCase()} · 0.1</motion.span>
         <motion.h1 className="lc-intro-title" variants={child}>
           <span className="lc-intro-title-line">{BRAND.universeName}</span>
           <span className="lc-intro-title-line lc-intro-title-line--accent">
-            Cosmos
+            Project Cosmos
           </span>
         </motion.h1>
         <motion.p className="lc-intro-sub" variants={child}>

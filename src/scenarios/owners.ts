@@ -2,7 +2,7 @@ import type { Service } from './types';
 
 /**
  * Team → reviewer mapping used by the drift-sync agent when it opens
- * Cosmos PRs. The team comes from `Service.team`; the reviewers come
+ * Project Cosmos PRs. The team comes from `Service.team`; the reviewers come
  * from this file. Update the GitHub team slugs + handles to match the
  * org. Slack channels are optional but used by the future Slack hook.
  */

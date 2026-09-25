@@ -1,9 +1,9 @@
 ---
 name: add-scenario
-description: Add a scenario (animated flow) to the Cosmos map. Use when the user says "add a scenario", "add a flow", "show what happens when X", or names a user action whose path through the system should play on the map. Traces the real flow from source across repos, then writes Scenario + Step entries (and any missing services/topics) into src/scenarios/.
+description: Add a scenario (animated flow) to the Project Cosmos map. Use when the user says "add a scenario", "add a flow", "show what happens when X", or names a user action whose path through the system should play on the map. Traces the real flow from source across repos, then writes Scenario + Step entries (and any missing services/topics) into src/scenarios/.
 ---
 
-# Add a scenario (flow) to the Cosmos
+# Add a scenario (flow) to Project Cosmos
 
 Use this skill when the user asks to "add a scenario", "add a flow", "show what happens when X", or "trace flow Y and add it". A scenario is a named, animated sequence of steps that plays end-to-end across services on the map.
 

@@ -75,11 +75,11 @@ function toolList(reposRoot: string, args: { path: string }): string {
 
 /**
  * Sandboxed write_file — only allowed under a specific writable root.
- * Used by the applier agent which must write to the Cosmos repo but not
+ * Used by the applier agent which must write to the Project Cosmos repo but not
  * any source repo.
  */
 function toolWrite(writeRoot: string, args: { path: string; content: string }): string {
-  // Documented footgun: the model sometimes prefixes the cosmos repo name
+  // Documented footgun: the model sometimes prefixes the Project Cosmos repo name
   // (e.g. "<repo-name>/src/scenarios/…"). Left as-is that resolves to a bogus
   // nested dir INSIDE writeRoot — it passes the root check below, so the write
   // "succeeds" but the REAL file is never touched. The resulting empty diff
@@ -217,7 +217,7 @@ export const APPLIER_TOOL_DEFS: Anthropic.Messages.Tool[] = [
   ...TOOL_DEFS,
   {
     name: 'write_file',
-    description: 'Overwrite a file in the Cosmos repo. Use after read_file to apply edits. Path is relative to the cosmos repo root, e.g. "src/scenarios/topics.ts".',
+    description: 'Overwrite a file in the Project Cosmos repo. Use after read_file to apply edits. Path is relative to the Project Cosmos repo root, e.g. "src/scenarios/topics.ts".',
     input_schema: {
       type: 'object',
       properties: {
@@ -229,7 +229,7 @@ export const APPLIER_TOOL_DEFS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'run_command',
-    description: 'Run a pre-approved command in the cosmos repo. Currently allowed: "npm run validate". Use after writing edits to confirm Cosmos is still internally consistent.',
+    description: 'Run a pre-approved command in the cosmos repo. Currently allowed: "npm run validate". Use after writing edits to confirm Project Cosmos is still internally consistent.',
     input_schema: {
       type: 'object',
       properties: {

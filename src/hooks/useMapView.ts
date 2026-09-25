@@ -62,6 +62,12 @@ interface Options {
    * zoom-out (you can't wheel out past seeing the whole map).
    */
   homeBBox?: BBox;
+  /**
+   * Screen px the home view must keep clear (e.g. a docked bottom sheet on
+   * phones). Changing it re-derives the max zoom-out; the caller decides
+   * whether to fly back home.
+   */
+  homePadding?: Partial<FitPadding>;
 }
 
 const DEFAULT: MapView = { tx: 0, ty: 0, scale: 1 };
@@ -74,6 +80,7 @@ export function useMapView({
   minScale = 0.35,
   maxScale = 3,
   homeBBox,
+  homePadding,
 }: Options): MapViewApi {
   const [view, setView] = useState<MapView>(DEFAULT);
   const [panning, setPanning] = useState(false);
@@ -116,8 +123,8 @@ export function useMapView({
   }, [worldW, worldH, worldMinX, worldMinY, minScale, maxScale]);
 
   const homeTarget = useCallback(
-    (): MapView | null => (homeBBox ? fitTarget(homeBBox) : null),
-    [homeBBox, fitTarget],
+    (): MapView | null => (homeBBox ? fitTarget(homeBBox, homePadding) : null),
+    [homeBBox, homePadding, fitTarget],
   );
 
   // clamp() runs on every wheel tick — cache the home scale (it only
@@ -128,6 +135,7 @@ export function useMapView({
     window.addEventListener('resize', invalidate);
     return () => window.removeEventListener('resize', invalidate);
   }, []);
+  useEffect(() => { homeScaleRef.current = null; }, [homePadding]);
 
   const clamp = useCallback((s: number) => {
     if (homeScaleRef.current == null) homeScaleRef.current = homeTarget()?.scale ?? minScale;
@@ -156,37 +164,50 @@ export function useMapView({
     };
   }, [worldW, worldH, worldMinX, worldMinY]);
 
-  const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
-    const v = viewRef.current;
-    const nextScale = clamp(v.scale * factor);
-    if (nextScale === v.scale) return;
-    // Pin the world point under the cursor: solve for tx, ty such that
-    //   vbX = world.x * nextScale + nextTx  (and same for y)
-    const world = toWorld(clientX, clientY);
+  /** The view after zooming `from` by `factor` around a screen point, or null if clamped. */
+  const zoomTarget = useCallback((from: MapView, clientX: number, clientY: number, factor: number): MapView | null => {
+    const nextScale = clamp(from.scale * factor);
+    if (nextScale === from.scale) return null;
     const svg = svgRef.current;
-    if (!svg) return;
+    if (!svg) return null;
     const rect = svg.getBoundingClientRect();
     const scaleFit = Math.min(rect.width / worldW, rect.height / worldH);
     const offsetX = (rect.width - worldW * scaleFit) / 2;
     const offsetY = (rect.height - worldH * scaleFit) / 2;
     const vbX = (clientX - rect.left - offsetX) / scaleFit + worldMinX;
     const vbY = (clientY - rect.top - offsetY) / scaleFit + worldMinY;
-    setView({
+    // Pin the world point under the cursor: solve for tx, ty such that
+    //   vbX = world.x * nextScale + nextTx  (and same for y)
+    const worldX = (vbX - from.tx) / from.scale;
+    const worldY = (vbY - from.ty) / from.scale;
+    return {
       scale: nextScale,
-      tx: vbX - world.x * nextScale,
-      ty: vbY - world.y * nextScale,
-    });
-  }, [clamp, toWorld, worldW, worldH, worldMinX, worldMinY]);
+      tx: vbX - worldX * nextScale,
+      ty: vbY - worldY * nextScale,
+    };
+  }, [clamp, worldW, worldH, worldMinX, worldMinY]);
+
+  const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
+    const target = zoomTarget(viewRef.current, clientX, clientY, factor);
+    if (target) setView(target);
+  }, [zoomTarget]);
+
+  // Forward declaration — defined below.
+  const animateRef = useRef<(target: MapView, ms?: number) => void>(() => {});
+  // Where an in-flight zoomBy animation is heading, so rapid +/− presses
+  // compound from the destination instead of a mid-tween frame.
+  const zoomDestinationRef = useRef<MapView | null>(null);
 
   const zoomBy = useCallback((factor: number) => {
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
-  }, [zoomAt]);
-
-  // Forward declaration — defined below.
-  const animateRef = useRef<(target: MapView, ms?: number) => void>(() => {});
+    const from = zoomDestinationRef.current ?? viewRef.current;
+    const target = zoomTarget(from, rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+    if (!target) return;
+    animateRef.current(target, 260);
+    zoomDestinationRef.current = target;
+  }, [zoomTarget]);
 
   const reset = useCallback(() => {
     // Smoothly fly back to the home view rather than snapping.
@@ -197,6 +218,7 @@ export function useMapView({
   const animRef = useRef<number>(0);
   const animateTo = useCallback((target: MapView, ms = 600) => {
     cancelAnimationFrame(animRef.current);
+    zoomDestinationRef.current = null;
     const start = { ...viewRef.current };
     const t0 = performance.now();
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -209,6 +231,7 @@ export function useMapView({
         scale: start.scale + (target.scale - start.scale) * k,
       });
       if (t < 1) animRef.current = requestAnimationFrame(tick);
+      else zoomDestinationRef.current = null;
     };
     animRef.current = requestAnimationFrame(tick);
   }, []);
@@ -258,9 +281,51 @@ export function useMapView({
     let startY = 0;
     let startTx = 0;
     let startTy = 0;
+    // Cumulative drag distance for the post-drag click-suppression heuristic.
+    let dragMoved = 0;
+
+    // Active touch/pen points, keyed by pointerId, for two-finger pinch.
+    const pointers = new Map<number, { x: number; y: number }>();
+    // Baseline captured when the second finger lands: the pinch center (screen
+    // px) and finger spread. Both are refreshed each move so factor is relative.
+    let pinch: { centerX: number; centerY: number; dist: number } | null = null;
+
+    const pinchGeometry = () => {
+      const pts = [...pointers.values()];
+      const [a, b] = pts;
+      return {
+        centerX: (a.x + b.x) / 2,
+        centerY: (a.y + b.y) / 2,
+        dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      };
+    };
+
+    // Screen px → viewBox units under the current preserveAspectRatio fit.
+    // Mirrors toWorld's fit math so a pinch pins the world point under the
+    // fingers exactly like wheel-zoom pins the point under the cursor.
+    const clientToVb = (clientX: number, clientY: number) => {
+      const rect = svg.getBoundingClientRect();
+      const scaleFit = Math.min(rect.width / worldW, rect.height / worldH);
+      const offsetX = (rect.width - worldW * scaleFit) / 2;
+      const offsetY = (rect.height - worldH * scaleFit) / 2;
+      return {
+        vbX: (clientX - rect.left - offsetX) / scaleFit + worldMinX,
+        vbY: (clientY - rect.top - offsetY) / scaleFit + worldMinY,
+      };
+    };
+
+    const startDrag = (e: PointerEvent) => {
+      dragId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      startTx = viewRef.current.tx;
+      startTy = viewRef.current.ty;
+      dragMoved = 0;
+      setPanning(true);
+    };
 
     const onPointerDown = (e: PointerEvent) => {
-      // Only start a drag on primary button + non-interactive targets.
+      // Only start a gesture on primary button + non-interactive targets.
       // Clicks on services / topics are handled before this via stopPropagation.
       if (e.button !== 0) return;
       const target = e.target as Element;
@@ -269,29 +334,71 @@ export function useMapView({
       // when the user drags across SVG <text> nodes or HTML overlays.
       e.preventDefault();
       window.getSelection()?.removeAllRanges();
-      dragId = e.pointerId;
-      startX = e.clientX;
-      startY = e.clientY;
-      startTx = viewRef.current.tx;
-      startTy = viewRef.current.ty;
       svg.setPointerCapture(e.pointerId);
-      setPanning(true);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (pointers.size === 2) {
+        // Second finger down — hand off from single-drag to pinch.
+        dragId = null;
+        setPanning(false);
+        pinch = pinchGeometry();
+      } else if (pointers.size === 1) {
+        startDrag(e);
+      }
     };
+
     const onPointerMove = (e: PointerEvent) => {
+      const tracked = pointers.get(e.pointerId);
+      if (tracked) { tracked.x = e.clientX; tracked.y = e.clientY; }
+
+      if (pointers.size >= 2 && pinch) {
+        // Pinch: scale by the finger-spread ratio and translate so the world
+        // point under the previous pinch center follows the new center — one
+        // setView carries both the zoom and the pan.
+        const next = pinchGeometry();
+        const factor = next.dist / pinch.dist;
+        const v = viewRef.current;
+        const nextScale = clamp(v.scale * factor);
+        const world = toWorld(pinch.centerX, pinch.centerY);
+        const { vbX, vbY } = clientToVb(next.centerX, next.centerY);
+        setView({
+          scale: nextScale,
+          tx: vbX - world.x * nextScale,
+          ty: vbY - world.y * nextScale,
+        });
+        pinch = next;
+        return;
+      }
+
       if (dragId !== e.pointerId) return;
+      dragMoved = Math.hypot(e.clientX - startX, e.clientY - startY);
       setView({
         scale: viewRef.current.scale,
         tx: startTx + (e.clientX - startX),
         ty: startTy + (e.clientY - startY),
       });
     };
+
     const endDrag = (e: PointerEvent) => {
+      const wasTracked = pointers.delete(e.pointerId);
+      try { svg.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+
+      if (pinch && pointers.size < 2) {
+        // Dropped below two fingers — end the pinch. If one finger lingers,
+        // promote it to a pan so the map doesn't jump.
+        pinch = null;
+        const [remaining] = pointers.keys();
+        if (remaining != null) {
+          const pt = pointers.get(remaining)!;
+          startDrag({ pointerId: remaining, clientX: pt.x, clientY: pt.y } as PointerEvent);
+        }
+        return;
+      }
+
       if (dragId !== e.pointerId) return;
-      svg.releasePointerCapture(e.pointerId);
-      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
       dragId = null;
       setPanning(false);
-      if (dist > 4) {
+      if (wasTracked && dragMoved > 4) {
         // Suppress the click the browser fires after a drag pointerup so
         // selections are not cleared when the user pans the map.
         svg.addEventListener('click', (ev) => ev.stopPropagation(), { capture: true, once: true });
@@ -320,7 +427,7 @@ export function useMapView({
       svg.removeEventListener('pointercancel', endDrag);
       window.removeEventListener('keydown', onKey);
     };
-  }, [zoomAt, zoomBy, reset]);
+  }, [zoomAt, zoomBy, reset, clamp, toWorld, worldW, worldH, worldMinX, worldMinY]);
 
   return { view, bind, zoomBy, reset, fitTo, toWorld, panning };
 }

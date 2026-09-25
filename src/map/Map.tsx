@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   PLAYABLE_BY_ID,
@@ -13,7 +13,8 @@ import {
 import type { Protocol, Service, Step, Topic } from '../scenarios/types';
 import type { Shot } from '../scenarios/runner';
 import { useMapView } from '../hooks/useMapView';
-import type { BBox } from '../hooks/useMapView';
+import type { BBox, FitPadding } from '../hooks/useMapView';
+import { useViewport } from '../hooks/useViewport';
 import { buildPathBetween, deriveEdges, activeNodeSet, shotNodeSet, subPosition } from './edge-builder';
 import type { EdgeRecord, PosOverrides } from './edge-builder';
 
@@ -94,6 +95,8 @@ const HOME_BBOX: BBox = (() => {
   return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
 })();
 
+const MOBILE_SHEET_SELECTOR = '.lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-health-card, .lc-map-panel, .lc-ask-panel';
+
 type Selection =
   | { kind: 'service'; id: string }
   | { kind: 'topic'; id: string }
@@ -116,7 +119,7 @@ interface MapProps {
   /** Set by the spotlight to pan+select a node; cleared after consumption. */
   spotlightTarget?: { id: string; kind: 'service' | 'topic' } | null;
   onSpotlightConsumed?: () => void;
-  /** Incremented by the "Cosmos" reset — clears selection and reframes home. */
+  /** Incremented by the "Project Cosmos" reset — clears selection and reframes home. */
   resetNonce?: number;
   /** A random node the Ask panel "focuses" on — dims the map to its cluster
    *  while the panel is open, so the answer reads as being about it. */
@@ -143,7 +146,7 @@ interface MapProps {
 }
 
 
-export function CosmosMap({
+export function ProjectCosmosMap({
   activeScenarioId = null,
   shot = null,
   speed = 1,
@@ -215,9 +218,11 @@ export function CosmosMap({
 
   // Ownership's team filter is meaningless once the overlay is closed (by any
   // route, including another surface opening) — drop it so it never lingers.
+  // Buried under another surface on a phone, it is kept for when it resurfaces.
+  const ownershipStacked = overlay.isStacked(OVERLAY.mapOwnership);
   useEffect(() => {
-    if (!ownershipMode) setOwnerFilter(null);
-  }, [ownershipMode]);
+    if (!ownershipStacked) setOwnerFilter(null);
+  }, [ownershipStacked]);
 
   // ── Blast-radius overlay mode (F14 — "what breaks if I change X") ──
   const [blastSourceId, setBlastSourceId] = useState<string | null>(null);
@@ -230,15 +235,17 @@ export function CosmosMap({
     () => (blastResult ? new Set(blastResult.levels.keys()) : null),
     [blastResult],
   );
+  const blastStacked = overlay.isStacked(OVERLAY.mapBlast);
   useEffect(() => {
-    if (!blastMode) setBlastSourceId(null);
-  }, [blastMode]);
+    if (!blastStacked) setBlastSourceId(null);
+  }, [blastStacked]);
 
   // ── Health heat-map overlay mode (F17) ─────────────────────
   const [healthSelectedId, setHealthSelectedId] = useState<string | null>(null);
+  const healthStacked = overlay.isStacked(OVERLAY.mapHealth);
   useEffect(() => {
-    if (!healthMode) setHealthSelectedId(null);
-  }, [healthMode]);
+    if (!healthStacked) setHealthSelectedId(null);
+  }, [healthStacked]);
 
   // Per-node overlay halo color: blast-severity while a source is picked,
   // health tint while the heat map is on. Null in every other mode.
@@ -331,12 +338,77 @@ export function CosmosMap({
   // by Edge children and read by CometPackets.
   const registry = useRef(createEdgeRegistry()).current;
 
+  // On phones the map must fit into the stage area left uncovered by the top
+  // chip strip and whatever is docked at the bottom (a legend sheet, or the
+  // step/incident narration above the transport bar). The transport bar and the
+  // narration panels are App-level siblings, so they're found via `.lc-stage`.
+  const { isMobile } = useViewport();
+  const [mobileClearance, setMobileClearance] = useState<FitPadding | undefined>(undefined);
+  useEffect(() => {
+    const stage = stageRef.current;
+    const shell = stage?.closest<HTMLElement>('.lc-stage');
+    if (!isMobile || !stage || !shell) { setMobileClearance(undefined); return; }
+    const visibleRect = (selector: string) => {
+      for (const el of shell.querySelectorAll(selector)) {
+        const rect = el.getBoundingClientRect();
+        if (rect.height > 0) return rect;
+      }
+      return null;
+    };
+    const measure = () => {
+      const stageRect = stage.getBoundingClientRect();
+      const controls = visibleRect('.lc-controls');
+      shell.style.setProperty('--lc-controls-h', `${Math.round(controls?.height ?? 0)}px`);
+      const strip = visibleRect('.lc-layout-controls');
+      const bottomDocked = [visibleRect(MOBILE_SHEET_SELECTOR), visibleRect('.lc-incident-panel, .lc-step-panel'), presentation ? null : controls]
+        .filter((rect): rect is DOMRect => rect !== null);
+      const obstructionTop = Math.min(stageRect.bottom, ...bottomDocked.map((rect) => rect.top));
+      const next: FitPadding = {
+        top: Math.round(strip ? strip.bottom - stageRect.top + 8 : 16),
+        bottom: Math.round(bottomDocked.length ? stageRect.bottom - obstructionTop + 8 : 16),
+        left: 12,
+        right: 12,
+      };
+      setMobileClearance((prev) => (prev && prev.top === next.top && prev.bottom === next.bottom ? prev : next));
+    };
+    const observer = new ResizeObserver(measure);
+    const observeDocked = () => {
+      observer.observe(stage);
+      shell.querySelectorAll(`${MOBILE_SHEET_SELECTOR}, .lc-incident-panel, .lc-step-panel, .lc-controls`).forEach((el) => observer.observe(el));
+    };
+    // The narration panels mount/unmount through AnimatePresence, often after
+    // this effect has run, so watch the stage's children to pick them up.
+    const mountObserver = new MutationObserver(() => { observeDocked(); measure(); });
+    mountObserver.observe(shell, { childList: true });
+    observeDocked();
+    measure();
+    return () => { observer.disconnect(); mountObserver.disconnect(); };
+  }, [isMobile, presentation, driftMode, ownershipMode, blastMode, healthMode, layoutMode, activeScenarioId, incidentActive, selection, healthSelectedId]);
+
   const { view, bind, zoomBy, reset, fitTo, toWorld, panning } = useMapView({
     worldW: WORLD_W,
     worldH: WORLD_H,
     worldMinY: WORLD_MIN_Y,
+    // Low enough that a phone's home fit is never clamped; user zoom-out is
+    // still floored at the home scale.
+    minScale: 0.08,
     homeBBox: HOME_BBOX,
+    homePadding: mobileClearance,
   });
+
+  // A node framed by focusNode (drift jump, spotlight). On phones the fit waits
+  // for the inspector sheet to mount and be measured — see the effect below.
+  const focusTargetRef = useRef<{ id: string; bbox: BBox } | null>(null);
+
+  useEffect(() => {
+    if (!isMobile || activeScenarioId || blastSourceId) return;
+    const focus = focusTargetRef.current;
+    if (selection && selection.kind !== 'sub-service' && focus?.id === selection.id) {
+      fitTo(focus.bbox, mobileClearance);
+      return;
+    }
+    reset();
+  }, [isMobile, mobileClearance, reset, fitTo, activeScenarioId, selection, blastSourceId]);
 
   // Feed the current world-pan to the background starfield so its stars
   // parallax by depth as the user pans/zooms the map (see parallaxPan.ts).
@@ -398,12 +470,15 @@ export function CosmosMap({
 
     if (!Number.isFinite(minX)) return;
 
-    overlay.close(OVERLAY.ask);
+    if (!isMobile) overlay.close(OVERLAY.ask);
     setSelection(kind === 'service' ? { kind: 'service', id } : { kind: 'topic', id });
 
+    const bbox = { minX, minY, maxX, maxY };
+    focusTargetRef.current = { id, bbox };
+    if (isMobile) return;
     // Left padding reserves room for the service/topic inspector panel (~340px at left:14).
-    fitTo({ minX, minY, maxX, maxY }, { top: 100, right: 120, bottom: 100, left: 380 });
-  }, [fitTo, overlay]);
+    fitTo(bbox, { top: 100, right: 120, bottom: 100, left: 380 });
+  }, [fitTo, overlay, isMobile]);
 
   // Spotlight: pan to + select the requested node, then signal consumed.
   useEffect(() => {
@@ -412,10 +487,15 @@ export function CosmosMap({
     onSpotlightConsumed?.();
   }, [spotlightTarget, focusNode, onSpotlightConsumed]);
 
-  // "Cosmos" reset: drop the inspector selection and reframe to the home view.
+  // "Project Cosmos" reset: drop the inspector selection and reframe to the home view.
   // Overlays are already closed by the manager (App calls overlay.reset()).
+  // `reset` changes identity whenever the phone clearance is re-measured (e.g.
+  // the inspector sheet opening), so only act on a new nonce — otherwise every
+  // later node click would be undone by this effect.
+  const handledResetNonceRef = useRef(resetNonce);
   useEffect(() => {
-    if (resetNonce === 0) return;
+    if (resetNonce === handledResetNonceRef.current) return;
+    handledResetNonceRef.current = resetNonce;
     setSelection(null);
     setTrafficDensity(1);
     reset();
@@ -426,9 +506,20 @@ export function CosmosMap({
   // (a node click closing Ask) is done in the click handlers, not an effect on
   // `selection`, so a selection left over when Ask opens can't race the effect
   // above and close the panel the same tick it appears.
+  // On phones neither closes the other: the inspector joins the overlay stack
+  // (below), so each buries the other and closing the top one brings back the
+  // one beneath it.
   useEffect(() => {
-    if (overlay.isOpen(OVERLAY.ask)) setSelection(null);
-  }, [overlay]);
+    if (!isMobile && overlay.isOpen(OVERLAY.ask)) setSelection(null);
+  }, [overlay, isMobile]);
+
+  const selectionKey = selection ? JSON.stringify(selection) : null;
+  const { open: openOverlay, close: closeOverlay } = overlay;
+  useLayoutEffect(() => {
+    if (isMobile && selectionKey) openOverlay(OVERLAY.inspector);
+    else closeOverlay(OVERLAY.inspector);
+  }, [isMobile, selectionKey, openOverlay, closeOverlay]);
+  const inspectorVisible = !isMobile || overlay.isOpen(OVERLAY.inspector);
 
   useEffect(() => {
     if (!activeScenarioId) {
@@ -458,6 +549,12 @@ export function CosmosMap({
       }
     }
     if (!Number.isFinite(minX)) return;
+    // Phones dock the step/incident narration above the transport bar, so the
+    // flow fits into the measured strip above both instead.
+    if (isMobile && mobileClearance) {
+      fitTo({ minX, minY, maxX, maxY }, mobileClearance);
+      return;
+    }
     fitTo(
       { minX, minY, maxX, maxY },
       // Right pad reserves room for the step explainer (~360px @ right:14)
@@ -465,7 +562,7 @@ export function CosmosMap({
       // smaller margin so scenario nodes hug the visible center-left.
       { top: 70, right: 440, bottom: 90, left: 80 },
     );
-  }, [activeScenarioId, fitTo, reset]);
+  }, [activeScenarioId, fitTo, reset, isMobile, mobileClearance]);
 
   // Topic side panel still summarises producers/consumers from the global
   // STEP list. (Service panel no longer shows integrations.)
@@ -723,30 +820,21 @@ export function CosmosMap({
   }, []);
 
   // The manager guarantees exclusivity — opening any of these closes the rest
-  // (and the changelog). We only clear the inspector selection, which the
-  // manager doesn't track.
-  function toggleOwnershipMode() {
-    overlay.toggle(OVERLAY.mapOwnership);
-    setSelection(null);
+  // (and the changelog). On desktop we also clear the inspector selection,
+  // which the manager doesn't track there; on phones the inspector is stacked
+  // and simply gets buried.
+  function toggleMapMode(id: string) {
+    overlay.toggle(id);
+    if (!isMobile) setSelection(null);
   }
+  const toggleOwnershipMode = () => toggleMapMode(OVERLAY.mapOwnership);
+  const toggleDriftMode = () => toggleMapMode(OVERLAY.mapChanges);
+  const toggleBlastMode = () => toggleMapMode(OVERLAY.mapBlast);
+  const toggleHealthMode = () => toggleMapMode(OVERLAY.mapHealth);
 
-  function toggleDriftMode() {
-    overlay.toggle(OVERLAY.mapChanges);
-    setSelection(null);
-  }
-
-  function toggleBlastMode() {
-    overlay.toggle(OVERLAY.mapBlast);
-    setSelection(null);
-  }
-
-  function toggleHealthMode() {
-    overlay.toggle(OVERLAY.mapHealth);
-    setSelection(null);
-  }
-
+  // A node click leaves ownership on desktop; on phones the inspector stacks on top.
   function exitOwnership() {
-    overlay.close(OVERLAY.mapOwnership);
+    if (!isMobile) overlay.close(OVERLAY.mapOwnership);
   }
 
   function resetLayout() {
@@ -942,7 +1030,7 @@ export function CosmosMap({
                       if (blastMode) { setBlastSourceId((prev) => (prev === id ? null : id)); return; }
                       if (healthMode) { setHealthSelectedId((prev) => (prev === id ? null : id)); return; }
                       exitOwnership();
-                      overlay.close(OVERLAY.ask);
+                      if (!isMobile) overlay.close(OVERLAY.ask);
                       setSelection((prev) =>
                         prev?.kind === 'service' && prev.id === id ? null : { kind: 'service', id },
                       );
@@ -950,7 +1038,7 @@ export function CosmosMap({
                     onSubServiceClick={(serviceId, subId) => {
                       if (layoutMode) return;
                       exitOwnership();
-                      overlay.close(OVERLAY.ask);
+                      if (!isMobile) overlay.close(OVERLAY.ask);
                       setSelection((prev) =>
                         prev?.kind === 'sub-service' && prev.subId === subId
                           ? null
@@ -1006,7 +1094,7 @@ export function CosmosMap({
                         if (blastMode) { setBlastSourceId((prev) => (prev === id ? null : id)); return; }
                         if (healthMode) return;
                         exitOwnership();
-                        overlay.close(OVERLAY.ask);
+                        if (!isMobile) overlay.close(OVERLAY.ask);
                         setSelection((prev) =>
                           prev?.kind === 'topic' && prev.id === id ? null : { kind: 'topic', id },
                         );
@@ -1131,6 +1219,7 @@ export function CosmosMap({
             groups={ownerGroups}
             activeKey={ownerFilter}
             onToggle={(key) => setOwnerFilter((prev) => (prev === key ? null : key))}
+            onClose={() => overlay.close(OVERLAY.mapOwnership)}
           />
         )}
 
@@ -1142,6 +1231,7 @@ export function CosmosMap({
               focusNode(nodeId, TOPICS_BY_ID[nodeId] ? 'topic' : 'service');
               onDriftSelect?.(entry);
             }}
+            onClose={() => overlay.close(OVERLAY.mapChanges)}
           />
         )}
 
@@ -1151,19 +1241,20 @@ export function CosmosMap({
             sourceName={blastSourceId ? SERVICES_BY_ID[blastSourceId]?.name ?? TOPICS_BY_ID[blastSourceId]?.name ?? blastSourceId : null}
             onFocus={(nodeId) => focusNode(nodeId, TOPICS_BY_ID[nodeId] ? 'topic' : 'service')}
             onClear={() => setBlastSourceId(null)}
+            onClose={() => overlay.close(OVERLAY.mapBlast)}
           />
         )}
 
         {healthMode && !layoutMode && (
           <>
-            <HealthLegend />
+            <HealthLegend onClose={() => overlay.close(OVERLAY.mapHealth)} />
             {healthSelectedId && (
               <HealthCard serviceId={healthSelectedId} onClose={() => setHealthSelectedId(null)} />
             )}
           </>
         )}
 
-        {selection && !blastMode && !healthMode && (
+        {selection && !blastMode && !healthMode && inspectorVisible && (
           <div
             className={`lc-map-panel lc-map-panel--${selection.kind}${driftMode || ownershipMode ? ' lc-map-panel--right' : ''}`}
             data-no-pan="true"

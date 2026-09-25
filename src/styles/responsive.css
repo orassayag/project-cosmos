@@ -1,0 +1,461 @@
+/* ════════════════════════════════════════════════════════════
+   Responsive layer — loaded LAST so it overrides the desktop-first
+   chrome in app.css / components.css. Two jobs:
+     1. Tablet (≤1024px): tighten the existing layout so nothing clips.
+     2. Phone  (≤768px):  the mobile redesign — collapse the topbar into
+        a drawer, dock every floating panel as a bottom sheet, and lay
+        the map controls out for thumbs.
+   Safe-area insets keep the shell clear of notches / home indicators.
+   ════════════════════════════════════════════════════════════ */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Touch devices: the map owns every gesture inside its stage, so the
+   browser must not steal pinch/drag for scroll-zoom. The app shell is
+   position:fixed and never scrolls, so this is safe app-wide. */
+html[data-touch='true'] .lc-map-stage,
+html[data-touch='true'] .lc-map-svg {
+  touch-action: none;
+}
+
+/* ── Hamburger toggle + slide-over drawer ─────────────────────
+   Markup exists at every size but is only rendered on phones. */
+.lc-menu-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 42px;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  cursor: pointer;
+}
+.lc-menu-toggle span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  border-radius: 2px;
+  background: var(--text-1);
+}
+.lc-menu-toggle:active { background: var(--bg-surface-2); }
+
+.lc-mobile-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  background: color-mix(in srgb, var(--bg-deep) 60%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: flex-end;
+}
+.lc-mobile-menu {
+  width: min(360px, 88vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border-left: 1px solid var(--border);
+  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.9);
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+}
+.lc-mobile-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.lc-mobile-menu-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lc-mobile-menu-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.lc-mobile-menu-close:active { color: var(--text-1); background: var(--bg-surface-2); }
+.lc-mobile-menu-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px calc(20px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.lc-mobile-menu-section { display: flex; flex-direction: column; gap: 10px; }
+.lc-mobile-menu-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lc-mobile-menu-nav,
+.lc-mobile-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Controls dropped into the drawer stretch full-width and flow in the
+   normal document, not anchored to a topbar that no longer holds them. */
+.lc-mobile-menu .lc-domain-bar,
+.lc-mobile-menu .lc-incident-bar { width: 100%; }
+/* Domains stack as separate full-width buttons, matching the Tools list. */
+.lc-mobile-menu .lc-domain-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: none;
+}
+.lc-mobile-menu .lc-domain-tab {
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.lc-mobile-menu .lc-domain-tab:not([data-active='true']) {
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+}
+.lc-mobile-menu .lc-domain-tab:last-child { border-right: 1px solid var(--border); }
+.lc-mobile-menu .lc-domain-tab[data-active='true'] { border-color: transparent; }
+.lc-mobile-menu .lc-domain-menu,
+.lc-mobile-menu .lc-picker-menu {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: 46vh;
+  margin-top: 8px;
+}
+/* The domain menu sits between tabs as an accordion; the column gap spaces it. */
+.lc-mobile-menu .lc-domain-menu { margin-top: 0; overflow-y: auto; }
+.lc-mobile-menu .lc-incident-trigger { width: 100%; justify-content: center; height: 44px; }
+
+
+.lc-mobile-menu .lc-present-btn,
+.lc-mobile-menu .lc-drift-footer,
+.lc-mobile-menu .lc-help-btn {
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+}
+.lc-mobile-menu .lc-help-btn { font-size: 18px; }
+
+/* ── Mobile-only corner close (PanelCloseButton) ──────────────
+   CONTRACT: on phone-class viewports every panel / popup / modal must show a
+   close control in its top-right corner. Panels with their own header close
+   keep theirs; the rest render <PanelCloseButton/> (this element). It's hidden
+   on desktop and revealed inside the phone media query below — so any FUTURE
+   panel gets the required mobile close simply by rendering PanelCloseButton. */
+.lc-panel-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-surface) 82%, transparent);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.lc-panel-x:active { color: var(--text-1); background: var(--bg-surface-2); }
+
+/* ════════════════════════════════════════════════════════════
+   TABLET — ≤1024px: keep the desktop shape, just stop it clipping.
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .lc-topbar-row { gap: 8px; padding: 10px 14px; }
+  .lc-topbar-side { gap: 8px; }
+  .lc-scenario-status-label { max-width: 22ch; }
+  .lc-step-panel { width: min(320px, 42vw); }
+  .lc-map-panel, .lc-ask-panel { width: min(320px, 62vw); }
+}
+
+/* ════════════════════════════════════════════════════════════
+   PHONE — narrow OR short (landscape phones) : the mobile redesign.
+   Mirrors MOBILE_QUERY in useViewport.ts so JS and CSS agree on what
+   counts as a phone.
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 768px), (max-height: 480px) {
+  /* Keyboard-shortcut footer is meaningless on touch. */
+  .lc-footer { display: none; }
+
+  /* Reveal the mobile corner × on every panel that renders PanelCloseButton. */
+  .lc-panel-x { display: inline-flex; }
+  /* Keep it clear of the incident header's step counter. */
+  .lc-incident-panel-head { padding-right: 34px; }
+
+  /* ── Compact topbar ─────────────────────────────────────── */
+  .lc-topbar--mobile { padding-top: var(--safe-top); }
+  .lc-topbar--mobile .lc-topbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+  .lc-topbar--mobile .lc-topbar-side { flex: 0 0 auto; gap: 8px; }
+  .lc-topbar-brand { font-size: 15px; }
+  .lc-topbar--mobile .lc-topbar-side--left { flex: 0 1 auto; min-width: 0; }
+  .lc-topbar--mobile .lc-topbar-side--right { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
+  .lc-topbar--mobile .lc-scenario-status {
+    min-width: 0;
+    max-width: 100%;
+    height: 28px;
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .lc-topbar--mobile .lc-scenario-status-dot { width: 7px; height: 7px; flex-shrink: 0; }
+  .lc-topbar--mobile .lc-scenario-status-label {
+    min-width: 0;
+    max-width: none;
+    font-size: 12px;
+  }
+  .lc-topbar--mobile .lc-scenario-status[data-active='false'] .lc-scenario-status-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+  .lc-topbar-search { padding: 0 14px 10px; }
+  /* In flow, not absolute, so the header grows and shrinks with the field. */
+  .lc-topbar-search .lc-ask { width: 100%; height: auto; }
+  .lc-topbar-search .lc-ask-shell { position: relative; width: 100%; height: 34px; border-radius: 17px; }
+  .lc-topbar-search .lc-ask--expanded .lc-ask-shell { height: 150px; }
+  .lc-topbar-search .lc-ask-icon { top: 11px; }
+  .lc-topbar-search .lc-ask-field { padding-top: 8px; }
+  /* The commit/branch pill can eat the whole row — let it wrap under brand. */
+  .lc-cosmos-state { display: none; }
+
+  /* ── Map gesture surface + zoom controls ────────────────── */
+  /* Pinch-to-zoom is the primary gesture on touch, so the on-screen zoom and
+     traffic steppers only earn their space on the idle map — the moment a
+     bottom sheet or the transport bar claims the lower edge, they hide. */
+  .lc-map-stepper--zoom,
+  .lc-map-stepper--traffic {
+    bottom: calc(8px + var(--safe-bottom));
+    top: auto;
+    transform: none;
+  }
+  .lc-map-stepper--zoom { right: calc(8px + var(--safe-right)); }
+  /* 8px edge + 38px zoom button + 2px border + 6px gap. */
+  .lc-map-stepper--traffic { right: calc(54px + var(--safe-right)); }
+  .lc-map-zoom-btn { width: 38px; height: 34px; font-size: 13px; }
+  /* Transport owns the bottom while playing, so hand it the stepper corner. */
+  .lc-stage:has(.lc-controls) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
+
+  /* Map-view toggles (Changes / Ownership / Blast / Health / Edit) become a
+     horizontally-scrollable chip strip pinned to the top of the stage. */
+  .lc-layout-controls {
+    top: 8px;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    padding: 6px 12px;
+    gap: 8px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .lc-layout-controls::-webkit-scrollbar { display: none; }
+  .lc-layout-btn { flex: 0 0 auto; height: 34px; white-space: nowrap; }
+
+  /* While a scenario/incident plays the transport panel owns the bottom and
+     the story panel owns the top — so hide the map-view strip to avoid a
+     three-way fight for the top edge. */
+  .lc-stage:has(.lc-controls) .lc-layout-controls { display: none; }
+
+  /* ── Map-view legends dock as a full-width bottom sheet ────────
+     The strip toggles (Changes / Ownership / Blast radius / Health) open
+     their legend as a horizontal panel pinned across the BOTTOM of the
+     stage — full width, so nothing is truncated and the map above stays
+     clean. No left/right card here: a bottom sheet reads better on a phone
+     and keeps the whole map visible above it. Capped to about a third of the
+     stage; the panel scrolls if its list is long. Map.tsx measures the sheet
+     and refits the home view into the space above it.
+     Idle-only — while a scenario plays the transport owns the bottom, so
+     these are hidden then (below). */
+  .lc-owner-legend,
+  .lc-drift-overlay,
+  .lc-blast-legend,
+  .lc-health-legend,
+  .lc-health-card,
+  .lc-map-panel,
+  .lc-ask-panel {
+    top: auto !important;
+    bottom: calc(8px + var(--safe-bottom)) !important;
+    left: calc(8px + var(--safe-left)) !important;
+    right: calc(8px + var(--safe-right)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(34%, 240px) !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    transform: none !important;
+  }
+  /* The drift list has its own inner scroll cap for desktop; let the bottom
+     sheet own the scrolling on mobile so it fills the docked height. */
+  .lc-drift-overlay-scroll { max-height: none !important; overflow: visible !important; }
+  /* The star inspector gets more room than the legends: its description and
+     ownership block are the whole point of tapping a star. */
+  .lc-map-panel,
+  .lc-ask-panel { max-height: min(50%, 380px) !important; }
+
+  /* The map steppers sit in the bottom-right corner, which both the
+     right-docked cards and the full-width bottom-sheet legends cover; hide
+     them while any of them is open so they never collide (pinch-to-zoom
+     still works). They are already hidden while the transport bar plays. */
+  .lc-stage:has(
+    .lc-map-panel, .lc-ask-panel, .lc-health-card, .lc-step-panel, .lc-owner-legend,
+    .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
+  ) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
+
+  /* Live activity log is supplementary — hide it to keep the map clear. */
+  .lc-activity { display: none; }
+
+  /* Step + incident narration: a full-width strip docked at the BOTTOM,
+     directly above the transport bar. --lc-controls-h is the transport's measured
+     height (set by Map.tsx), and Map.tsx fits the flow into the space
+     above this panel, so the map stays fully visible. */
+  .lc-incident-panel,
+  .lc-step-panel {
+    top: auto !important;
+    bottom: calc(var(--lc-controls-h, 150px) + 18px + var(--safe-bottom)) !important;
+    left: calc(8px + var(--safe-left)) !important;
+    right: calc(8px + var(--safe-right)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(30%, 200px) !important;
+    height: auto !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: none !important;
+    padding: 12px 14px 10px !important;
+    gap: 7px;
+  }
+  /* Presentation mode fades the transport bar out, so drop to the bottom edge. */
+  .lc-app[data-presentation='true'] :is(.lc-incident-panel, .lc-step-panel) {
+    bottom: calc(8px + var(--safe-bottom)) !important;
+  }
+  .lc-step-panel { max-height: min(38%, 260px) !important; gap: 10px; }
+  .lc-step-panel-body { gap: 10px; flex: none; }
+  /* The transport bar right below already has prev/next and the step dots. */
+  .lc-step-panel-actions { display: none; }
+  .lc-incident-panel-title { font-size: 13px; }
+  .lc-incident-panel-body { font-size: 12px; line-height: 1.42; }
+
+  /* ── One card at a time — panels never stack over each other ──
+     On desktop a legend (left) and an inspector/health card (right) sit side by
+     side; on a phone that pair would collide, so a detail card takes over and
+     the context panels behind it are hidden. Close the card (its corner ×) to
+     bring the previous one back. Priority, high → low:
+       inspector / ask / health card  >  step + incident narration  >  legends. */
+  .lc-stage:has(.lc-map-panel) :is(
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
+  ),
+  .lc-stage:has(.lc-ask-panel:not([hidden])) :is(
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
+  ),
+  .lc-stage:has(.lc-health-card) :is(
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
+  ),
+  .lc-stage:has(.lc-incident-panel) .lc-step-panel {
+    display: none !important;
+  }
+
+  /* The bottom-sheet legends and the transport bar both live at the bottom
+     edge, so they can never share it — the transport wins while playing. */
+  .lc-stage:has(.lc-controls) :is(
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
+  ) {
+    display: none !important;
+  }
+
+  /* The on-call card is a bottom sheet too; while playing it lifts to sit
+     directly above the transport bar instead of behind it. */
+  .lc-stage:has(.lc-controls) :is(.lc-health-card, .lc-map-panel, .lc-ask-panel) {
+    bottom: calc(var(--lc-controls-h, 150px) + 18px + var(--safe-bottom)) !important;
+    max-height: min(30%, 200px) !important;
+  }
+
+  /* ── Transport: desktop-style centered pill, just narrower ── */
+  .lc-controls {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(560px, 94vw);
+    bottom: calc(10px + var(--safe-bottom));
+    padding: 12px 14px 10px;
+    gap: 10px;
+  }
+  .lc-controls-row { flex-wrap: wrap; gap: 8px; }
+  .lc-controls .lc-pb-btn { width: 46px; height: 46px; }
+  .lc-controls .lc-pb-play { width: 60px; height: 46px; }
+  .lc-pb-share { margin-left: auto; }
+
+  /* ── Modals fit the small viewport ──────────────────────── */
+  .lc-help-modal { padding: 24px 20px 20px; max-height: 88dvh; overflow-y: auto; }
+  .lc-help-title { font-size: 22px; }
+  .lc-changelog { width: 100vw; }
+  .lc-spotlight-backdrop { padding-top: 72px; }
+
+  /* Keyboard hints mean nothing on touch; the corner × exits instead. */
+  .lc-present-hint { display: none; }
+  .lc-present-exit { width: 40px; height: 40px; opacity: 0.85; }
+}
+
+/* Very small phones — tighten transport so the row never overflows. */
+@media (max-width: 380px) {
+  .lc-controls .lc-pb-btn { width: 42px; height: 42px; font-size: 16px; }
+  .lc-controls .lc-pb-play { width: 52px; height: 42px; }
+  .lc-controls .lc-pb-pill { padding: 8px 10px; }
+  .lc-topbar-brand { font-size: 14px; }
+}
+
+/* Short viewports (landscape phones) need no special clamp: the card
+   heights above are a % of the stage, so they shrink with it automatically
+   and always keep their in-stage top offset and transport-bar reserve. */

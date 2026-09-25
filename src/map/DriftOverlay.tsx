@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { DriftEntry } from '../scenarios/drift';
 import { DRIFT_KIND_META, driftPrUrl } from '../scenarios/drift';
+import { PanelCloseButton } from '../components/PanelCloseButton';
 
 interface DriftRun {
   /** ISO date of the run. */
@@ -14,6 +15,8 @@ interface DriftOverlayProps {
   runs: DriftRun[];
   /** Select an entry: flies the map to its node and stamps the "current time". */
   onSelect: (entry: DriftEntry) => void;
+  /** Close the overlay (mobile corner ×). */
+  onClose?: () => void;
 }
 
 /** How many findings are shown before the "Load more" button appears. */
@@ -50,7 +53,7 @@ function groupByRun(items: DatedEntry[]): DriftRun[] {
  * draft the pipeline raised. The nodes themselves glow on the map in each
  * finding's kind color while this overlay is active.
  */
-export function DriftOverlay({ runs, onSelect }: DriftOverlayProps) {
+export function DriftOverlay({ runs, onSelect, onClose }: DriftOverlayProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadTimer = useRef<number | null>(null);
@@ -86,6 +89,7 @@ export function DriftOverlay({ runs, onSelect }: DriftOverlayProps) {
 
   return (
     <div className="lc-drift-overlay" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
+      {onClose && <PanelCloseButton onClose={onClose} label="Close changes" />}
       <div className="lc-drift-overlay-title">Changed</div>
       <div className="lc-drift-overlay-hint">
         {flat.length} finding{flat.length === 1 ? '' : 's'} — click to fly there

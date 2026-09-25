@@ -14,7 +14,7 @@ import type { DriftEntry } from '../scenarios/data';
 import type { SpotlightTarget } from './Spotlight';
 
 /** The commit context a clicked item warps the map into — shown by the title. */
-export interface CosmosState {
+export interface ProjectCosmosState {
   repo: string;
   sha: string;
   branch: string;
@@ -28,13 +28,15 @@ export interface CosmosState {
 /** Payload emitted when a whole changelog item is clicked. */
 export interface ChangelogActivation {
   target: SpotlightTarget;
-  state: CosmosState | null;
+  state: ProjectCosmosState | null;
   /** The selected entry's run date — the cursor even when `state` is null. */
   date: string;
 }
 
 interface ChangelogPanelProps {
   open: boolean;
+  /** Open or buried under another surface on a phone — search is kept while true. */
+  stacked: boolean;
   onClose: () => void;
   /** Fly the map to a node when a changelog item's node chip is clicked. */
   onSelectNode: (target: SpotlightTarget) => void;
@@ -68,7 +70,7 @@ function primaryTarget(nodeIds: string[]): SpotlightTarget | null {
 }
 
 /** The commit context an entry warps into, when it has a source commit. */
-export function cosmosStateFor(entry: DriftEntry): CosmosState | null {
+export function projectCosmosStateFor(entry: DriftEntry): ProjectCosmosState | null {
   if (!entry.source) return null;
   return {
     repo: entry.source.repo,
@@ -100,7 +102,7 @@ function groupByRun(items: DatedEntry[]): { date: string; entries: DriftEntry[] 
  * the affected node on the map. Searchable by keyword / tag / PR / owner, and
  * paginated so long histories load a page at a time.
  */
-export function ChangelogPanel({ open, onClose, onSelectNode, onActivateItem }: ChangelogPanelProps) {
+export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivateItem }: ChangelogPanelProps) {
   const [query, setQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -115,16 +117,20 @@ export function ChangelogPanel({ open, onClose, onSelectNode, onActivateItem }: 
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Reset the search + pagination each time the panel opens, and cancel any
-  // in-flight "load more" timer when it closes so it can't fire after unmount.
+  // Reset the search + pagination once the panel leaves the overlay stack — a
+  // phone can bury it under the inspector and bring it back with the results.
   useEffect(() => {
-    if (open) {
-      setQuery('');
-      setVisibleCount(PAGE_SIZE);
-      setLoadingMore(false);
-    }
+    if (stacked) return;
+    setQuery('');
+    setVisibleCount(PAGE_SIZE);
+  }, [stacked]);
+
+  // Cancel any in-flight "load more" timer when the panel hides so it can't
+  // fire after unmount.
+  useEffect(() => {
     return () => {
       if (loadTimer.current != null) window.clearTimeout(loadTimer.current);
+      setLoadingMore(false);
     };
   }, [open]);
 
@@ -210,7 +216,7 @@ export function ChangelogPanel({ open, onClose, onSelectNode, onActivateItem }: 
                   const commitUrl = driftCommitUrl(entry);
                   const target = primaryTarget(entry.nodeIds);
                   const activate = () => {
-                    if (target) onActivateItem({ target, state: cosmosStateFor(entry), date: entry.date });
+                    if (target) onActivateItem({ target, state: projectCosmosStateFor(entry), date: entry.date });
                   };
                   return (
                     <li

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cosmos drift-sync nightly orchestrator — dry-run mode
+ * Project Cosmos drift-sync nightly orchestrator — dry-run mode
  *
  * Loops every repo in drift-sync/state.json, runs `diff-repo --json` on
  * each (concurrency-capped), collects verdicts, buckets drifts by team,
@@ -61,7 +61,7 @@ if (!state) {
 // ──────────────────────────────────────────────────────────────────
 //  Types
 // ──────────────────────────────────────────────────────────────────
-interface CosmosEdit {
+interface ProjectCosmosEdit {
   file: string;
   rationale: string;
   patch_hint?: string;
@@ -71,7 +71,7 @@ interface Change {
   kind: string;
   description: string;
   evidence: string[];
-  proposed_cosmos_edits: CosmosEdit[];
+  proposed_cosmos_edits: ProjectCosmosEdit[];
 }
 
 interface Verdict {
@@ -207,9 +207,9 @@ for (const r of [...drifts, ...inconclusives]) {
 // ──────────────────────────────────────────────────────────────────
 // here = drift-sync/scripts → the cosmos repo root is TWO levels up. Was '..',
 // which resolved to drift-sync/ — so every git op below (and the applier
-// subprocess spawned with cwd: cosmosRoot) ran against the wrong root and the
+// subprocess spawned with cwd: projectCosmosRoot) ran against the wrong root and the
 // WRITABLE_PATHS pathspecs never matched the real files.
-const cosmosRoot = path.resolve(here, '..', '..');
+const projectCosmosRoot = path.resolve(here, '..', '..');
 const WRITABLE_PATHS = ['src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
 
 /**
@@ -220,10 +220,10 @@ const WRITABLE_PATHS = ['src/scenarios/', 'drift-sync/cosmos-confirmed.json'];
  * not clear (e.g. dirt outside WRITABLE_PATHS).
  */
 function resetWritableSurface(): string {
-  try { execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: cosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
-  try { execFileSync('git', ['clean', '-fdq', '--', ...WRITABLE_PATHS], { cwd: cosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
+  try { execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: projectCosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
+  try { execFileSync('git', ['clean', '-fdq', '--', ...WRITABLE_PATHS], { cwd: projectCosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
   try {
-    return execFileSync('git', ['status', '--porcelain', '--', ...WRITABLE_PATHS], { cwd: cosmosRoot, encoding: 'utf8' }).trim();
+    return execFileSync('git', ['status', '--porcelain', '--', ...WRITABLE_PATHS], { cwd: projectCosmosRoot, encoding: 'utf8' }).trim();
   } catch { return ''; }
 }
 
@@ -232,7 +232,7 @@ const STATE_REL = 'drift-sync/state.json';
 /**
  * Advance the drift-sync baseline SHAs for the repos whose drift was actually
  * applied, then ship the bump INSIDE the team's PR. Merging the PR therefore
- * both updates Cosmos and records "we're caught up to <to_sha>" atomically —
+ * both updates Project Cosmos and records "we're caught up to <to_sha>" atomically —
  * the next run sees baseline == HEAD for these repos, skips the clone, and
  * emits a synthetic no_drift, so handled drift never re-surfaces. Scoped to
  * repos with >=1 applied edit, so an entirely-skipped repo still re-surfaces.
@@ -240,7 +240,7 @@ const STATE_REL = 'drift-sync/state.json';
  */
 function advanceBaselines(driftItems: RepoResult[], ap: ApplierResult): string[] {
   const applied = new Set((ap.applier_report?.applied ?? []).map(e => e.verdict_service));
-  const statePath = path.join(cosmosRoot, STATE_REL);
+  const statePath = path.join(projectCosmosRoot, STATE_REL);
   let state: { repos?: Record<string, { sha?: string }> };
   try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { return []; }
   const moved: string[] = [];
@@ -257,14 +257,14 @@ function advanceBaselines(driftItems: RepoResult[], ap: ApplierResult): string[]
 
 /**
  * Auto-advance baselines for repos that had a real delta (HEAD != baseline)
- * but NO Cosmos drift. A no_drift verdict means HEAD is confirmed
+ * but NO Project Cosmos drift. A no_drift verdict means HEAD is confirmed
  * Cosmos-consistent — there is nothing to review, so the next run can safely
  * skip re-cloning/re-analyzing it. Skips synthetic no_drift (no delta) and
  * low-confidence verdicts (re-checked next run rather than silently burying a
  * possible false negative). Writes state.json; returns the moved repos.
  */
 function advanceNoDriftBaselines(noDriftResults: RepoResult[]): string[] {
-  const statePath = path.join(cosmosRoot, STATE_REL);
+  const statePath = path.join(projectCosmosRoot, STATE_REL);
   let state: { repos?: Record<string, { sha?: string }> };
   try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { return []; }
   const moved: string[] = [];
@@ -284,7 +284,7 @@ function advanceNoDriftBaselines(noDriftResults: RepoResult[]): string[] {
  * Advance the no-drift baselines via a single AUTO-MERGED chore PR. main is
  * ruleset-protected (required check `validate`, no bypass actors), so a direct
  * push of a fresh commit is rejected. Instead we open one PR that carries only
- * the state.json bump (no Cosmos data change → `validate` passes trivially) and
+ * the state.json bump (no Project Cosmos data change → `validate` passes trivially) and
  * enable auto-merge, so it squash-merges itself once the check is green — no
  * human action. Idempotent: if anything fails, the next run re-detects the same
  * no_drift delta and retries. CI runners are ephemeral, so a half-done attempt
@@ -292,7 +292,7 @@ function advanceNoDriftBaselines(noDriftResults: RepoResult[]): string[] {
  */
 function openNoDriftAdvancePR(moved: string[]): void {
   if (!moved.length) return;
-  const git = (a: string[]) => execFileSync('git', a, { cwd: cosmosRoot, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+  const git = (a: string[]) => execFileSync('git', a, { cwd: projectCosmosRoot, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
   const branch = `cosmos-sync/state-${dateStr}-${Date.now().toString(36)}`;
   const title = `[cosmos-sync] chore: advance ${moved.length} no-drift baseline${moved.length === 1 ? '' : 's'}`;
   const bodyFile = path.join(os.tmpdir(), `cosmos-state-pr-${Date.now()}.md`);
@@ -308,14 +308,14 @@ function openNoDriftAdvancePR(moved: string[]): void {
       '',
       ...moved.map(r => `- \`${r}\``),
       '',
-      '_`state.json` baseline bump only — no Cosmos data change. Auto-merges once `validate` passes._',
+      '_`state.json` baseline bump only — no Project Cosmos data change. Auto-merges once `validate` passes._',
     ].join('\n'));
     const ghArgs = ['pr', 'create', '--base', prBase, '--head', branch, '--title', title, '--body-file', bodyFile];
     let prUrl = '';
-    try { prUrl = execFileSync('gh', [...ghArgs, '--label', 'cosmos-sync,chore'], { cwd: cosmosRoot, encoding: 'utf8' }).trim(); }
-    catch { prUrl = execFileSync('gh', ghArgs, { cwd: cosmosRoot, encoding: 'utf8' }).trim(); }
+    try { prUrl = execFileSync('gh', [...ghArgs, '--label', 'cosmos-sync,chore'], { cwd: projectCosmosRoot, encoding: 'utf8' }).trim(); }
+    catch { prUrl = execFileSync('gh', ghArgs, { cwd: projectCosmosRoot, encoding: 'utf8' }).trim(); }
     try {
-      execFileSync('gh', ['pr', 'merge', prUrl, '--auto', '--squash', '--delete-branch'], { cwd: cosmosRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+      execFileSync('gh', ['pr', 'merge', prUrl, '--auto', '--squash', '--delete-branch'], { cwd: projectCosmosRoot, stdio: ['ignore', 'pipe', 'pipe'] });
       console.log(`  [state] no-drift advance PR (auto-merge enabled): ${prUrl} → ${moved.join(', ')}`);
     } catch (e) {
       const err = e as { stderr?: Buffer };
@@ -360,7 +360,7 @@ interface ApplierResult {
 // identified by an @-mention in the message body instead of by channel.
 // The env var NAME is configurable (config.slackWebhookEnv); the URL itself
 // always comes from the environment so it never lands in the repo.
-const COSMOS_WEBHOOK_ENV = config.slackWebhookEnv;
+const PROJECT_COSMOS_WEBHOOK_ENV = config.slackWebhookEnv;
 
 /**
  * Render an @-mention for a team. If a Slack user-group ID (e.g. "S012345")
@@ -382,9 +382,9 @@ function teamMention(team: string): string {
  * webhook is set.
  */
 async function postSlack(team: string, items: RepoResult[], ap: ApplierResult, prUrl: string): Promise<{ posted: boolean; reason?: string }> {
-  const webhook = process.env[COSMOS_WEBHOOK_ENV];
+  const webhook = process.env[PROJECT_COSMOS_WEBHOOK_ENV];
   if (!webhook) {
-    return { posted: false, reason: `no webhook configured (${COSMOS_WEBHOOK_ENV} not set)` };
+    return { posted: false, reason: `no webhook configured (${PROJECT_COSMOS_WEBHOOK_ENV} not set)` };
   }
   // Worst confidence drives the icon
   const confs = items.map(r => r.verdict?.confidence ?? 'low');
@@ -419,9 +419,9 @@ async function postSlack(team: string, items: RepoResult[], ap: ApplierResult, p
  * everything is in sync. No @-mentions — this is a quiet heartbeat.
  */
 async function postAllClear(repoCount: number, inconclusiveCount: number, durationMs: number): Promise<{ posted: boolean; reason?: string }> {
-  const webhook = process.env[COSMOS_WEBHOOK_ENV];
+  const webhook = process.env[PROJECT_COSMOS_WEBHOOK_ENV];
   if (!webhook) {
-    return { posted: false, reason: `no webhook configured (${COSMOS_WEBHOOK_ENV} not set)` };
+    return { posted: false, reason: `no webhook configured (${PROJECT_COSMOS_WEBHOOK_ENV} not set)` };
   }
   const runUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -501,9 +501,9 @@ async function postFailure(
   diffErrors: RepoResult[],
   unreportedDriftTeams: string[],
 ): Promise<{ posted: boolean; reason?: string }> {
-  const webhook = process.env[COSMOS_WEBHOOK_ENV];
+  const webhook = process.env[PROJECT_COSMOS_WEBHOOK_ENV];
   if (!webhook) {
-    return { posted: false, reason: `no webhook configured (${COSMOS_WEBHOOK_ENV} not set)` };
+    return { posted: false, reason: `no webhook configured (${PROJECT_COSMOS_WEBHOOK_ENV} not set)` };
   }
   const runUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
@@ -575,7 +575,7 @@ function buildPrBody(team: string, items: RepoResult[], ap: ApplierResult): stri
   // ─── Header ───────────────────────────────────────
   lines.push(`# cosmos-sync · ${team} domain`);
   lines.push('');
-  lines.push(`> 🤖 **Auto-generated by cosmos-sync.** Drift detected by AI agent in \`scripts/diff-repo.ts\`. Cosmos edits produced by \`scripts/apply-edits.ts\`. \`npm run validate\` passed in-loop.`);
+  lines.push(`> 🤖 **Auto-generated by cosmos-sync.** Drift detected by AI agent in \`scripts/diff-repo.ts\`. Project Cosmos edits produced by \`scripts/apply-edits.ts\`. \`npm run validate\` passed in-loop.`);
   lines.push('');
 
   // ─── TL;DR table ──────────────────────────────────
@@ -585,7 +585,7 @@ function buildPrBody(team: string, items: RepoResult[], ap: ApplierResult): stri
   lines.push(`|---|---|`);
   lines.push(`| **Services drifted** | ${items.map(r => `\`${r.repo}\``).join(', ')} |`);
   lines.push(`| **Total findings** | ${items.reduce((acc, r) => acc + (r.verdict?.changes?.length ?? 0), 0)} |`);
-  lines.push(`| **Cosmos edits applied** | ${ap.applier_report?.applied?.length ?? '?'} |`);
+  lines.push(`| **Project Cosmos edits applied** | ${ap.applier_report?.applied?.length ?? '?'} |`);
   lines.push(`| **Validator** | ${ap.applier_report?.validator_passed ? '✅ passed' : '❌ FAILED'} |`);
   if (ap.applier_report?.skipped && ap.applier_report.skipped.length > 0) {
     lines.push(`| **Skipped (manual follow-up)** | ${ap.applier_report.skipped.length} |`);
@@ -594,7 +594,7 @@ function buildPrBody(team: string, items: RepoResult[], ap: ApplierResult): stri
 
   // ─── What this PR modifies ────────────────────────
   if (ap.applier_report?.applied && ap.applier_report.applied.length > 0) {
-    lines.push('## ✍️ What this PR modifies in Cosmos');
+    lines.push('## ✍️ What this PR modifies in Project Cosmos');
     lines.push('');
     // Group applied edits by file
     const byFile = new Map<string, { verdict_service: string; summary: string }[]>();
@@ -671,7 +671,7 @@ function buildPrBody(team: string, items: RepoResult[], ap: ApplierResult): stri
   lines.push('## 👀 How to review');
   lines.push('');
   lines.push('1. **Verify the findings**: read the "Why these changes" section above. Each finding has file:line evidence — open the linked lines in the source repo to confirm.');
-  lines.push('2. **Review the diff**: PR "Files changed" tab shows exactly what Cosmos is updating.');
+  lines.push('2. **Review the diff**: PR "Files changed" tab shows exactly what Project Cosmos is updating.');
   lines.push('3. **If correct**: mark Ready for review and merge.');
   lines.push('4. **If wrong**: close with the `not-drift` label so the cron advances state but doesn\'t re-surface.');
   lines.push('');
@@ -688,14 +688,14 @@ if (!skipApplier && byTeam.size > 0) {
   let initialStatus = '';
   try {
     initialStatus = execFileSync('git', ['status', '--porcelain', '--', ...WRITABLE_PATHS], {
-      cwd: cosmosRoot, encoding: 'utf8',
+      cwd: projectCosmosRoot, encoding: 'utf8',
     }).trim();
   } catch (err) {
     applierSkipReason = `git status failed: ${String(err).slice(0, 200)}`;
   }
 
   if (initialStatus.length > 0 && !applierSkipReason) {
-    applierSkipReason = `Cosmos writable surface is dirty (${initialStatus.split('\n').length} files). Commit/stash these before the applier can run:\n${initialStatus}`;
+    applierSkipReason = `Project Cosmos writable surface is dirty (${initialStatus.split('\n').length} files). Commit/stash these before the applier can run:\n${initialStatus}`;
   }
 
   if (!applierSkipReason) {
@@ -731,7 +731,7 @@ if (!skipApplier && byTeam.size > 0) {
 
       let applierStdout: string;
       try {
-        applierStdout = execFileSync('npx', applierArgs, { cwd: cosmosRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }) || '';
+        applierStdout = execFileSync('npx', applierArgs, { cwd: projectCosmosRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }) || '';
 
         let out: ApplierResult | null = null;
         if (existsSync(resultFile)) {
@@ -763,7 +763,7 @@ if (!skipApplier && byTeam.size > 0) {
               '--label', `cosmos-sync,team:${team}`,
               '--json', 'number,url,headRefName',
               '--limit', '5',
-            ], { cwd: cosmosRoot, encoding: 'utf8' });
+            ], { cwd: projectCosmosRoot, encoding: 'utf8' });
             const existing = JSON.parse(listOut) as { number: number; url: string; headRefName: string }[];
             if (existing.length > 0) {
               existingPrUrl = existing[0].url;
@@ -789,7 +789,7 @@ if (!skipApplier && byTeam.size > 0) {
               ].join('\n');
               const commentFile = path.join(os.tmpdir(), `cosmos-sync-comment-${team}-${Date.now()}.md`);
               writeFileSync(commentFile, commentBody);
-              execFileSync('gh', ['pr', 'comment', String(existingPrNumber), '--body-file', commentFile], { cwd: cosmosRoot, stdio: 'ignore' });
+              execFileSync('gh', ['pr', 'comment', String(existingPrNumber), '--body-file', commentFile], { cwd: projectCosmosRoot, stdio: 'ignore' });
               unlinkSync(commentFile);
               console.log(`  [PR:${team}] DEDUPED — commented on existing #${existingPrNumber} (${existingPrUrl})`);
               out.pr_url = existingPrUrl!;
@@ -804,21 +804,21 @@ if (!skipApplier && byTeam.size > 0) {
             } finally {
               try { unlinkSync(prBodyFile); } catch { /* ignore */ }
               // Revert the applier's edits — we didn't open a PR so don't keep them.
-              try { execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: cosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
+              try { execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS], { cwd: projectCosmosRoot, stdio: 'ignore' }); } catch { /* ignore */ }
             }
             continue; // skip the new-PR flow below
           }
 
           try {
-            execFileSync('git', ['checkout', '-b', branchName], { cwd: cosmosRoot, stdio: 'ignore' });
+            execFileSync('git', ['checkout', '-b', branchName], { cwd: projectCosmosRoot, stdio: 'ignore' });
             // Advance baselines for the applied repos and ship the bump IN this
-            // PR — merging it advances state.json atomically with the Cosmos
+            // PR — merging it advances state.json atomically with the Project Cosmos
             // edits, so the next run skips re-cloning/re-analyzing them.
             const moved = advanceBaselines(driftItems, out);
             if (moved.length) console.log(`  [state:${team}] baseline advanced → ${moved.join(', ')}`);
-            execFileSync('git', ['add', ...WRITABLE_PATHS, STATE_REL], { cwd: cosmosRoot, stdio: 'ignore' });
-            execFileSync('git', ['commit', '-m', `[cosmos-sync] ${team} domain · ${summary}\n\nAuto-generated by scripts/sync-nightly.ts. Validator passed.`], { cwd: cosmosRoot, stdio: 'ignore' });
-            execFileSync('git', ['push', '-u', 'origin', branchName], { cwd: cosmosRoot, stdio: 'ignore' });
+            execFileSync('git', ['add', ...WRITABLE_PATHS, STATE_REL], { cwd: projectCosmosRoot, stdio: 'ignore' });
+            execFileSync('git', ['commit', '-m', `[cosmos-sync] ${team} domain · ${summary}\n\nAuto-generated by scripts/sync-nightly.ts. Validator passed.`], { cwd: projectCosmosRoot, stdio: 'ignore' });
+            execFileSync('git', ['push', '-u', 'origin', branchName], { cwd: projectCosmosRoot, stdio: 'ignore' });
             // Labels: best-effort. If a label doesn't exist on the repo,
             // gh pr create fails the whole call. Try with labels; on fail,
             // retry without. (Long-term: pre-create labels in the repo.)
@@ -832,10 +832,10 @@ if (!skipApplier && byTeam.size > 0) {
             ];
             let prOut = '';
             try {
-              prOut = execFileSync('gh', [...ghArgs, '--label', `cosmos-sync,team:${team}`], { cwd: cosmosRoot, encoding: 'utf8' });
+              prOut = execFileSync('gh', [...ghArgs, '--label', `cosmos-sync,team:${team}`], { cwd: projectCosmosRoot, encoding: 'utf8' });
             } catch {
               // Retry without labels.
-              prOut = execFileSync('gh', ghArgs, { cwd: cosmosRoot, encoding: 'utf8' });
+              prOut = execFileSync('gh', ghArgs, { cwd: projectCosmosRoot, encoding: 'utf8' });
             }
             const prUrl = prOut.trim();
             console.log(`  [PR:${team}] ${prUrl}`);
@@ -857,9 +857,9 @@ if (!skipApplier && byTeam.size > 0) {
             try { unlinkSync(prBodyFile); } catch { /* ignore */ }
             // Return to base + clean working tree for next team
             try {
-              execFileSync('git', ['checkout', prBase], { cwd: cosmosRoot, stdio: 'ignore' });
+              execFileSync('git', ['checkout', prBase], { cwd: projectCosmosRoot, stdio: 'ignore' });
               // Also drop the state.json bump if the commit/push/PR never landed.
-              execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS, STATE_REL], { cwd: cosmosRoot, stdio: 'ignore' });
+              execFileSync('git', ['checkout', '--', ...WRITABLE_PATHS, STATE_REL], { cwd: projectCosmosRoot, stdio: 'ignore' });
             } catch { /* ignore */ }
           }
         } else if (livePr && out) {
@@ -899,7 +899,7 @@ if (!skipApplier && byTeam.size > 0) {
 
 // ──────────────────────────────────────────────────────────────────
 //  Auto-advance no-drift baselines via one self-merging chore PR
-//  Repos that changed but produced no Cosmos drift get their baseline moved
+//  Repos that changed but produced no Project Cosmos drift get their baseline moved
 //  through a single auto-merged PR (main is ruleset-protected, so we can't
 //  push directly). Next run sees baseline == HEAD → UNCHANGED → skips the
 //  clone + analysis. One self-merging PR per run, no human action — PR volume
@@ -924,7 +924,7 @@ function worstConfidence(items: RepoResult[]): 'high' | 'medium' | 'low' {
 // ──────────────────────────────────────────────────────────────────
 const md: string[] = [];
 
-md.push('# Cosmos sync — dry-run report');
+md.push('# Project Cosmos sync — dry-run report');
 md.push('');
 md.push(`**Run at:** ${new Date().toISOString()}`);
 md.push(`**Duration:** ${(totalMs / 1000).toFixed(1)}s`);
@@ -1016,10 +1016,10 @@ if (byTeam.size === 0) {
       }
     }
 
-    // Proposed Cosmos diff (from applier)
+    // Proposed Project Cosmos diff (from applier)
     const ap = applierResults.get(team);
     if (ap) {
-      md.push('#### Proposed Cosmos diff');
+      md.push('#### Proposed Project Cosmos diff');
       md.push('');
       md.push(`- **Applied:** ${ap.applier_report?.applied?.length ?? '?'} edit(s)`);
       md.push(`- **Skipped:** ${ap.applier_report?.skipped?.length ?? 0}`);
@@ -1051,7 +1051,7 @@ if (byTeam.size === 0) {
       }
       md.push('');
     } else if (applierSkipReason) {
-      md.push('#### Proposed Cosmos diff');
+      md.push('#### Proposed Project Cosmos diff');
       md.push('');
       md.push(`_Applier skipped — ${applierSkipReason.split('\n')[0]}_`);
       md.push('');
@@ -1178,7 +1178,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
     : null;
 
-  sum.push(`## 🌌 Cosmos Sync · ${dateStr}`);
+  sum.push(`## 🌌 Project Cosmos Sync · ${dateStr}`);
   sum.push('');
   sum.push(`**Duration:** ${(totalMs / 1000).toFixed(1)}s · **Repos:** ${results.length} · **Concurrency:** ${CONCURRENCY}`);
   sum.push('');
@@ -1191,7 +1191,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   sum.push('');
 
   if (byTeam.size === 0) {
-    sum.push('### ✅ Cosmos is in sync');
+    sum.push('### ✅ Project Cosmos is in sync');
     sum.push('');
     sum.push('Every tracked repo is at its baseline. No PRs were opened.');
   } else {

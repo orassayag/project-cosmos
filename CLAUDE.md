@@ -1,4 +1,4 @@
-# The Cosmos — notes for Claude Code
+# Project Cosmos — notes for Claude Code
 
 ## Commands
 
@@ -44,3 +44,31 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 - Service `hex` must match its `color` CSS token hue (`src/styles/tokens.css`); topics always `TOPIC_COLOR`/`TOPIC_HEX`.
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
+
+## Responsive / mobile
+
+**Mobile-first (invariant).** Every new feature is built and verified on a phone-class
+viewport FIRST, then checked on desktop — never the other way around. Design the layout,
+panels, and controls to work at ~390px wide (and short landscape) before widening to the
+desktop presentation. A feature isn't done until it's been looked at on mobile.
+
+**One panel at a time (invariant).** Panels / popups / windows must never stack or overlap
+on mobile. Two cards must not render on top of each other — a detail card (inspector, ask,
+health card) hides the context panels (legends, step/incident narration) behind it; see the
+"One card at a time" block in `responsive.css`. Any new panel joins that priority policy.
+
+The responsive layer lives in `src/styles/responsive.css` (loaded last) plus the
+`useViewport` hook (`src/hooks/useViewport.ts`), which mirrors the breakpoints onto
+`<html data-viewport data-touch>`. Phone-class = `max-width:768px` **or** `max-height:480px`
+(catches landscape phones); the JS query and the CSS media query must stay in sync.
+
+**Mobile close-button contract (invariant).** On phone-class viewports **every** floating
+panel / popup / modal MUST have a close control in its top-right corner — existing *and*
+future ones. Satisfy it one of two ways:
+- The panel already has its own header close button (inspector, step panel, help,
+  changelog, ask, health card, mobile menu). Leave it.
+- Otherwise render `<PanelCloseButton onClose={…} />` (`src/components/PanelCloseButton.tsx`).
+  It emits `.lc-panel-x`, hidden on desktop and revealed on phones by `responsive.css`. The
+  map legends (ownership / changes / blast / health) and the incident banner use this.
+
+Any new panel added later must ship with one of the two — this is the "new panel" checklist item.
