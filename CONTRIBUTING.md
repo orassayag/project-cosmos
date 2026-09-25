@@ -2,16 +2,18 @@
 
 Thanks for wanting to make the galaxy bigger. Two rules of the universe before you start:
 
-1. **The map is data.** Almost everything lives in `src/scenarios/` — services, topics, scenarios, steps. If your change is "the demo should show X", it's probably a data change, not a code change.
-2. **Never run `tsc` without `--noEmit`** (or `-b`). Stray `.js` files shadow `.tsx` in Vite and the app silently serves stale code.
+1. **The map is data.** Almost everything lives in `client/src/scenarios/` — services, topics, scenarios, steps. If your change is "the demo should show X", it's probably a data change, not a code change.
+2. **Never run `tsc` without `--noEmit`** (or `-b`). Stray `.js` files shadow `.tsx` in Vite (`client/`) and the app silently serves stale code.
 
 ## Dev setup
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # typecheck + production build — must pass before a PR
-npm run validate   # data sanity checks (ids resolve, phaseIds unique, …)
+npm run build      # typecheck + production build (all workspaces) — must pass before a PR
+npm run typecheck  # typecheck only (all workspaces)
+npm run snapshot   # regenerate server/src/generated/cosmos-map.json after any data edit
+npm run validate   # data sanity checks (ids resolve, phaseIds unique, snapshot fresh, …)
 npm run lint       # eslint — must pass before a PR
 ```
 

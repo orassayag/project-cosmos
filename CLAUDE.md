@@ -3,19 +3,26 @@
 ## Commands
 
 ```bash
-npm run dev        # dev server on :5173
-npm run build      # tsc -b && vite build — the gate for every change
-npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok
+npm run dev        # client dev server on :5173
+npm run dev:client # client dev server on :5173 (plain Vite)
+npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
+npm run typecheck  # every workspace, no emit
+npm run lint       # eslint over client/, server/, drift-sync/
+npm run snapshot   # regenerate server/src/generated/cosmos-map.json from the map data
+npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok, snapshot fresh
 ```
 
-**Never run `tsc` without `--noEmit`/`-b`** — emitted `.js` files shadow `.tsx` in Vite and the app silently serves stale code.
+Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
+
+**Never run `tsc` without `--noEmit`/`-b`** — emitted `.js` files shadow `.tsx` in Vite (`client/`) and the app silently serves stale code.
 
 ## Layout
 
-- `src/scenarios/` — the entire universe as typed data: `services.ts`, `topics.ts`, `scenarios.ts` (domains + scenarios), `owners.ts` (teams), `steps/<domain>.ts`, barrel in `data.ts`. **Most changes belong here.**
-- `src/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/data.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
-- `src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
-- `src/components/` — UI shell: intro, playback controls, step panel, tech icons.
+- `client/src/scenarios/` — the entire universe as typed data: `services.ts`, `topics.ts`, `scenarios.ts` (domains + scenarios), `owners.ts` (teams), `steps/<domain>.ts`, barrel in `data.ts`. **Most changes belong here.**
+- `client/src/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/data.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
+- `client/src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
+- `client/src/components/` — UI shell: intro, playback controls, step panel, tech icons.
+- `server/` — Node service workspace. `server/src/generated/cosmos-map.json` is a committed snapshot of the map data (written by `npm run snapshot`, checked by `npm run validate`); commit it with every data edit.
 - `drift-sync/` — the nightly honesty pipeline (its own README).
 - `.claude/skills/` — `add-service` and `add-scenario`: THE documented procedures for growing the map. Follow them rather than improvising.
 
@@ -41,7 +48,7 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 
 - `phaseId` global, unique, never reused; every step's `phase` equals its scenario's `phaseId`.
 - Step `from`/`to`/`via`/`through` must exactly match `SERVICES[].id` / `TOPICS[].id`.
-- Service `hex` must match its `color` CSS token hue (`src/styles/tokens.css`); topics always `TOPIC_COLOR`/`TOPIC_HEX`.
+- Service `hex` must match its `color` CSS token hue (`client/src/styles/tokens.css`); topics always `TOPIC_COLOR`/`TOPIC_HEX`.
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
 
@@ -57,8 +64,8 @@ on mobile. Two cards must not render on top of each other — a detail card (ins
 health card) hides the context panels (legends, step/incident narration) behind it; see the
 "One card at a time" block in `responsive.css`. Any new panel joins that priority policy.
 
-The responsive layer lives in `src/styles/responsive.css` (loaded last) plus the
-`useViewport` hook (`src/hooks/useViewport.ts`), which mirrors the breakpoints onto
+The responsive layer lives in `client/src/styles/responsive.css` (loaded last) plus the
+`useViewport` hook (`client/src/hooks/useViewport.ts`), which mirrors the breakpoints onto
 `<html data-viewport data-touch>`. Phone-class = `max-width:768px` **or** `max-height:480px`
 (catches landscape phones); the JS query and the CSS media query must stay in sync.
 
@@ -67,7 +74,7 @@ panel / popup / modal MUST have a close control in its top-right corner — exis
 future ones. Satisfy it one of two ways:
 - The panel already has its own header close button (inspector, step panel, help,
   changelog, ask, health card, mobile menu). Leave it.
-- Otherwise render `<PanelCloseButton onClose={…} />` (`src/components/PanelCloseButton.tsx`).
+- Otherwise render `<PanelCloseButton onClose={…} />` (`client/src/components/PanelCloseButton.tsx`).
   It emits `.lc-panel-x`, hidden on desktop and revealed on phones by `responsive.css`. The
   map legends (ownership / changes / blast / health) and the incident banner use this.
 

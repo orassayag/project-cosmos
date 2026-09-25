@@ -94,7 +94,7 @@ Mouse equivalents: drag the background to pan, scroll to zoom around the cursor,
 
 ## Make it your cosmos
 
-The entire universe lives in `src/scenarios/` — plain, typed TypeScript:
+The entire universe lives in `client/src/scenarios/` — plain, typed TypeScript:
 
 | Concept | What it is | Where |
 |---|---|---|
@@ -103,7 +103,7 @@ The entire universe lives in `src/scenarios/` — plain, typed TypeScript:
 | **Domain** | A group of related scenarios | `scenarios.ts` |
 | **Scenario** | A named, playable end-to-end flow | `scenarios.ts` |
 | **Step** | One hop: from → to, protocol, payload | `steps/*.ts` |
-| **Incident** | A past production incident, frozen in time and replayable | `src/incidents/*.ts` |
+| **Incident** | A past production incident, frozen in time and replayable | `client/src/incidents/*.ts` |
 
 **Start from the template:** click **Use this template** on GitHub (or clone), then:
 
@@ -133,7 +133,7 @@ You can also install the skills into any environment as a plugin, no clone neede
 
 The skills make Claude read your actual source — call sites, producers, consumers, schemas — and write verified entries. No guessing allowed; the skill files are the guardrails.
 
-**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, and that capsules keep their minimum spacing. Both run in CI on every PR (the **Validate** badge above), alongside `npm run lint`.
+**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that the committed map snapshot (`server/src/generated/cosmos-map.json`) is fresh — run `npm run snapshot` after any data edit. Both run in CI on every PR (the **Validate** badge above), alongside `npm run lint`.
 
 Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the numbers back into `services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
 
@@ -141,20 +141,20 @@ To start clean, empty the arrays in `services.ts`, `topics.ts`, `scenarios.ts`, 
 
 ## Record a production incident
 
-An incident is just a scenario frozen in time. Recordings live in `src/incidents/` (one file per incident); the app discovers, lists, and plays them automatically — no AI, no backend, no database. Recording one takes 10–30 minutes for someone who already has the logs:
+An incident is just a scenario frozen in time. Recordings live in `client/src/incidents/` (one file per incident); the app discovers, lists, and plays them automatically — no AI, no backend, no database. Recording one takes 10–30 minutes for someone who already has the logs:
 
-1. **Open the closest scenario** in `src/scenarios/steps/` (or start blank) and note the hops the failing request actually took.
+1. **Open the closest scenario** in `client/src/scenarios/steps/` (or start blank) and note the hops the failing request actually took.
 2. **Copy the relevant steps** and replace the example payloads with the real ones from the logs — redact card/customer/token fields (`"[redacted]"`).
 3. **Add the title, date, and a one- or two-sentence note** describing what went wrong.
 4. **Give it a globally-unique `phaseId`** (incidents use `101+` so they never collide with scenarios) and set every step's `phase` to that same id.
-5. **Save the file** under `src/incidents/`, import it in `src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it.
+5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it.
 
 Every step's `from` / `to` / `via` / `through` must match an existing `SERVICES[].id` or `TOPICS[].id` — incidents reuse the same map you already drew.
 
 A complete, copyable example (trimmed):
 
 ```ts
-// src/incidents/checkout-timeout-2026-08-01.ts
+// client/src/incidents/checkout-timeout-2026-08-01.ts
 import type { Incident } from './types';
 
 export const CHECKOUT_TIMEOUT_2026_08_01: Incident = {
@@ -187,7 +187,7 @@ export const CHECKOUT_TIMEOUT_2026_08_01: Incident = {
 Then register it:
 
 ```ts
-// src/incidents/data.ts
+// client/src/incidents/data.ts
 import { CHECKOUT_TIMEOUT_2026_08_01 } from './checkout-timeout-2026-08-01';
 export const INCIDENTS: Incident[] = [
   CHECKOUT_TIMEOUT_2026_08_01,
@@ -195,7 +195,7 @@ export const INCIDENTS: Incident[] = [
 ].sort((a, b) => b.date.localeCompare(a.date));
 ```
 
-The three incidents that ship with AstroMart (`src/incidents/*.ts`) are working references — copy whichever is closest to your first real recording.
+The three incidents that ship with AstroMart (`client/src/incidents/*.ts`) are working references — copy whichever is closest to your first real recording.
 
 ## Drift Sync
 
