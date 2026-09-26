@@ -17,6 +17,7 @@ import type { AskAction } from './components/AskPanel';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { DemoCaption } from './components/DemoCaption';
 import { DemoPointer } from './components/DemoPointer';
+import { DemoEndCard } from './components/DemoEndCard';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
@@ -329,7 +330,10 @@ export function App() {
     openIncident: handlePickScenario,
     // The legend toggles live inside the map; the `all` script's stage wires them.
     toggleLegend: () => undefined,
-    showEndCard: demoView.requestEndCard,
+    showEndCard: () => {
+      demoView.requestEndCard();
+      overlay.open(OVERLAY.demoEndCard);
+    },
   };
   const handleDemoEnd = () => {
     demoAi.setDemoStatus('disconnected');
@@ -436,6 +440,7 @@ export function App() {
         demoConnect={demoConnect}
       />
       {demoOverlays}
+      {demoScript && <DemoEndCard />}
     </OverlayProvider>
   );
 }
