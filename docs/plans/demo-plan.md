@@ -59,9 +59,9 @@ app back to the viewer.
 
 ## Design
 
-Build it in two increments, following the draft's scope challenge. **Increment 1** is §1–§6,
-§8, and §9 for `demo=ai`, which can be recorded on its own. **Increment 2** is §7 (`demo=all`),
-which reuses the same runner and only adds its step list and a few more actions.
+Both demos are delivered together in one change (the developer's decision). The draft's scope
+challenge proposed shipping `demo=ai` first, so the build order still goes §1–§6, §8, §9 before
+§7, but nothing is released between them.
 
 ### §1 — Runner (`client/src/demo/`)
 
@@ -130,7 +130,7 @@ shows both keys being pasted.
   `{ provider, providerKey, jevKey, showJevField, isBusy }`. When the prop is present:
   - The dialog is controlled by it: provider, the key value, and the busy state.
   - Below the provider key it renders a second `lc-connect-field` labelled **"Vercel AI Gateway
-    key (JEV)"**, with the same password input style.
+    key (JEV, site owner)"**, with the same password input style.
   - Submitting calls **no** `onConnect`. The runner drives `connecting → connected` through §3.
 - When the prop is absent, the dialog behaves exactly as today. Visitors never see a JEV field,
   and in production the key stays a server environment variable.
@@ -138,9 +138,10 @@ shows both keys being pasted.
   appear all at once, like a paste, not one letter at a time.
 - A caption on the paste step reads "Adding the JEV key (the site's question classifier)", so
   the video is honest about the key's role.
-- Accepted gap: the video shows a field that real visitors don't have. See Open Questions.
+- Accepted gap: the video shows a field that real visitors don't have. The developer accepted
+  this; the "site owner" label and the caption make the key's role clear.
 - Tests: `client/src/components/__tests__/ConnectAgentModal.test.tsx` adds two cases. With
-  `demo`, the JEV field and both masked values render, and submitting never calls `onConnect`.
+  `demo`, the JEV field (labelled "site owner") and both masked values render, and submitting never calls `onConnect`.
   Without `demo`, there is no JEV field. *Protects: the demo field never leaks to real visitors,
   and the demo never submits a key.* Component layer.
 
@@ -195,7 +196,7 @@ That leaves about 30s of headroom under the 60s limit for re-timing after watchi
 Each step that clicks something has a `target`, so the A1 pointer glides there first (inside the
 step's time).
 
-### §7 — `demo=all` script (≤ 120s), increment 2 (I2)
+### §7 — `demo=all` script (≤ 120s) (I2)
 
 | # | Segment | ms |
 |---|---------|----|
@@ -228,7 +229,7 @@ step's time).
   intro button. The pointer is hidden on phones (touch has no cursor) and has
   `pointer-events: none`. Verify: visual, in the A4 recording.
 - **A2 — End card.** `DemoEndCard.tsx` reads "Built by Or Assayag · GitHub · LinkedIn". The
-  GitHub link is the repo URL from `package.json` `repository`. The card joins the overlay
+  GitHub link points to the repo, using the URL from `package.json` `repository`. The card joins the overlay
   manager as `OVERLAY.demoEndCard` and has a top-right close button (mobile close-button
   contract). It stays open after the run finishes. Test: `DemoEndCard.test.tsx` renders both
   links with `rel="noopener noreferrer"`, and close calls the overlay close.
@@ -276,11 +277,4 @@ Verify manually at 390×844 portrait and 844×390 landscape with `?demo=ai&speed
 
 ## Open Questions
 
-- **JEV field honesty (I1).** Real visitors never enter the JEV key, because it is the site
-  owner's server environment variable. The video shows it being pasted. The caption explains its
-  role. Should the field label also say "(site owner)", or is the current label fine for the
-  video?
-- **End card links (A2).** The LinkedIn profile URL, and whether the GitHub link should point to
-  the repo or to the profile.
-- **Increment boundary.** Whether to ship and record `demo=ai` (increment 1) before starting
-  `demo=all`, or deliver both together.
+- **LinkedIn URL (A2).** The end card needs the developer's LinkedIn profile URL.
