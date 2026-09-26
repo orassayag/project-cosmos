@@ -13,6 +13,10 @@
     "vitest": "^5.0.2"
   },
   "dependencies": {
+    "@langchain/anthropic": "1.5.11",
+    "@langchain/core": "1.2.12",
+    "@langchain/langgraph": "1.4.18",
+    "@langchain/openai": "1.5.13",
     "ai": "^7.0.116",
     "hono": "^4.13.9",
     "zod": "^4.6.5"
