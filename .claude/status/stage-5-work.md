@@ -1,65 +1,52 @@
-# Stage 5 work brief — M0: repoint CLAUDE.md, README, CONTRIBUTING, cosmos-sync.yml; run the M0 verification gate
+# Stage 5 work brief — §5: AskAgent demo props
 
-## Scope for this stage
-1. Repoint the remaining path consumers from the I2 checklist: `CLAUDE.md` (Layout, Commands, invariants' paths — keep the emitted-.js-shadows-.tsx warning, now applying to `client/`), `README.md`, `CONTRIBUTING.md`, `.github/workflows/cosmos-sync.yml` (any `src/scenarios` path in its steps). CLAUDE.md must be *enriched/edited in place*, never replaced wholesale. Commands sections should reflect real root scripts (`npm run dev`, `dev:client`, `build`, `typecheck`, `lint`, `validate`, `snapshot`) as they exist in package.json now — never invent a script (`test` does not exist until stage 7; `dev` swaps to `vercel dev` only in stage 6).
-2. Run the full M0 verification gate below and record every result in the report's ## Summary.
+Plan: docs/plans/demo-plan.md
+Stage line: "§5: AskAgent demoQuestion/demoExpanded/demoSearchPressed props + AskAgent.test cases"
 
-## Carry-overs from earlier stages (ledger)
-- `npx tsc -p drift-sync --noEmit` has never been run (permission denied in stages 1–3) — MUST run it now.
-- `npx eslint <server file>` (e.g. server/scripts/snapshot-map.ts) never run — run it.
-- The plan's `npm run sync -- --dry-run` does not exist; the real credential-free check is `npm run sync:bootstrap -- --dry-run` — use that (and say so in the report).
-- Validate/typecheck ignore `client/src/scenarios/steps/core.ts` (pre-existing orphan) — out of scope, don't touch.
+## Scope for this stage (AskAgent only)
+- `AskAgent` component + its test file (`AskAgent.test.tsx`). Nothing else unless a type
+  must be shared (then `client/src/demo/types.ts`).
+- **Out of scope:** `AskPanel` `scriptedAnswer` (stage 6), `demo/scriptedAnswer.ts` (stage 7),
+  the runner-driven typing growth and App wiring (stage 8), `data-demo-target` attributes
+  (stage 10). AskAgent only *renders* whatever `demoQuestion` it is given; the one-char-per-55ms
+  growth is produced upstream by the runner/App.
 
-## Screenshot baseline note
-The plan says to compare against screenshots of `main` taken before the move. You may NOT create a git worktree or switch branches. If you want a baseline, export main with `git archive main | tar -x -C <scratch dir outside repo>` and run it there; if that's impractical, take the current screenshots only and list the missing baseline under ## Open questions. Put screenshots under the session scratchpad or `.claude/status/stage-5-shots/` — never commit them.
+## Plan text (pasted verbatim, §5)
 
-## Plan text (docs/plans/add-ai.md §1 — Milestone 0, verbatim)
-### §1 — Milestone 0: Repo reorganisation (client / server)
+### §5 — Question and scripted answer (I3, I4)
 
-**Target layout**
+- `AskAgent` gets optional `demoQuestion?: string`, `demoExpanded?: boolean`, and
+  `demoSearchPressed?: boolean`. When `demoQuestion` is defined, it is the text shown and the
+  focus-clears-text path is bypassed. The `type` step grows the text one character per 55ms, so
+  it looks like a person typing. The `ask` step shows the Search button pressed for 250ms, then
+  the runner calls `onAsk(question)` directly.
+- Demo question: *"Which services does placing an order go through, and who owns them?"*
+  (69 characters, about 3.8s to type).
+- `AskPanel` gets an optional `scriptedAnswer?: { text: string; thinkingMs: number; wordMs:
+  number; actions?: AskAction[] }`. When it is set, the panel plays that text with fixed timing
+  (thinking 1500ms, 90ms per word) and fires `actions` when the answer starts. The joke list and
+  the connect prompt are skipped, and no request is made. The joke list is untouched for normal
+  visitors.
+- The answer is about 70 words of fictional AstroMart facts, taken from the
+  `shopping.place-order` steps and `owners.ts`. It lives in `client/src/demo/scriptedAnswer.ts`,
+  with a `highlight` action for the services it names.
+- Tests:
+  - `AskAgent.test.tsx`: `demoQuestion` renders, focusing the box does not clear it, and the
+    Search pressed state shows. *Protects: I4.*
+  - `AskPanel.test.tsx`: `scriptedAnswer` renders the exact text after `thinkingMs +
+    words × wordMs` with fake timers, `fetch` is never called, and `onAction` gets the highlight.
+    *Protects: I3/I5. The same answer every time, with no joke.*
+  - `client/src/demo/__tests__/scriptedAnswer.test.ts`: every highlighted id exists in
+    `SERVICES`. *Protects: the answer stays true to the map when services change.*
+  - All at the component/unit layer.
 
-```
-project-cosmos/
-├── package.json          ← npm workspaces root: ["client", "server"]; orchestration scripts only
-├── client/               ← today's Vite app, moved as-is
-│   ├── index.html  vite.config.ts  tsconfig.json  package.json
-│   ├── public/
-│   └── src/              ← scenarios/, incidents/, map/, components/, hooks/, styles/ …
-├── server/               ← new Node service (see §3)
-│   ├── package.json  tsconfig.json
-│   ├── src/
-│   │   └── generated/cosmos-map.json   ← committed snapshot of the map data (see below)
-│   └── scripts/snapshot-map.ts
-├── drift-sync/           ← stays at root, repointed at client/src/scenarios
-├── scripts/  versions/  docs/  .claude/  skills/
-├── vercel.json           ← Services config (§2)
-└── eslint.config.mjs     ← stays at root, covers both workspaces
-```
-
-**How the server gets the map data without depending on `client/`.** The map data is the single source of truth, and it stays in `client/src/scenarios/`. drift-sync edits it there, and the skills target it there. `server/scripts/snapshot-map.ts` (run with tsx) imports only the pure data modules (`services`, `topics`, `scenarios`, `steps/*`, `owners`, `incidents/data` — **not** `runner.ts`, which is a React hook) and writes a compact JSON snapshot to `server/src/generated/cosmos-map.json`, which is committed. This keeps `server/` self-contained, so the Vercel server service never reaches outside its root. The snapshot can't silently go stale, for three reasons:
-- `npm run validate` regenerates the snapshot in memory and fails when it differs from the committed file, with the message `cosmos-map.json is stale — run npm run snapshot`.
-- `drift-sync/scripts/apply-edits.ts` runs `npm run snapshot` after it writes edits, and adds `server/src/generated/cosmos-map.json` to its `WRITABLE_PATHS`.
-- `snapshot` is also exposed as a root script.
-
-**Every path consumer to update (the I2 checklist):**
-- `drift-sync/scripts/**`: the relative imports `../../src/…` and `../../../src/…` become `../../client/src/…` and `../../../client/src/…`. `WRITABLE_PATHS` and every prompt string in `apply-edits.ts:87-173` that says `src/scenarios/` becomes `client/src/scenarios/`. Also update `drift-sync/README.md` and `drift-sync/tsconfig.json` includes.
-- `scripts/fresh-start.mjs`: the `src/scenarios` paths (lines 8, 16, 180).
-- `client/vite.config.ts`: `readdirSync('versions')` becomes `'../versions'`.
-- `.github/workflows/validate-on-pr.yml`: add the `npm test` step. Commands keep running from root through workspace scripts.
-- `.github/workflows/cosmos-sync.yml`: any `src/scenarios` path in its steps.
-- `.claude/skills/add-service`, `.claude/skills/add-scenario`, `skills/add-service`, `skills/add-scenario` (56 `src/` references in total).
-- `CLAUDE.md` (Layout, Commands, invariants' paths), `README.md`, `CONTRIBUTING.md`.
-- Root `package.json`: `dev` runs `vercel dev` (both services). `dev:client` keeps plain Vite on :5173. `build`, `lint`, `typecheck`, and `test` fan out with `--workspaces`. `validate` is **not** fanned out: it stays the root script `tsx drift-sync/scripts/validate.ts` (repointed at `client/src/scenarios`), and the snapshot-freshness check lives inside it. No workspace has a `validate` script, so fanning it out would either fail or, with `--if-present`, silently run nothing. **Never use `--if-present` on a gate script.** Dependencies move into the workspace that uses them. `@anthropic-ai/sdk` stays at root for drift-sync.
-- `.gitignore`: `client/dist/`, `server/dist/`, `**/tsconfig.tsbuildinfo`.
-- `CLAUDE.md` warning about emitted `.js` shadowing `.tsx` still applies to `client/`, so keep it.
-
-**Use `git mv` for every move** so history follows the files.
-
-**Verification (the "re-test and re-verify" the developer asked for)**
-- Gate: `grep -rn "src/scenarios\|src/incidents" --exclude-dir={node_modules,client,dist} .` returns only `client/…`-prefixed hits. This proves no stale path survived.
-- `npm run build`, `npm run lint`, `npx tsc -p drift-sync --noEmit`, and `npm run validate` all pass.
-- `validate` is proven live, not vacuous: temporarily corrupt one step's `from` id in `client/src/scenarios/steps/` and confirm `npm run validate` exits non-zero naming the bad id, then revert. Repeat once with a hand-edited `cosmos-map.json` to see the stale-snapshot failure. *Protects: CI's "Validate Project Cosmos" step can never turn green without checking anything.*
-- `npm run sync -- --dry-run` against one repo (per `drift-sync/README.md`) completes. This proves drift-sync can still read and resolve the map.
-- Runtime: `npm run dev:client`, then drive the map with the `browser-drive` skill: play a scenario, open an incident, open the inspector, use a deep link. Do it at 390px first, then desktop, and compare against screenshots of `main` taken before the move.
-- The milestone ships with no behaviour change. The screenshots are the proof.
-
+## This stage's deliverables
+1. `demoQuestion?: string` — when defined, the input shows exactly this text (controlled,
+   read-only so stray input can't change it), and focusing the box does NOT clear it.
+2. `demoExpanded?: boolean` — when defined, forces the expanded/collapsed state of the Ask box
+   (whatever "expanded" means in the current component) instead of internal state.
+3. `demoSearchPressed?: boolean` — when true, the Search button renders in its pressed state
+   (reuse an existing pressed/active class or add a minimal one; keep it visible on mobile).
+4. When none of the demo props are passed, behaviour is exactly unchanged.
+5. Tests in `AskAgent.test.tsx`: demoQuestion renders; focus doesn't clear it; pressed state
+   shows when `demoSearchPressed`; non-demo path unchanged (existing tests still pass).

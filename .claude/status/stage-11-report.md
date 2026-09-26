@@ -1,53 +1,36 @@
 ## Files
-package.json
-package-lock.json
-server/package.json
-vercel.json
-server/src/app.ts
-server/src/config.ts
-server/src/logger.ts
-server/src/cookieCrypto.ts
-server/src/__tests__/cookieCrypto.test.ts
+client/src/components/DemoEndCard.tsx
+client/src/components/__tests__/DemoEndCard.test.tsx
+client/src/overlays/OverlayManager.tsx
+client/src/App.tsx
+client/src/styles/app.css
+client/src/styles/responsive.css
 
 ## Summary
-The `server/` workspace now has a Hono app (`server/src/app.ts`, `basePath('/api')`, JSON `404 NOT_FOUND` / `500 INTERNAL_ERROR` handlers) that doubles as the Vercel entry. It also has a lazy config module (`getCookieSecret()` returns null and logs one error when `AI_COOKIE_SECRET` is missing or not 32 bytes; `getGatewayApiKey()` returns null when the key is unset). A structured JSON logger only ever writes `{ level, scope, message, errorCode, provider, noPHI: true, time }`. `cookieCrypto` seals and opens `{ provider, apiKey }` as `base64url(iv ‖ ciphertext ‖ authTag)` with AES-256-GCM. Root `engines.node` is now `>=22`, and `hono@^4.13.9` is a server dependency.
+Adds the demo's closing credit card. It reads "Built by Or Assayag · GitHub · LinkedIn". GitHub points to the repo page built from the root `package.json` `repository.url`. LinkedIn points to `https://www.linkedin.com/in/orassayag/`. Both links open in a new tab with `rel="noopener noreferrer"`.
 
-| Gate | Result |
-|---|---|
-| `npm run typecheck` | pass (client + server + server/scripts) |
-| `npm run build` | pass |
-| `npm run lint` | pass: 0 errors, 2 pre-existing exhaustive-deps warnings (AskPanel.tsx, Map.tsx) |
-| `npm test` | pass: client 12/12, server 7/7 (5 new in cookieCrypto.test.ts) |
-| `npm run validate` | pass: 0 errors, no drift |
-| Non-vacuous proof | Mutation A (the decrypt catch accepts a forged payload) made 3 tamper/wrong-secret tests fail. Mutation B (skipping `decipher.final()`, so no auth check) made the auth-tag test fail. The file was restored and the tests are green. |
-| No-env import probe | With both env vars unset, `app.request('/api/ai/status')` → `404 {"errorCode":"NOT_FOUND"}`. Two `getCookieSecret()` calls → exactly one `AI_NOT_CONFIGURED` error line. |
-| `vercel dev -L` | Without the `vercel.json` change only `client` is detected and `/api/*` gives `502 Cannot route to service server`. With `entrypoint: src/app.ts`, both `client [Vite]` and `server [Hono]` are detected, `/api/ai/status` reaches Hono with the full path (JSON 404), and `/` gives 200. |
+The card opens on the script's `endCard` step and stays open after the run finishes. You can close it with its top-right close button, which shows on every viewport, or with Esc or a click on the backdrop. On phones it joins the "one card at a time" policy at the top, next to the Connect window, so it hides the stage panels and the demo caption behind it.
+
+Checks:
+- `npm run typecheck`: clean.
+- `npm run lint`: 0 errors. The one existing warning in `Map.tsx` was already there.
+- Client tests: 18 files, 123 tests pass, including the new `DemoEndCard.test.tsx` (5 tests).
+- `npm run build --workspace client`: succeeds.
+
+I did not check it in a browser, on mobile or desktop.
 
 ## Commit message
-feat(server): add Hono app, lazy AI config, structured logger and cookie crypto
+feat(demo): add end card crediting the author with GitHub and LinkedIn links
 
-Lays the server foundation the AI connect/status/ask routes build on in the next stage.
-Env vars are read lazily so the map still deploys and boots with no AI configured.
-The cookie is AES-256-GCM sealed so a tampered or forged cookie can never be read as a key.
+The demo recording needs a closing credit that stays up after the run ends.
+It joins the overlay manager as OVERLAY.demoEndCard and has a corner close
+button on every viewport, since that close is its only way out.
 
 ## Key decisions
-- **One file is both the app and the Vercel entry.** `server/src/app.ts` is on Vercel's Hono entrypoint list. `vercel.json` still has to pin `"entrypoint": "src/app.ts"` on the `server` service: without it, `vercel dev` does not detect the server at all (verified).
-- **Routes are declared under `/api`:** stage 12 registers `app.post('/ai/connect', …)` etc. on the default-exported app, which resolves to `/api/ai/connect`. Tests can use `app.request('/api/ai/…')` with no server.
-- **Decrypt returns `AiCookiePayload | null` and never throws.** Stage 12 treats null as "not connected" and clears the cookie. There is no error class, because no caller needs to `instanceof`-discriminate. A rejected cookie logs one `warn` with `errorCode: 'AI_COOKIE_REJECTED'`. The decrypted JSON is shape-checked (provider ∈ `AI_PROVIDERS`, non-empty `apiKey`).
-- **Cookie constants live in `cookieCrypto.ts`:**
-  - `AI_COOKIE_NAME = 'cosmos_ai'`.
-  - `AI_COOKIE_OPTIONS` is typed against Hono `setCookie`'s options: `httpOnly`, `secure`, `sameSite: 'Strict'`, `path: '/api/ai'`, `maxAge: 2592000`.
-  - For disconnect, use `{ ...AI_COOKIE_OPTIONS, maxAge: 0 }` or `deleteCookie` with the same path.
-- **Config API:**
-  - `getCookieSecret(): Buffer | null` is read per call, never at import. Null means respond `503 { errorCode: AI_NOT_CONFIGURED }`.
-  - The one-time error log uses a module-level flag, so a stage-12 `config.test.ts` that asserts "one error" needs `vi.resetModules()` between cases.
-  - A malformed secret (not 32 bytes after base64 decoding) logs `AI_COOKIE_SECRET_INVALID` and is also treated as not configured.
-  - `getGatewayApiKey(): string | null` does not warn. Stage 13 owns the once-only `JEV_UNAVAILABLE` warning.
-- **The logger allowlists fields by name** (`errorCode`, `provider`) and never spreads, so passing a wider object cannot leak a body, header or cookie. Every line carries `noPHI: true`. The logger module is the only place that uses `console.*`.
-- **`AI_PROVIDERS` / `AiProvider` sit in `logger.ts` for now**, because the log fields need them and a separate `types/` file would have broken the file ceiling. Stage 12's Zod `ConnectRequestSchema` should become the canonical source (e.g. `z.enum(AI_PROVIDERS)`), or move them.
-- **`app.onError` replaces Hono's default handler**, which prints the raw error. It logs only `INTERNAL_ERROR` because of the plan's "error logs carry only `{ errorCode, provider, noPHI }`" rule. This is a deliberate trade against the global "log with context" rule.
-
-## Open questions
-- **File ceiling:** 8 hand-written files against a ceiling of 6 (`package-lock.json` is extra). The overage comes from the one-line `engines` edit, the `hono` dependency line, and the `vercel.json` entrypoint pin; the pin was needed for the server to run at all. Accept, or move the `engines`/`vercel.json` lines to another stage?
-- **Root `dev` → `vercel dev` (stage 6 carry-over) is not done**, because it would add root `package.json` script + README (9–10 files). It is now verified feasible: `vercel dev -L` with the pinned entrypoint serves both services on one port. It needs a small follow-up (root `"dev": "vercel dev"` + README line → `npm run dev`). Still unverified: whether `.env.local` from `vercel env pull` reaches the server service. Check that with stage 12's first cookie route.
-- `server/package.json` keeps its stage-3 `build` script (`tsc --noEmit`). Vercel's Node-backend guidance says not to add a build script for transpilation. This one emits nothing, so it should be harmless, but confirm it on the first preview deploy.
+- `OVERLAY.demoEndCard = 'demo-end-card'`. `DemoEndCard` reads its visibility from `useOverlay()`, following the same pattern as `ConnectAgentModal`, and is portaled to `<body>`. It is mounted only in App's shell branch, inside `OverlayProvider`, and only when `demoScript` is set. It cannot mount in the intro branch because that branch has no provider.
+- The card opens directly from the `showEndCard` action, which calls `demoView.requestEndCard()` and then `overlay.open(OVERLAY.demoEndCard)`. It does not use an effect on `isEndCardRequested`, so it never reopens itself after the user closes it. `isEndCardRequested` is still set and still survives `reset()`, but nothing reads it at the moment.
+- On desktop the overlay manager has a single slot, so opening the end card closes the answer panel. On phones the card stacks on top, and closing it brings the answer panel back.
+- The card reuses the `.lc-help-overlay`/`.lc-help-modal`/`.lc-help-close` styles. It has its own close button, so it does not need `PanelCloseButton`, which only shows on phones. `.lc-demo-end-overlay` sits at z-index 240, above the pointer (230) and caption (220), which are still on screen during the 4s `endCard` step. Because the backdrop has the `.lc-help-overlay` class, App's Esc-reset of the whole map is skipped while the card is open.
+- A trusted click on the card's close button during the `endCard` step also aborts the run. That is harmless: the teardown does not touch the end card.
+- The GitHub URL comes from `import { repository } from '../../../package.json'`. Only that one field ends up in the bundle. `toRepositoryWebUrl` strips the `git+` prefix and the `.git` suffix.
+- Stage 12: `demo=all` gets the end card simply by ending with an `endCard` step. No other wiring is needed.

@@ -1,45 +1,53 @@
-# Stage 13 work brief — §5: route.ts decision, localRelevance, OFF_TOPIC_ANSWERS + route/localRelevance tests
+# Stage 13 work brief — A4: scripts/record-demo.mjs, `record:demo` npm script, playwright devDependency, recordings/ gitignored
 
-Plan: docs/plans/add-ai.md. Branch: feature/add-ai. Stage-plan line:
-"Stage 13: §5: route.ts decision, localRelevance, OFF_TOPIC_ANSWERS + route/localRelevance tests"
+Plan: docs/plans/demo-plan.md (no spec file for this run). Stage-plan line:
+"A4: scripts/record-demo.mjs, `record:demo` npm script, playwright devDependency, recordings/ gitignored"
 
-## In scope for THIS stage
-- `server/src/agent/route.ts` — the pure routing-decision function (below).
-- `localRelevance(question, snapshot)` — the free keyword on-topic check (below), in its own module under `server/src/agent/`.
-- `OFF_TOPIC_ANSWERS` — the self-aware humour lines, same tone as the client's existing `DEMO_ANSWERS` (find it under `client/src/` for the tone; do not import client code into server).
-- Tests: `server/src/agent/__tests__/route.test.ts` and `server/src/agent/__tests__/localRelevance.test.ts`.
+## Plan §8 A4 — pasted verbatim
 
-## Explicitly OUT of scope (later stages — do not build)
-- `classify.ts`, the JEV `evaluate` call, the 3s timeout, the `JEV_UNAVAILABLE` warn-once, and installing the `ai` package → **stage 14**. So `route.ts` must NOT import from `ai`; define its own plain input type for the classification result (onTopic probability, intent, targetScenario + its probability) that stage 14's `classify.ts` will map JEV's output into.
-- Context digest / system prompt / LangGraph → stages 15–16. `POST /api/ai/ask` → stage 17.
+- **A4 — Recorder.** `scripts/record-demo.mjs` (`npm run record:demo -- ai|all`), with
+  `playwright` as a root devDependency. It opens `${BASE_URL:-http://localhost:5173}/?demo=<mode>`
+  at 1920×1080 with `recordVideo`, waits for `html[data-demo-state="done"]`, and saves the video
+  to `recordings/demo-<mode>.webm` (gitignored). It **exits non-zero if the real elapsed time is
+  over 60s or 120s**, which is the real-time check for §9. Verify: run it for both modes.
 
-## Plan text (pasted verbatim from §5)
+## Plan §9 — Time limits (I9) — pasted verbatim
 
-`state` carries names only, never the full snapshot, which keeps the input small (the "keep state focused" guidance). `targetScenario` options are generated from `cosmos-map.json`, with one entry per scenario (id → title). There are 8 today, well under the 255-option limit.
+`client/src/demo/__tests__/scripts.test.ts` builds both scripts and sums `durationMs`. It
+asserts `ai ≤ 60_000` and `all ≤ 120_000`. It also asserts that every step `kind` has a handler
+in `DemoActions`, and every `target` exists in the `DemoTarget` union. *Protects: a timing edit
+cannot silently push a demo over its limit.* Unit layer. The A4 recorder is the real-time
+backstop, because the scenario playback in §7 runs on the app's own clock.
 
-JEV questions stage 14 will ask (for the shape of the classification result):
-- `onTopic`: boolean — "Is this question about the AstroMart system shown on the map — its services, topics, flows, teams, or incidents?"
-- `intent`: choice — `explainFlow` | `findService` | `playScenario` | `incident` | `ownership`
-- `targetScenario`: choice — `none` | one entry per scenario id from the snapshot
+## Plan §10 — Screens — relevant line
 
-**Routing decision** (`server/src/agent/route.ts`, a pure function)
-- `onTopic.probability < 0.35` → **off-topic**: return a random line from `OFF_TOPIC_ANSWERS`, the same self-aware humour as today's `DEMO_ANSWERS` ("I only know about stars on this map — for the weather, try looking up. ☁️"). The visitor's model is not called.
-- `intent = playScenario` **and** `targetScenario ≠ none` with probability ≥ 0.6 → a **direct action**: stream a short templated line ("Playing *Checkout* for you ▶") and a `playScenario` action. The visitor's model is not called.
-- Otherwise → **agent** (§6), with `intent` and `targetScenario` passed in as hints.
+The demo is **recorded on desktop (1920×1080)**.
 
-**Fallback when JEV is unavailable** (gateway error, timeout > 3s, or `AI_GATEWAY_API_KEY` not set — the last one skips the `evaluate` call entirely): run `localRelevance(question, snapshot)`. This is a free check that is on-topic when the question contains any service, topic, domain, team, or scenario name, or an architecture word from a short fixed list. Off-topic → funny reply; on-topic → agent. **The fallback never calls the visitor's model to classify.** That is the I6 guarantee, and a warning log (`JEV_UNAVAILABLE`) makes spikes visible.
+## Plan Final acceptance — relevant line (verified fully in stage 14, not here)
 
-**Tests** — `server/src/agent/__tests__/`
-- `route.test.ts`: a table of classification results mapped to decisions, covering the threshold edges (0.34 / 0.35, 0.59 / 0.6). *Protects: the off-topic and direct-action rules never drift.*
-- `localRelevance.test.ts`: "what's the weather" → off; "what does payments-gateway do" → on.
+- `npm run record:demo -- ai` and `-- all` both finish under their limits and produce videos
+  that match the §6 and §7 tables.
 
-(I6 from Issue Resolutions: "Unrelated questions cost zero tokens" — the fallback is a free keyword check and never the visitor's model.)
+## Carry-overs from the ledger (stage 12)
 
-## Design notes for this stage (orchestrator guidance; the plan wins any conflict)
-- Keep `route.ts` pure and deterministic under test: inject the randomness for the off-topic pick (e.g. an optional `pickIndex`/random fn param) so tests don't depend on `Math.random`.
-- The decision should carry everything stage 17 needs without re-deriving: off-topic → the answer text; direct → scenario id + the templated line (title from the snapshot); agent → the hints. Make the decision type a discriminated union.
-- Make it easy for stage 14 to route the fallback through the same function (e.g. localRelevance result → off-topic / agent, never direct-action), so there is one decision path.
-- The snapshot is `server/src/generated/cosmos-map.json` (committed; read its actual shape — services, topics, domains, owners/teams, scenarios). Type it minimally for what `localRelevance` and the scenario-title lookup need; don't retype the whole map.
-- `localRelevance` matching: case-insensitive; be careful that service ids with hyphens ("payments-gateway") and display names both match; avoid substring false-positives on very short tokens where cheap to do so. Keep the architecture-word list short and fixed.
-- Server rules from the ledger: `.js` suffix on every relative import (NodeNext), no `console.*` outside `logger.ts`, file names camelCase, tests in `__tests__/`, import `vitest` explicitly (no globals).
-- Ceilings: ≤6 files, ≤250 hand-written LOC.
+- Recorder should use speed 1 (`?speed=` does not affect scenario/incident playback).
+- `html[data-demo-state="done"]` lands ~116.6s after load for `all` (~29.3s for `ai`); the
+  wait timeout needs headroom (e.g. 150s) — but the elapsed-time check itself stays 60s / 120s.
+- `data-demo-state` can also become `aborted` — the recorder must fail fast on that, not hang.
+- The end card stays open after `done`.
+
+## Notes for this stage
+
+- Limits should come from a single place; `client/src/demo/scripts.ts` exports
+  `DEMO_TIME_LIMITS_MS` but it is TS inside the client workspace — the .mjs recorder may
+  hard-code 60_000 / 120_000 if importing is impractical (say which in Key decisions).
+- Decide what "elapsed" measures (page navigation → `done`) and document it.
+- Playwright's `recordVideo` writes a random filename; the script must move/save it to
+  `recordings/demo-<mode>.webm` after `context.close()`.
+- Invalid/missing mode → non-zero exit with a clear usage message.
+- If the dev server isn't running, fail with a clear message naming `npm run dev` / `BASE_URL`.
+- Actually installing playwright (npm install -D playwright at root) and the chromium browser
+  (`npx playwright install chromium`) is in scope. Try a real run of `npm run record:demo -- ai`
+  against a started dev server if feasible; if the environment can't (no browser download,
+  etc.), say so plainly — stage 14 does the full acceptance runs.
+- Update README only if there is an obvious place for recorder usage; otherwise leave it.

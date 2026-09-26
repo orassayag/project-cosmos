@@ -1,49 +1,28 @@
-# Stage 2 report — M0: repoint drift-sync + fresh-start to client/src
+# Stage 2 report
 
 ## Files
-drift-sync/README.md
-drift-sync/scripts/apply-edits.ts
-drift-sync/scripts/bootstrap-state.ts
-drift-sync/scripts/diff-repo.ts
-drift-sync/scripts/lib/agent.ts
-drift-sync/scripts/lib/cosmos-context.ts
-drift-sync/scripts/sync-nightly.ts
-drift-sync/scripts/sync.ts
-drift-sync/scripts/validate.ts
-drift-sync/tsconfig.json
-scripts/fresh-start.mjs
+client/src/demo/runDemo.ts
+client/src/demo/__tests__/runDemo.test.ts
 
 ## Summary
-Repointed every `src/scenarios` consumer outside the client to `client/src/scenarios`. All changes are path strings only (48 lines changed in 11 files).
-- Imports: `../../src/…` became `../../client/src/…` in sync.ts, sync-nightly.ts, validate.ts and bootstrap-state.ts. `../../../src/…` became `../../../client/src/…` in lib/cosmos-context.ts.
-- `WRITABLE_PATHS` became `client/src/scenarios/` in **both** apply-edits.ts:87 and sync-nightly.ts:213. The plan named only the first one; the sweep found the second.
-- Prompt and tool strings: the apply-edits.ts system prompt (file list, forbidden-paths line `Any file under client/src/`, the `<repo-name>/client/src/…` footgun example, and the JSON example). Also the example path in the sync.ts proposal JSON, the diff-repo.ts prompt example, and the lib/agent.ts `write_file` tool description plus its footgun comment.
-- drift-sync/README.md: 5 path mentions.
-- drift-sync/tsconfig.json: `extends` was `../tsconfig.json`, which no longer exists since stage 1 moved it to `client/`. It is now `../client/tsconfig.json`. `include: ["scripts"]` is unchanged, because tsc follows the imports into `client/src/scenarios`.
-- scripts/fresh-start.mjs: lines 8, 16 (`resolve(root, 'client/src/scenarios', p)`) and 180. Checked by reading and grep only; **not run**.
-- A final sweep with `grep src` over drift-sync/ and fresh-start.mjs finds no root-relative `src/` left. There are no `path.join(root,'src',…)` calls or globs.
-
-Verification:
-- `npm run validate` — **PASS**: 12 services, 8 topics, 40 steps, 5 scenarios, 0 errors. Stage 1's ERR_MODULE_NOT_FOUND is fixed.
-- Live-validate check — **PASS**: changed the first `from` in `client/src/scenarios/steps/shopping.ts` to `bogus-svc`. validate exited 1 with `step.from "bogus-svc" is not a known service or topic`. The file was restored from backup, and `git status` shows it clean.
-- `npm run build` — **PASS**. The only warning is the existing chunk-size notice.
-- `npm run lint` — **PASS**: 0 errors, 2 existing react-hooks warnings in Map.tsx.
-- `npx tsc -p drift-sync --noEmit` — **NOT RUN**. The permission system denied it, and also denied `./node_modules/.bin/tsc -p drift-sync/tsconfig.json --noEmit`. Indirect evidence that it would pass: tsx resolves every repointed import at runtime (validate and bootstrap both ran), and the extends target exists. The orchestrator or a human should run it.
-- `npm run sync -- --dry-run` — **cannot run as written**. `sync.ts` has no `--dry-run` flag. Its only mode is `investigate-topic <id>`, which needs `ANTHROPIC_API_KEY` and the network. I ran the credential-free equivalent instead, `npm run sync:bootstrap -- --dry-run`. It loaded the map through the new imports, derived all 15 repos, and reported every one as MISS because there are no sibling clones on this machine. It wrote no state file. The imports resolve end to end.
+Added the demo runner. `runDemo(script, actions, { signal, speed, onStepStart? })` plays steps one after another, changes the app only through `DemoActions`, divides every duration by `speed`, and resolves `'done'` or `'aborted'` (it never throws on abort). `sleep(ms, signal)` clears its timer on abort and removes its abort listener when it resolves. `scaledDuration(ms, speed)` is exported so stage 9's pointer and caption animations can scale. `abortOnTrustedInput(controller, target = window)` aborts on a trusted `pointerdown`/`keydown`, ignores untrusted events, and returns a cleanup function for stage 8's hook to reuse. `types.ts` is unchanged.
+The tests (18, fake timers) cover: script order; every `DEMO_STEP_KINDS` entry calling exactly the callbacks in `DEMO_STEP_ACTIONS`; `connect` and `ask` timing within a step; speed 4 finishing in a quarter of the time; abort mid-run (no later action, `vi.getTimerCount() === 0`); an already-aborted signal calling nothing; a non-positive speed being rejected; and trusted vs. untrusted input, including a trusted `pointerdown` stopping a running demo.
+Verification: `npm run typecheck` is clean. `npm run lint` has 0 errors and 1 warning that was already there, in `Map.tsx`, which this stage did not touch. `npm --prefix client test` passes 9 files / 67 tests.
 
 ## Commit message
-refactor(drift-sync): repoint map paths to client/src after workspace move
+feat(demo): add abortable demo runner with speed scaling
 
-Stage 1 moved the Vite app into client/, which broke drift-sync's imports,
-its writable-path sandbox, the agent prompts and fresh-start. Repointing them
-brings `npm run validate` back and keeps the nightly applier writing to the real map files.
+The demo must drive the app only through App-supplied callbacks, since
+synthetic clicks are ignored by mouse-down buttons and the map pan handler.
+One AbortSignal stops the whole run with no stray timers, and only real
+viewer input can trigger it.
 
 ## Key decisions
-- sync-nightly.ts has its own `WRITABLE_PATHS` (line 213), separate from the one in apply-edits.ts. I updated it too. If I hadn't, the nightly guard would reject every legitimate map edit.
-- drift-sync/tsconfig.json now extends `../client/tsconfig.json` rather than adding a new root tsconfig. That keeps compiler options in one place. It also pulls in the client's `types: ["vite/client"]` and DOM libs, which was already true before the move.
-- `sync.ts` builds `repoRoot = path.resolve(here, '..')`, which resolves to `drift-sync/`. This predates the move and has nothing to do with `src/`, so I left it alone.
+- **Call-then-sleep.** A step's actions fire at its start, then its `durationMs` elapses, so the step's result stays on screen for its whole duration. Two steps split their duration instead of adding to it. `connect` calls `setAiStatus('connecting')`, waits `durationMs`, then calls `setAiStatus('connected')`. `ask` calls `setSearchPressed(true)`, waits `min(SEARCH_PRESS_MS=150, durationMs)`, calls `setSearchPressed(false)` and then `ask(question)`, and waits for the rest of the duration. Both steps take exactly `durationMs / speed` in total.
+- **Added `onStepStart?(step, stepIndex)` to the run options.** It fires before each step's actions. Stage 9 needs a way to follow the script to move the pointer to `step.target` and show `step.caption`, and `DemoActions` has no pointer or caption callbacks. It is optional, and the runner itself ignores `target`/`caption`.
+- **Abort during a step.** If an abort lands while the search button is pressed or while the fake connection is `connecting`, no more actions run. That means `setSearchPressed(false)` / `setAiStatus('connected')` never fire. Stage 8's teardown must reset the pressed state and drop the fake AI connection. The plan already gives it that job (§1 I8).
+- **Speed validation.** `runDemo` throws a `RangeError` for a speed that is not finite or not positive. `readDemoMode` already clamps speed to 1–8, so this only catches a wiring bug.
+- **Test for trusted input.** jsdom's `Event.isTrusted` is a non-configurable getter, so `Object.defineProperty` throws (I checked this directly). The workaround in the brief does not work. Instead, `abortOnTrustedInput` takes `target: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>`. The tests pass a fake target that calls the listener with `{ isTrusted: true }`, and a real `window.dispatchEvent` (untrusted) test proves synthetic events do not abort.
 
 ## Open questions
-- Someone needs to run `npx tsc -p drift-sync --noEmit`, since the permission system denied it here. Stage 5's full gate should cover it.
-- The plan's verification line says `npm run sync -- --dry-run`, but that flag doesn't exist on `sync.ts`. `sync:bootstrap -- --dry-run` (used above) or `sync:nightly` (needs a key) are the real candidates. The plan or stage 5 gate text should be corrected.
-- A pre-existing, out-of-scope finding: `client/src/scenarios/steps/core.ts` (`CORE_STEPS`) is not imported by the `data.ts` barrel. validate and the app never see its steps, so a bad id there goes unnoticed. My first corruption test hit this file and returned 0 errors. I did not change it.
+- The global workflow asks for verified platform facts to be written to `~/.claude/bank/platform-facts/`. The fact here is that jsdom 30's `Event.isTrusted` cannot be overridden via `defineProperty`. The stage scope contract does not let me touch files outside this stage, so I did not write it. The orchestrator can record it if wanted.

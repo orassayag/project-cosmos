@@ -1,32 +1,54 @@
-# Stage 9 work brief — M1: ConnectAgentModal + OVERLAY.connect registration + responsive.css priority + ConnectAgentModal.test
+# Stage 9 work brief — Fake pointer, caption bar, responsive rules, App mount
 
-Stage-plan line: M1: ConnectAgentModal + OVERLAY.connect registration + responsive.css priority + ConnectAgentModal.test
-Ceilings: ≤6 files, ≤250 hand-written LOC.
+**Stage line:** A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
 
-## In scope (pasted from docs/plans/add-ai.md §4)
+## Scope for THIS stage
+- New `client/src/components/DemoPointer.tsx` (A1 pointer component only).
+- New `client/src/components/DemoCaption.tsx` (A3 caption bar).
+- CSS for both (pointer + caption base styles in the appropriate existing stylesheet, phone rules in `client/src/styles/responsive.css`: pointer hidden on touch/phone-class, caption above playback controls on phones and hidden while a detail card is open — join the "One card at a time" block).
+- Mount both in `client/src/App.tsx`, driven by `demoRunner.caption`, `demoRunner.target`, `demoRunner.isOverlayVisible`, and `demoSpeed` (see ledger Stage 8).
+- Tests for the two components are welcome (e.g. caption renders text with `aria-live="polite"`; pointer computes position from a `[data-demo-target]` element's rect and does nothing when absent) if they fit the ceilings.
 
-**New `client/src/components/ConnectAgentModal.tsx`**
-- A provider picker (Claude / OpenAI segmented control) and a key field (`type="password"`, `autoComplete="off"`).
-- A "Get a key" link per provider (`https://console.anthropic.com/settings/keys` or `https://platform.openai.com/api-keys`).
-- A Connect button with a busy state, and inline errors ("That key didn't work — check it and try again").
-- It closes on success. One provider at a time: connecting a second provider replaces the first, and the modal says so.
-- **Overlay registration:** add `connect: 'connect-agent'` to `OVERLAY` in `client/src/overlays/OverlayManager.tsx`. The modal's visibility is `overlay.isOpen(OVERLAY.connect)`, and every open/close goes through `overlay.open` / `overlay.close` — no private `open` boolean. So on desktop opening it closes whatever was open, and on phones it stacks and closing it brings back the buried panel (e.g. the answer panel) intact.
-- **Mobile contract:** it has its own top-right header close button. It also joins the "One card at a time" block in `client/src/styles/responsive.css` (kept alongside the manager registration), so it hides the context panels on phone-class viewports. It is laid out at 390px first and in short landscape (`max-height:480px`).
+**Out of scope (later stages):** adding `data-demo-target` attributes to app elements (stage 10 — until then the pointer simply finds no element and must stay put/hidden gracefully); DemoEndCard (stage 11); `demo=all` + `toggleLegend` (stage 12); recorder (stage 13).
 
-Relevant disconnected-status rule (§2): the client treats `AI_NOT_CONFIGURED` from `status` as disconnected and hides the Connect button.
+## Plan text (verbatim)
 
-**Wiring:** replace the empty `onConnectRequest` callback in `client/src/App.tsx` (left by stage 8) with `overlay.open(OVERLAY.connect)`, render `<ConnectAgentModal>` in App using the same `useAiConnection()` instance's `connect()` (result shape `ConnectResult` from stage 8 — show the error on `ok:false`, keep modal open; close via `overlay.close` on success). Map `errorCode` to plain inline messages (INVALID_KEY → "That key didn't work — check it and try again"; others get a sensible plain message).
+### §1 — Runner (excerpt)
+- `types.ts` defines a typed step union. Every step has `durationMs` and an optional `caption`
+  (A3): … `target` names a `data-demo-target` attribute that the pointer moves to (A1).
+- Abort (I8): `useDemoRunner` owns one `AbortController`. … On abort or on finish it hides the pointer and
+  caption, drops the fake AI connection back to the real one (§3), and sets
+  `<html data-demo-state="aborted" | "done">`, which A4 waits for.
 
-## Tests (pasted from §4)
+### §8 — Accepted additions (A1, A3, A5)
+- **A1 — Fake pointer.** `DemoPointer.tsx` is one absolutely positioned SVG arrow in a portal.
+  Before each targeted step, it moves over 500ms to the center of
+  `document.querySelector('[data-demo-target="…"]').getBoundingClientRect()`, then shows a 300ms
+  ripple. Add `data-demo-target` to: the Connect button, the provider buttons, the key fields,
+  the Connect submit, Search, domain buttons, play/step controls, the legend toggle, and the
+  intro button. The pointer is hidden on phones (touch has no cursor) and has
+  `pointer-events: none`. Verify: visual, in the A4 recording.
+- **A3 — Captions.** `DemoCaption.tsx` is a one-line bar at the bottom center with
+  `aria-live="polite"`. It shows the current step's `caption` and keeps the last one until a new
+  caption replaces it. It is a caption strip, not a panel. On phones it sits above the playback
+  controls and is hidden while a detail card is open, following the "one card at a time" block
+  in `responsive.css`. Verify: visual at 390px and desktop.
+- **A5 — Speed dial.** `?speed=` is parsed in §1, and the runner divides every duration by it.
+  The pointer and caption animations scale too. Covered by `runDemo.test.ts`.
 
-  - `ConnectAgentModal.test.tsx`: a failed connect shows the inline error and keeps the modal open; success closes it. Rendered inside `OverlayProvider`: opening it from the open answer panel makes `OVERLAY.connect` active; with the phone viewport mocked, closing it makes `OVERLAY.ask` active again. *Protects: a visitor always knows whether their key was accepted, and the modal never stacks on or loses another panel (round-2 I5).*
-- Visual: drive with `browser-drive` at 390×844 and 844×390, then desktop 1440×900. Screenshot the modal over an open answer panel on a phone to prove no stacking, and confirm the close button is visible.
+### §10 — Screens (I10)
+The demo is **recorded on desktop (1920×1080) and must not break on phones.** It is built and
+checked at 390px first, per the mobile-first invariant:
+- The caption hides behind detail cards (A3), and the end card has its close button (A2).
+- The pointer is hidden on touch devices.
+Verify manually at 390×844 portrait and 844×390 landscape with `?demo=ai&speed=4`.
 
-## Out of scope (later stages)
-- AskPanel "Connect an AI agent for real answers." line + starter chips → stage 10.
-- Server routes → stages 11–12. `/api/ai/*` 404s locally today; mock the status/connect route for runtime checks.
-- Optional: `client/src/hooks/__tests__/useAiConnection.test.ts` (stage-8 open question) ONLY if it fits within the 6-file / 250-LOC ceiling; otherwise leave it and note it.
+## Project invariants (CLAUDE.md) that apply
+- Mobile-first; phone-class = `max-width:768px` **or** `max-height:480px`; JS (`useViewport`) and CSS queries stay in sync.
+- One panel at a time on mobile — see "One card at a time" block in `responsive.css`.
+- The caption is a strip, not a panel, so it does not need a close button; the pointer is not interactive (`pointer-events: none`).
+- Never run `tsc` without `--noEmit`/`-b`. Gate: `npm run build`, `npm run typecheck`, `npm run lint`, client tests.
 
-## Project rules to honour
-- Mobile-first: build/verify at 390×844 and 844×390 first, then 1440×900. One panel at a time; modal has its own top-right header close button; join the "One card at a time" block in client/src/styles/responsive.css.
-- Never run `tsc` without `--noEmit`/`-b`. Use `npm exec -- <bin>` (bare npx is permission-denied). A stale vite may be on :5173 — use another port for runtime checks; install Playwright in the scratchpad, not the repo.
+## Notes from the ledger
+- Stage 8: read `demoRunner.caption`, `demoRunner.target`, `demoRunner.isOverlayVisible` in App (the `demoRunner` const), use `demoSpeed` for animation scaling. `target` is sticky until a later step replaces it; `closeConnect` has no target.
+- Stage 10 will add `data-demo-target` attributes; the runner never touches them.

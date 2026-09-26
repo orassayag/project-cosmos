@@ -1,51 +1,85 @@
-# Stage 12 work brief — M2: connect / disconnect / status routes + ConnectRequestSchema + key check + route/config tests
+# Stage 12 work brief — §7: `demo=all` script + new DemoActions wired in App + scripts.test (all ≤ 120s)
 
-Plan: `docs/plans/add-ai.md` (§3). Branch: `feature/add-ai`. Builds on stage 11 (see ledger: `app.ts`, `config.ts`, `logger.ts`, `cookieCrypto.ts`).
+Plan: docs/plans/demo-plan.md (no spec file for this run). Stage-plan line:
+"§7: `demo=all` script (scenario-derived segment 2 time) + new DemoActions wired in App
+(pressIntro, playScenario, stepBack/Forward, openIncident, toggleLegend) + scripts.test (all ≤ 120s)"
 
-## In scope
-- `POST /api/ai/connect`, `POST /api/ai/disconnect`, `GET /api/ai/status` registered on the stage-11 Hono app (`app.post('/ai/connect', …)` etc. → `/api/ai/…`).
-- Zod `ConnectRequestSchema` (in a `server/src/schemas/` file per naming rules) — make it the canonical provider source (`z.enum(AI_PROVIDERS)`), moving `AI_PROVIDERS`/`AiProvider` out of `logger.ts` if that fits the file ceiling; otherwise reference them and note it.
-- The provider key check (free `GET /v1/models`, stubbable `fetch`).
-- Tests: `connectRoute.test.ts`, `statusRoute.test.ts`, `config.test.ts` (per §3 below).
-- `zod` added as a server dependency if not already resolvable there.
+## Plan §7 — `demo=all` script (≤ 120s) (I2) — pasted verbatim
 
-## Out of scope
-- `POST /api/ai/ask` (stage 17). In `config.test.ts`, cover `status`/`connect` → 503 and `disconnect` → 200 only; note that the `ask` 503 case lands with stage 17.
-- Root `"dev": "vercel dev"` + README line (stage 6 carry-over) — do not add.
-- `useAiConnection` client unit test — do not add (keeps this stage server-only); flag in Open questions as still deferred.
+| # | Segment | ms |
+|---|---------|----|
+| 0 | pressIntro + warp | 4,000 |
+| 1 | Domain switch: Shopping → Fulfillment → Shopping | 8,000 |
+| 2 | Play "Place an order" (`shopping.place-order`) | 30,000 |
+| 3 | Step back ×2, forward ×2 | 10,000 |
+| 4 | Open a recorded incident (the first in `INCIDENTS`) and let it play | 20,000 |
+| 5 | Ownership legend on, hold, off | 10,000 |
+| 6 | `demo=ai` sequence, shortened (skip steps 0, 1, 12; answer 7,000) | 25,000 |
+| 7 | endCard | 4,000 |
+| | **Total** | **111,000** |
 
-## Plan §3 — Milestone 2: Server (key handling) (pasted verbatim)
+- New `DemoActions`: `pressIntro`, `playScenario`, `stepBack`, `stepForward`, `openIncident`,
+  `toggleLegend`. Each one is wired to the handler App already uses (`handlePlayScenario`,
+  `navPlay`, the overlay manager for `OVERLAY.mapOwnership`).
+- The `wait` for segments 2 and 4 must cover the real playback length of that scenario or
+  incident. Segment 2 sums the step durations from the scenario data, and the script builder
+  reads them from there, so a data change updates the budget automatically.
+- Test: `scripts.test.ts` (§9). Segment 2's time comes from the scenario data, not a constant.
+  *Protects: I2. The tour is fixed and stays within its limit.*
 
-**Stack:** a Node service in `server/`. Use Hono on Vercel's Node runtime (Node 24 on Vercel, 22 locally per `.nvmrc`). Set root `engines.node` to `>=22`, because AI SDK 7 requires Node 22+ and ESM. In `server/tsconfig.json`, set `module`/`moduleResolution: NodeNext`. That makes every extensionless relative import a compile error, so the `.js` rule (L016) is enforced by the type-checker instead of discovered at deploy time.
+## Plan §9 — Time limits (I9) — pasted verbatim
 
-**Routes**
+`client/src/demo/__tests__/scripts.test.ts` builds both scripts and sums `durationMs`. It
+asserts `ai ≤ 60_000` and `all ≤ 120_000`. It also asserts that every step `kind` has a handler
+in `DemoActions`, and every `target` exists in the `DemoTarget` union. *Protects: a timing edit
+cannot silently push a demo over its limit.* Unit layer. The A4 recorder is the real-time
+backstop, because the scenario playback in §7 runs on the app's own clock.
 
-| Route | Behaviour |
-|---|---|
-| `POST /api/ai/connect` `{ provider: 'anthropic' \| 'openai', apiKey }` | Validates the body with a Zod `ConnectRequestSchema`. Checks the key with the provider's free `GET /v1/models` (Anthropic `x-api-key` + `anthropic-version`; OpenAI `Authorization: Bearer`). A 401 returns `400 { errorCode: 'INVALID_KEY' }`. On success it sets the cookie, replacing any existing provider, and returns `{ connected: true, provider }`. |
-| `POST /api/ai/disconnect` | Clears the cookie (`Max-Age=0`). Returns `{ connected: false }`. |
-| `GET /api/ai/status` | No cookie returns `{ connected: false }`. Otherwise it decrypts the cookie and repeats the `/v1/models` check. A 401 clears the cookie and returns `{ connected: false, reason: 'KEY_REVOKED' }`. A network error keeps it connected, since the check is advisory. |
-| `POST /api/ai/ask` `{ question }` | Streamed. See §5–§7. |
+## Plan §2 (the `demo=all` part) — pasted verbatim
 
-**Cookie:** `cosmos_ai=<base64url(iv ‖ ciphertext ‖ authTag)>; HttpOnly; Secure; SameSite=Strict; Path=/api/ai; Max-Age=2592000`. The payload is `{ provider, apiKey }` encrypted with AES-256-GCM using `AI_COOKIE_SECRET` through Node's built-in `crypto`. A tampered or undecryptable cookie is treated as "not connected" and cleared. The server stores nothing: it decrypts per request, uses the key, and drops it.
+- `demo=all` keeps the intro, and its step 0 (`pressIntro`) calls the same handler the intro
+  button uses. The warp is counted in the time budget (4s).
+- In demo mode, `cosmos-intro-seen` is **never** written, so a later normal visit still gets the
+  intro.
 
-**Logging:** use a structured logger. It never logs request bodies, headers, or the cookie. Error logs carry only `{ errorCode, provider, noPHI: true }`.
+## Plan §6 — the `demo=ai` table segment 6 shortens (pasted verbatim)
 
-**Tests** — `server/src/__tests__/`, Vitest, unit layer:
-- `cookieCrypto.test.ts`: (done in stage 11)
-- `connectRoute.test.ts`, with the provider `fetch` stubbed: a valid key sets a cookie with all four attributes; a 401 returns `INVALID_KEY` and sets no cookie; a bad body returns a named validation error. *Protects: only working keys get stored, and the cookie is always locked down.*
-- `statusRoute.test.ts`: a revoked key (stub returns 401) clears the cookie and reports disconnected. *Protects: the light never stays green on a dead key (I9).*
-- `config.test.ts`: the app module imports with neither env var set; `status`/`connect`/`ask` return `503 AI_NOT_CONFIGURED` without `AI_COOKIE_SECRET`; `disconnect` still returns 200. *Protects: a missing secret disables AI only, never the whole site (round-2 I1).*
+| # | Step | ms | Caption |
+|---|------|----|---------|
+| 0 | wait (settle) | 800 | — |
+| 1 | pickDomain `shopping` | 1200 | "Exploring the Shopping domain" |
+| 2 | type question | 4000 | "Asking the map a question" |
+| 3 | wait | 600 | — |
+| 4 | openConnect (pointer → Connect) | 1100 | "Connecting an AI agent" |
+| 5 | pickProvider Claude | 600 | — |
+| 6 | paste Claude key | 900 | "Pasting a Claude key" |
+| 7 | paste JEV key | 900 | "Adding the JEV key (the site's question classifier)" |
+| 8 | connect (busy → connected) | 2500 | "Connecting…" |
+| 9 | closeConnect | 400 | — |
+| 10 | ask (Search pressed) | 800 | — |
+| 11 | answer (thinking + words) | 8500 | "The agent answers from the live map" |
+| 12 | wait (hold on highlight) | 3000 | — |
+| 13 | endCard | 4000 | — |
 
-## Relevant issue resolutions (pasted)
-- I4: AES-256-GCM encrypted HttpOnly/Secure/SameSite=Strict cookie. Stateless server, no logging of secrets.
-- I9: The green light can lie → key checked on connect and on every page load. A 401 disconnects.
-- I12: `.js` on every relative import under `server/`, enforced by `moduleResolution: NodeNext`.
-- Round-2 I1: Only `AI_COOKIE_SECRET` is required, and only by the cookie routes; a missing gateway key falls back to `localRelevance`.
-- Round-2 I4: The client calls `POST /api/ai/disconnect` on an `INVALID_KEY` event — so disconnect must work even without `AI_COOKIE_SECRET`.
+Each step that clicks something has a `target`, so the A1 pointer glides there first (inside the
+step's time).
 
-## Client contract to honour
-Client error map (stage 9 `ConnectAgentModal`): `INVALID_KEY`, `AI_NOT_CONFIGURED`, network error, unexpected response. Client `useAiConnection` (stage 8) calls `/api/ai/status`, `/api/ai/connect`, `/api/ai/disconnect` — read it and match its expected response shapes exactly; flag any mismatch.
+## Carry-forward obligations from earlier stages (from the ledger — MUST do in this stage)
 
-## Verification required
-`npm run typecheck`, `npm run build`, `npm run lint`, `npm test`, `npm run validate`. Non-vacuous proof: at least one mutation per protected behaviour (e.g. drop an attribute from the cookie; skip clearing on 401) shown to fail the relevant test, then restored. If feasible, a `vercel dev -L` smoke of `/api/ai/status` with and without `AI_COOKIE_SECRET` (and note whether `.env.local` reaches the server service — open ledger item).
+- Stage 7: `DEMO_SCRIPTS` / `DEMO_TIME_LIMITS_MS` are `Partial<Record<DemoModeName, …>>` —
+  add `ALL_DEMO_SCRIPT`, `all: 120_000`, and switch both to full `Record` (tests iterate all entries).
+- Stage 8: keep `all`'s step 0 idempotent (StrictMode double-fires step 0). `toggleLegend` is
+  currently a no-op (legend state lives inside `Map`) — **wire it**. `pressIntro`,
+  `playScenario`, `stepBack`/`stepForward`, `openIncident` exist — verify they drive the real
+  handlers correctly for the `all` tour. `?demo=all` currently has no script (normal load) — this
+  stage makes it play.
+- Stage 10: add `data-demo-target="legend-ownership"` to the Ownership `lc-layout-btn`
+  (`onClick={toggleOwnershipMode}`, ~line 1178 of `client/src/map/Map.tsx`) and remove
+  `'legend-ownership'` from `TARGETS_OUTSIDE_THESE_COMPONENTS` in
+  `client/src/demo/__tests__/demoTargets.test.tsx`. If the `all` script uses other targets
+  (intro-start, domain tabs, playback controls), make sure the target-coverage test covers them.
+- Stage 11: `demo=all` gets the end card just by ending with an `endCard` step.
+
+## Mobile-first / project invariants
+- Any change must not break phone-class viewports; no new panel is expected in this stage.
+- Demo data is fictional (AstroMart).

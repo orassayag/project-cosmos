@@ -1,212 +1,27 @@
+# Stage 1 report
+
 ## Files
-package.json
-package-lock.json
-.gitignore
-eslint.config.mjs
-client/package.json
-index.html
-client/index.html
-public/favicon.svg
-client/public/favicon.svg
-src/App.tsx
-client/src/App.tsx
-src/appVersion.d.ts
-client/src/appVersion.d.ts
-src/components/ActivityLog.tsx
-client/src/components/ActivityLog.tsx
-src/components/AskAgent.tsx
-client/src/components/AskAgent.tsx
-src/components/AskPanel.tsx
-client/src/components/AskPanel.tsx
-src/components/ChangelogPanel.tsx
-client/src/components/ChangelogPanel.tsx
-src/components/DomainBar.tsx
-client/src/components/DomainBar.tsx
-src/components/DriftFooter.tsx
-client/src/components/DriftFooter.tsx
-src/components/HelpButton.tsx
-client/src/components/HelpButton.tsx
-src/components/HelpModal.tsx
-client/src/components/HelpModal.tsx
-src/components/IncidentBanner.tsx
-client/src/components/IncidentBanner.tsx
-src/components/IncidentBar.tsx
-client/src/components/IncidentBar.tsx
-src/components/IntroOverlay.tsx
-client/src/components/IntroOverlay.tsx
-src/components/MobileMenu.tsx
-client/src/components/MobileMenu.tsx
-src/components/PanelCloseButton.tsx
-client/src/components/PanelCloseButton.tsx
-src/components/PlaybackControls.tsx
-client/src/components/PlaybackControls.tsx
-src/components/ScenarioStatus.tsx
-client/src/components/ScenarioStatus.tsx
-src/components/Spotlight.tsx
-client/src/components/Spotlight.tsx
-src/components/Starfield.tsx
-client/src/components/Starfield.tsx
-src/components/StepPanel.tsx
-client/src/components/StepPanel.tsx
-src/components/TechIcon.tsx
-client/src/components/TechIcon.tsx
-src/components/WarpTransition.tsx
-client/src/components/WarpTransition.tsx
-src/components/payload-parser.ts
-client/src/components/payload-parser.ts
-src/hooks/useDeepLink.ts
-client/src/hooks/useDeepLink.ts
-src/hooks/useMapView.ts
-client/src/hooks/useMapView.ts
-src/hooks/useViewport.ts
-client/src/hooks/useViewport.ts
-src/incidents/data.ts
-client/src/incidents/data.ts
-src/incidents/hub-silence-2026-07-19.ts
-client/src/incidents/hub-silence-2026-07-19.ts
-src/incidents/inventory-oversell-2026-05-04.ts
-client/src/incidents/inventory-oversell-2026-05-04.ts
-src/incidents/payment-cascade-2026-03-12.ts
-client/src/incidents/payment-cascade-2026-03-12.ts
-src/incidents/types.ts
-client/src/incidents/types.ts
-src/main.tsx
-client/src/main.tsx
-src/map/AmbientPackets.tsx
-client/src/map/AmbientPackets.tsx
-src/map/BlastLegend.tsx
-client/src/map/BlastLegend.tsx
-src/map/BrandStarfield.tsx
-client/src/map/BrandStarfield.tsx
-src/map/CometPackets.tsx
-client/src/map/CometPackets.tsx
-src/map/DriftOverlay.tsx
-client/src/map/DriftOverlay.tsx
-src/map/Edge.tsx
-client/src/map/Edge.tsx
-src/map/EngagementCluster.tsx
-client/src/map/EngagementCluster.tsx
-src/map/FulfillmentCluster.tsx
-client/src/map/FulfillmentCluster.tsx
-src/map/HealthCard.tsx
-client/src/map/HealthCard.tsx
-src/map/HealthLegend.tsx
-client/src/map/HealthLegend.tsx
-src/map/Map.tsx
-client/src/map/Map.tsx
-src/map/MapStepper.tsx
-client/src/map/MapStepper.tsx
-src/map/NebulaField.tsx
-client/src/map/NebulaField.tsx
-src/map/OwnershipLegend.tsx
-client/src/map/OwnershipLegend.tsx
-src/map/Planet.tsx
-client/src/map/Planet.tsx
-src/map/ServiceNode.tsx
-client/src/map/ServiceNode.tsx
-src/map/ServicePanel.tsx
-client/src/map/ServicePanel.tsx
-src/map/ShoppingCluster.tsx
-client/src/map/ShoppingCluster.tsx
-src/map/StarExplosion.tsx
-client/src/map/StarExplosion.tsx
-src/map/SubServicePanel.tsx
-client/src/map/SubServicePanel.tsx
-src/map/TopicNode.tsx
-client/src/map/TopicNode.tsx
-src/map/TopicPanel.tsx
-client/src/map/TopicPanel.tsx
-src/map/UICluster.tsx
-client/src/map/UICluster.tsx
-src/map/blast-radius.ts
-client/src/map/blast-radius.ts
-src/map/edge-builder.ts
-client/src/map/edge-builder.ts
-src/map/edge-registry.ts
-client/src/map/edge-registry.ts
-src/map/edge-resolver.ts
-client/src/map/edge-resolver.ts
-src/map/parallaxPan.ts
-client/src/map/parallaxPan.ts
-src/map/planetMorphology.ts
-client/src/map/planetMorphology.ts
-src/map/topic-groups.ts
-client/src/map/topic-groups.ts
-src/overlays/OverlayManager.tsx
-client/src/overlays/OverlayManager.tsx
-src/scenarios/brand.ts
-client/src/scenarios/brand.ts
-src/scenarios/data.ts
-client/src/scenarios/data.ts
-src/scenarios/drift.ts
-client/src/scenarios/drift.ts
-src/scenarios/health.ts
-client/src/scenarios/health.ts
-src/scenarios/owners.ts
-client/src/scenarios/owners.ts
-src/scenarios/runner.ts
-client/src/scenarios/runner.ts
-src/scenarios/scenarios.ts
-client/src/scenarios/scenarios.ts
-src/scenarios/services.ts
-client/src/scenarios/services.ts
-src/scenarios/steps/core.ts
-client/src/scenarios/steps/core.ts
-src/scenarios/steps/engagement.ts
-client/src/scenarios/steps/engagement.ts
-src/scenarios/steps/fulfillment.ts
-client/src/scenarios/steps/fulfillment.ts
-src/scenarios/steps/shopping.ts
-client/src/scenarios/steps/shopping.ts
-src/scenarios/topics.ts
-client/src/scenarios/topics.ts
-src/scenarios/types.ts
-client/src/scenarios/types.ts
-src/styles/app.css
-client/src/styles/app.css
-src/styles/components.css
-client/src/styles/components.css
-src/styles/global.css
-client/src/styles/global.css
-src/styles/responsive.css
-client/src/styles/responsive.css
-src/styles/tokens.css
-client/src/styles/tokens.css
-tsconfig.json
-client/tsconfig.json
-vite.config.ts
-client/vite.config.ts
+client/src/demo/types.ts
+client/src/demo/demoMode.ts
+client/src/demo/__tests__/demoMode.test.ts
 
 ## Summary
-The Vite app (`index.html`, `vite.config.ts`, `tsconfig.json`, `public/`, `src/`) now lives in `client/`, moved with `git mv` (86 renames, all shown as `R`). The root `package.json` is now an npm workspaces root (`["client"]`) holding only orchestration scripts and the shared tooling, and the React/Vite dependencies moved into the new `client/package.json`. `client/vite.config.ts` reads the version ledger from `../versions/`, resolved from the config file's own location. `eslint.config.mjs` now targets `client/src` and ignores every `dist/`, and `.gitignore` gained `client/dist/`, `server/dist/` and `**/tsconfig.tsbuildinfo`.
-
-Verification:
-- `npm install`: pass. The lockfile was rewritten for the workspace layout.
-- `npm run build`: pass (exit 0). Output goes to `client/dist/`, with the existing >500 kB chunk-size warning.
-- `npm run lint`: pass (exit 0), with 0 errors and 2 `react-hooks/exhaustive-deps` warnings (`client/src/components/AskPanel.tsx:53`, `client/src/map/Map.tsx:820`). These are not new: the same rule already covered these files at their old `src/` paths.
-- `npm run typecheck`: pass (exit 0).
-- `npm run validate`: fails as expected until stage 2, with `Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/orassayag/Repos/project-cosmos/src/scenarios/services.js' imported from /Users/orassayag/Repos/project-cosmos/drift-sync/scripts/validate.ts`.
-- `npx tsc -p drift-sync --noEmit`: not run. The permission system denied the command in this session, including with the flags reordered. It is expected to fail on the same `../../src/...` imports, so stage 2 should capture the baseline.
-- `npm run fresh`: deliberately not run, because it overwrites scenario data and cannot be undone. From reading the code: `scripts/fresh-start.mjs` still resolves `<root>/src/scenarios/`, which no longer exists, so it would fail with ENOENT. Stage 2 repoints it.
-- Dev-server smoke: pass. `npm run dev:client` started Vite from `client/`, and both `/` (the Project Cosmos index HTML) and `/src/main.tsx` returned HTTP 200. It came up on :5174, because :5173 was already held by an older root-level `vite` process (PID 23408, `node .../project-cosmos/node_modules/.bin/vite`) that was running before this stage. That old process now returns 404 because `index.html` has moved. I did not kill it, since it is not mine. My own dev server was stopped.
+Added the demo-mode foundation: `types.ts` defines the full step union (all §1 and §7 kinds, each with `durationMs`, optional `caption` and `target`), the `DemoTarget` union for every A1 pointer target, and the `DemoActions` callback interface. `demoMode.ts` adds `readDemoMode` (only `ai`/`all`, speed clamped 1–8, default 1) and `shouldShowIntro`, which never writes storage. `demoMode.test.ts` covers ai/all/unknown modes, speed clamping, the intro rule for all three cases, the no-write guarantee, and that every domain has a pointer target.
+Verification: `npm run typecheck` clean; `npm run lint` 0 errors (1 existing warning in `Map.tsx`, not touched); `npm --prefix client test` 8 files / 49 tests passed.
 
 ## Commit message
-refactor(client): move Vite app into client/ workspace
+feat(demo): add demo step types and demo-mode URL parsing
 
-Prepares the repo for a server workspace next to the SPA (add-ai plan, M0).
-Root package.json becomes the npm workspaces root with orchestration scripts only;
-app deps move into client/, and vite.config resolves ../versions from its own path.
+Later demo stages (runner, pointer, scripts, App wiring) build on one shared
+step/target/action contract, so it is defined up front. A bad `?demo=` value
+returns null so the app loads as normal, and the intro helper cannot write storage.
 
 ## Key decisions
-- `dev` and `dev:client` both run `npm run dev --workspace client` for now. Stage 6 switches `dev` to `vercel dev` once the `vercel.json` Services config exists.
-- `build` and `typecheck` fan out with `--workspaces`, and no gate script uses `--if-present`. When stage 3 adds `server` to `workspaces`, it must give the server its own `build` and `typecheck` scripts, or the fan-out will fail.
-- `lint` stays a single root `eslint .`: there is one flat config at the root that already covers every folder, so splitting it per workspace would only duplicate it. The react-hooks block now matches `client/src/**/*.{ts,tsx}`, and the ignore list uses `**/dist/` so `client/dist` and a future `server/dist` are skipped. The `scripts/**` / `drift-sync/**` globals block is unchanged.
-- `validate`, all the `sync*` scripts and `fresh` are unchanged at the root.
-- `@anthropic-ai/sdk`, `tsx`, `typescript`, `@types/node`, `eslint`, `@eslint/js`, `typescript-eslint` and `eslint-plugin-react-hooks` stay in the root devDependencies. `client/` runs `tsc -b` using the hoisted `typescript`.
-- The client workspace package is named `@project-cosmos/client`. Root scripts address it by path (`--workspace client`).
-- `client/vite.config.ts` uses `VERSIONS_DIRECTORY = fileURLToPath(new URL('../versions/', import.meta.url))`. This is independent of cwd, so it works for both `npm run build --workspaces` (cwd `client/`) and a direct Vite run.
-- The stale, ignored root `dist/` and `tsconfig.tsbuildinfo` were left in place.
-- `vercel.json` was not touched. Its build and output settings still assume the root layout until stage 6.
-
-## Open questions
-- The stale root Vite dev server on :5173 (PID 23408) should be restarted by the developer, from `npm run dev:client`.
+- `DEMO_TARGETS` and `DEMO_STEP_KINDS` are runtime `as const` arrays, and `DemoTarget` / `DemoStepKind` come from them. `DEMO_STEP_ACTIONS: Record<DemoStepKind, (keyof DemoActions)[]>` maps each kind to the callbacks it drives (`wait` → `[]`). The §9 `scripts.test.ts` can check coverage against these arrays at runtime.
+- Target ids (the `data-demo-target` values stage 10 must add): `intro-start`, `domain-shopping|fulfillment|engagement`, `ask-input`, `ask-search`, `connect-open`, `connect-provider-anthropic|openai`, `connect-provider-key`, `connect-jev-key`, `connect-submit`, `playback-play`, `playback-step-back`, `playback-step-forward`, `legend-ownership`. Domain targets are listed by hand because `Domain['id']` is a plain `string`. A test checks that every `DOMAINS` id has one.
+- `DemoStep` is a discriminated union with a payload for each kind: `pickDomain{domainId}`, `type{text}`, `pickProvider{provider: AiProvider}`, `paste{field: 'providerKey'|'jevKey', value}`, `ask{question}`, `answer{answer: DemoScriptedAnswer}`, `playScenario{scenarioId}`, `openIncident{incidentId}`, `toggleLegend{isVisible}`. `toggleLegend` sets the legend explicitly instead of flipping it, so the result is always the same.
+- `DemoActions` has: `pressIntro`, `pickDomain`, `setQuestion`, `openConnect`, `pickProvider`, `setConnectField`, `setAiStatus(DemoAiStatus)`, `closeConnect`, `setSearchPressed`, `ask`, `playAnswer`, `playScenario`, `stepBack`, `stepForward`, `openIncident`, `toggleLegend`, `showEndCard`. The `ask` kind drives `setSearchPressed` + `ask`, and `connect` drives `setAiStatus` (`disconnected → connecting → connected`).
+- `DemoAiStatus = 'disconnected' | 'connecting' | 'connected'` is separate from the app's `AiConnectionStatus`, which has no `connecting` state. Stage 3 maps it (`connecting` → the modal's `isBusy`).
+- `DemoScriptedAnswer { text; thinkingMs; wordMs; actions?: AskAction[] }` lives in `types.ts`, so stage 5 (`AskPanel.scriptedAnswer`) and stage 7 (`scriptedAnswer.ts`) share one type.
+- `shouldShowIntro(demoMode, storage: Pick<Storage,'getItem'>, hasDeepLink = false)`: the optional third argument makes the `null` case match App.tsx exactly (`no deep link && !cosmos-intro-seen`). Stage 8 should pass `initial.scenario != null || initial.incident != null || initial.domain != null`. `demo=all` always returns true, even if the intro was seen before, because the script's first step presses the intro button. `INTRO_SEEN_STORAGE_KEY` is exported so App can reuse it.
+- `DemoMode` / `DemoModeName` types live in `types.ts`.

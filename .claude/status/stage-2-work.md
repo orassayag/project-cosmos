@@ -1,31 +1,54 @@
-# Stage 2 work brief — M0: repoint drift-sync + scripts/fresh-start.mjs to client/src
+# Stage 2 work brief — §1/A5: runDemo.ts + runDemo.test
 
-Plan: docs/plans/add-ai.md (§1 — Milestone 0). Branch: feature/add-ai.
+Stage-plan line: `runDemo.ts (sequential steps, abortable sleep, speed divisor) + runDemo.test (fake timers, order, speed, abort, trusted pointerdown)`
 
-## Stage scope (from the stage plan)
-Stage 2: M0: repoint drift-sync (imports, WRITABLE_PATHS, prompts, tsconfig, README) + scripts/fresh-start.mjs to client/src
+Files expected (≤6 files, ≤300 lines each):
+- `client/src/demo/runDemo.ts` (new)
+- `client/src/demo/__tests__/runDemo.test.ts` (new)
 
-**Out of scope for this stage** (later stages own them — do NOT touch):
-- `server/` workspace, `snapshot-map.ts`, `cosmos-map.json`, the validate snapshot-freshness check, the
-  apply-edits `npm run snapshot` hook, and adding `server/src/generated/cosmos-map.json` to `WRITABLE_PATHS` → stage 3.
-- `.claude/skills/*`, `skills/*` → stage 4.
-- `CLAUDE.md`, root `README.md`, `CONTRIBUTING.md`, `.github/workflows/cosmos-sync.yml`, and the full M0 verification gate → stage 5.
+Builds on stage 1's `client/src/demo/types.ts` (`DemoStep`, `DemoActions`, `DEMO_STEP_ACTIONS`, etc.) — read it first; do not redefine those types. Only amend `types.ts` if runDemo genuinely needs it, and say so in the report.
 
-## Plan text (pasted verbatim, §1 — the parts this stage implements)
+## Plan — §1 Runner (verbatim)
 
-**Every path consumer to update (the I2 checklist):**
-- `drift-sync/scripts/**`: the relative imports `../../src/…` and `../../../src/…` become `../../client/src/…` and `../../../client/src/…`. `WRITABLE_PATHS` and every prompt string in `apply-edits.ts:87-173` that says `src/scenarios/` becomes `client/src/scenarios/`. Also update `drift-sync/README.md` and `drift-sync/tsconfig.json` includes.
-- `scripts/fresh-start.mjs`: the `src/scenarios` paths (lines 8, 16, 180).
+- `runDemo.ts` has `runDemo(script, actions: DemoActions, { signal, speed })`. It runs the steps
+  one after another and awaits `sleep(durationMs / speed, signal)`. It changes the app only by
+  calling `DemoActions`, which are callbacks App supplies (`pickDomain`, `setQuestion`,
+  `openConnect`, `setConnectField`, `setAiStatus`, `ask`, `playScenario`, …). It never
+  dispatches DOM events. The app's buttons act on mouse-down, and the map's pan handler cancels
+  background presses, so synthetic clicks would do nothing (I7).
+- Abort (I8): `useDemoRunner` owns one `AbortController`. A `pointerdown` or `keydown` on
+  `window` with `event.isTrusted` aborts it. On abort or on finish it hides the pointer and
+  caption, drops the fake AI connection back to the real one (§3), and sets
+  `<html data-demo-state="aborted" | "done">`, which A4 waits for. Timers are cleared through
+  the signal, so none keep running.
+- Tests: … `client/src/demo/__tests__/runDemo.test.ts` uses vitest fake
+  timers. Actions are called in script order. `speed: 4` finishes in a quarter of the time. An
+  abort mid-run means no later action is called and no timer is pending. A trusted `pointerdown`
+  aborts the run. *Protects: I7/I8. The run is deterministic and stoppable as one unit.* Unit
+  layer.
 
-Root `package.json`: … `validate` is **not** fanned out: it stays the root script `tsx drift-sync/scripts/validate.ts` (repointed at `client/src/scenarios`) … **Never use `--if-present` on a gate script.** … `@anthropic-ai/sdk` stays at root for drift-sync.
+## Plan — §8 A5 Speed dial (verbatim)
 
-**Verification (subset relevant to this stage)**
-- `npm run build`, `npm run lint`, `npx tsc -p drift-sync --noEmit`, and `npm run validate` all pass.
-- `validate` is proven live, not vacuous: temporarily corrupt one step's `from` id in `client/src/scenarios/steps/` and confirm `npm run validate` exits non-zero naming the bad id, then revert. (The stale-snapshot half of this check belongs to stage 3.)
-- `npm run sync -- --dry-run` against one repo (per `drift-sync/README.md`) completes, if it can run without network credentials; otherwise report why not.
+- **A5 — Speed dial.** `?speed=` is parsed in §1, and the runner divides every duration by it.
+  The pointer and caption animations scale too. Covered by `runDemo.test.ts`.
 
-## Stage-specific notes from stage 1 (see ledger)
-- `npm run validate` currently fails with ERR_MODULE_NOT_FOUND on `/src/scenarios/services.js` — this stage must make it pass.
-- Capture the `npx tsc -p drift-sync --noEmit` result (stage 1 could not run it).
-- Do NOT run `npm run fresh` — it overwrites scenario data irreversibly. Verify `fresh-start.mjs` by reading/grep, or by pointing it at a scratch copy if it supports that; never against the real tree.
-- Also grep drift-sync for any other root-relative `src/` strings (e.g. `path.join(root, 'src', …)`, globs) beyond the ones the plan names — the plan's line numbers are hints, sweep the whole folder.
+## Scope notes (orchestrator)
+
+- `useDemoRunner` (the React hook, App wiring, `data-demo-state`) is **stage 8**, not this stage.
+  To satisfy "a trusted `pointerdown` aborts the run" at the unit layer here, export a small
+  framework-free helper from `runDemo.ts` (e.g. `abortOnTrustedInput(controller, target = window)`
+  returning a cleanup function) that listens for `pointerdown`/`keydown`, aborts only when
+  `event.isTrusted`, and that stage 8's hook will reuse. Test that an untrusted synthetic event
+  does NOT abort and a trusted one does (jsdom events are untrusted by default — fake `isTrusted`
+  in the test, e.g. by dispatching an event whose `isTrusted` is overridden via
+  `Object.defineProperty`).
+- Step dispatch: each step kind calls the `DemoActions` callbacks per stage 1's
+  `DEMO_STEP_ACTIONS` mapping (`ask` → `setSearchPressed` + `ask`; `connect` → `setAiStatus`
+  `connecting` then `connected`; `wait` → nothing; etc.). Decide call-then-sleep vs.
+  sleep-then-call for the step duration and document it under Key decisions.
+- `runDemo` should resolve to a result the hook can map to `done` / `aborted` (e.g. returns
+  `'done' | 'aborted'`, never throws on abort). An already-aborted signal must call no action.
+- The abortable `sleep(ms, signal)` must clear its `setTimeout` on abort (no pending timer —
+  assert with `vi.getTimerCount()`) and remove its abort listener when it resolves.
+- Speed: divide every `durationMs` by `speed`; also expose the speed so stage 9 pointer/caption
+  animations can scale (e.g. export a `scaledDuration(ms, speed)` helper) — keep it minimal.

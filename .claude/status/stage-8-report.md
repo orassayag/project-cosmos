@@ -1,37 +1,38 @@
-# Stage 8 report — M1: shared .lc-status-dot, useAiConnection, AskAgent Search/bot light/Connect-Disconnect
+# Stage 8 report — Demo runner hook and `demo=ai` wiring in App
 
 ## Files
-client/src/hooks/useAiConnection.ts
-client/src/components/AskAgent.tsx
-client/src/components/__tests__/AskAgent.test.tsx
-client/src/components/DriftFooter.tsx
-client/src/styles/app.css
+client/src/demo/useDemoRunner.ts
+client/src/demo/__tests__/useDemoRunner.test.ts
+client/src/demo/useDemoView.ts
+client/src/demo/__tests__/useDemoView.test.ts
 client/src/App.tsx
 
 ## Summary
-- `.lc-drift-footer-dot` extracted into shared `.lc-status-dot` (7px round) with modifiers `--on` (`--svc-green` + glow + 2.6s pulse, keyframes renamed `lc-status-pulse`), `--off` (`--svc-red`, no pulse), `--unknown` (`--text-faint` grey). `DriftFooter` now renders `lc-status-dot lc-status-dot--on`; no references to the old class/keyframe remain. Computed drift dot colour verified unchanged (`oklch(0.8 0.13 158)`).
-- New `useAiConnection` hook: `GET /api/ai/status` once on mount (AbortController on unmount), exposes `{ status: 'unknown'|'connected'|'disconnected', provider, connect(provider, apiKey), disconnect() }`. Any rejected fetch, non-OK response (404 today, 503 `AI_NOT_CONFIGURED`), unparseable body or `connected !== true` resolves to `disconnected` — no throw, no console output, single call.
-- `AskAgent`: "Go!" → **Search** (`title="Search"`); 🤖 + status dot on the right of the input (tooltip + `aria-label`: "AI agent connected (Claude)" / "No AI agent connected" / "Checking for an AI agent" while unknown); expanded footer shows **Connect AI Agent** (disconnected) or **Disconnect AI Agent** (connected) left of Search, both `onMouseDown` + `preventDefault`. New props: `aiStatus`, `aiProvider`, `onConnectRequest`, `onDisconnect`.
-- `App.tsx`: calls `useAiConnection()` in the app body, passes status/provider to AskAgent; `onDisconnect` → `disconnect()`; `onConnectRequest` is an empty callback for stage 9 to replace with `overlay.open(OVERLAY.connect)`.
-- Gates: `npm run build` pass, `npm run typecheck` pass, `npm run lint` pass (0 errors, the 2 pre-existing exhaustive-deps warnings in AskPanel.tsx/Map.tsx only), `npm test` pass (client 5/5 incl. 4 new AskAgent tests; server 2/2), `npm run validate` pass (no drift).
-- Non-vacuous proof: temporarily mapped `connected → 'off'` and restored "Go!" in AskAgent → 2 tests failed ("Search" label, connected light); reverted → 5/5 pass.
-- Visual/runtime check (Playwright, scratchpad install, client Vite on :5188): phone 390×844 FIRST, then landscape 844×390, then desktop 1440×900, each disconnected (real 404 from dev server) and connected (status route mocked `{connected:true, provider:'anthropic'}`). No page errors; no horizontal page scroll; footer does not overflow (shell 359px at 390 wide); bot + dot centred in the collapsed pill and top-right in the expanded card; correct button/dot/label per state in all six runs.
+Opening the site with `?demo=ai` now skips the intro and plays the AI demo on its own: it picks the Shopping domain, types the question into the Ask box one character at a time, opens the Connect window, picks Claude, pastes the fake Claude and JEV keys, shows it connecting and connected (without any network call), closes it, presses Search, and plays the fixed answer with its service highlights. `?speed=` speeds all of it up, including the typing.
+
+Any real click or key press stops the demo at once. The Connect window closes, the Ask box goes back to normal, the fake connection is dropped, and the real AI status check runs again. `<html data-demo-state>` reads `running`, then `done` or `aborted`. A demo visit never writes `cosmos-intro-seen`. `?demo=all` has no script yet, so the app loads as normal but still shows the intro, as §2 requires. Without `?demo=`, the app behaves as before: same intro rule, and the real status check starts only once the intro is gone, exactly as when it lived in the shell.
+
+`useDemoRunner` owns the AbortController, the trusted-input listener, and `data-demo-state`. It exposes `status`, `isActive`, `caption`, `target` (each kept until a later step replaces it), and `isOverlayVisible`. `useDemoView` holds what the demo shows: the typed question, the pressed Search button, the Connect window fields, and the end-card request.
+
+Checks: `npm run typecheck` clean; `npm run lint` 0 errors (1 pre-existing warning in `client/src/map/Map.tsx`, untouched); client tests 108/108 pass (14 files, 15 new tests); `npm run build` succeeds. **Not looked at in a browser** (mobile or desktop). The full `?demo=ai` run and abort-then-use-the-app have only been checked by reading the code and by the hook-level tests.
 
 ## Commit message
-feat(client): add AI connection light and Connect/Disconnect to AskAgent
+feat(demo): run the AI demo from ?demo=ai and stop it on any input
 
-The ask bar needs to show whether a real AI agent backs its answers and give
-visitors a way to connect one. The status hook treats any failed status call as
-disconnected so the client keeps working before the /api/ai routes exist.
+The demo must drive the real app through callbacks only, and must stop as
+one unit when the viewer touches anything. The fake AI connection swaps in
+while it runs, so the scripted run never reaches the server.
 
 ## Key decisions
-- **`connect()` result shape:** `Promise<ConnectResult>` where `ConnectResult = { ok: true; provider } | { ok: false; errorCode: 'INVALID_KEY' | 'AI_NOT_CONFIGURED' | 'NETWORK_ERROR' | 'UNEXPECTED_RESPONSE' }`. It never throws; status/provider update only on success. Stage 9's modal shows its error on `ok: false` and stays open.
-- **`disconnect()`** returns `Promise<boolean>` and never throws; the light flips to disconnected only when the server confirms (the cookie is httpOnly, so the server is the truth).
-- **Hook lives in App, AskAgent is presentational** (props, not the hook) — stage 9's modal, rendered in App, needs the same `connect()`, and the component test needs no fetch mocking.
-- **`unknown` state:** grey dot and neither Connect nor Disconnect button (avoids offering the wrong action for the brief load window). Tooltip "Checking for an AI agent" — the plan specified only the two settled strings.
-- Provider display labels (`AI_PROVIDER_LABELS`: anthropic → "Claude", openai → "OpenAI") exported from the hook module.
-- Connect button blurs the field (collapses the card) before calling `onConnectRequest`, since a modal will take over; Disconnect keeps the card open so the label visibly flips.
-- Bot vertical centring uses `top:50%/translateY` while collapsed so it centres in both the 30px desktop pill and the 34px mobile pill without a `responsive.css` entry.
+- **Ask state and both AI hooks moved from `ProjectCosmosShell` up into `App`**, because the runner (in App) must call `ask` and `setAiStatus`. It also has to span the intro for stage 12's `pressIntro`, and the shell only mounts after the intro. `realAi = useAiConnection({ enabled: !isDemoActive && !showIntro && !warping })` keeps the no-demo status check at the same moment as before. The shell now receives `aiConnection`, the ask state, `onAsk`/`onAnswerStart`/`onAskAction`, `demoAsk`, and `demoConnect` as props. Its now-unused `onPlayScenario` prop was removed.
+- **Answer panel during the demo:** the `ask` step opens the panel with a module constant, `DEMO_AWAITING_ANSWER` (empty text, 60s thinking). Without it the panel would mount with `isAiConnected` true (the fake connection) and start a live `/api/ai/ask` fetch before `playAnswer` arrives. `playAnswer` then swaps in `DEMO_SCRIPTED_ANSWER` on the same panel (same nonce), and the identity-keyed effect restarts it. If the demo stops while the panel is still waiting, the teardown closes the panel. A finished answer stays open after the demo ends.
+- `useDemoRunner` reads the latest `actions`/`onEnd` through refs (a small forwarding Proxy), so App's per-render actions object never restarts the run. `onEnd` does not fire on unmount. In dev StrictMode, the first run is aborted by its cleanup and a new run starts, so step 0's actions fire twice. That is harmless for `ai` (step 0 is `wait`). **Stage 12:** keep `all`'s step 0 idempotent (`pressIntro` → `setWarping(true)` is).
+- Typing is App-side (`useDemoView.typeQuestion`): the question starts at `''` and gains one character every `55ms / speed`. Its interval is cleared by `reset()` on end or abort.
+- **Stage-12 DemoActions**, all required by `DemoActions`. Wired now because each was trivial: `pressIntro` → the intro's own `handleIntroStart` (writes storage only outside demo mode), `playScenario` → `handlePlayScenario`, `stepBack`/`stepForward` → `navPrev`/`navNext`, `openIncident` → `handlePickScenario` (the same handler `IncidentBar` uses). `toggleLegend` is a no-op, because the legend state lives inside `Map`. **Stage 12** must wire it and check the other four against the `all` script.
+- **Stage 9:** read `demoRunner.caption`, `demoRunner.target`, and `demoRunner.isOverlayVisible` in `App` (the `demoRunner` const), and use `demoSpeed` for animation scaling. `closeConnect` has no target, so `target` keeps the previous value.
+- **Stage 10:** the runner never touches `data-demo-target`. Only the pointer (stage 9) will need it.
+- **Stage 11:** `demoView.view.isEndCardRequested` goes true on the `endCard` step and survives the end-of-run `reset()`. Open `OVERLAY.demoEndCard` from it (e.g. an effect in App). Note that the teardown currently calls `overlay.close(OVERLAY.connect)` and may close `OVERLAY.ask`. Neither touches an end-card overlay.
+- `DemoAskState` (App-local) gives `demoExpanded: true` whenever a demo question exists (from the first `type` step through `ask`). The Connect `demo` prop is passed only while `isDemoActive`, with `showJevField: true` and `isBusy: demoAi.isConnecting`.
 
 ## Open questions
-- No unit test for `useAiConnection` itself (404/503 → disconnected, connect error mapping) — it would be a 7th file over the stage ceiling. Behaviour was verified at runtime against the real 404; stage 9 or 12 could add `client/src/hooks/__tests__/useAiConnection.test.ts`.
+None.

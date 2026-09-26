@@ -1,67 +1,53 @@
-# Stage 10 report — M1: AskPanel connect prompt + starter question chips
+# Stage 10 report — `data-demo-target` attributes
 
 ## Files
 client/src/components/AskAgent.tsx
-client/src/components/AskPanel.tsx
-client/src/components/__tests__/AskAgent.test.tsx
-client/src/components/__tests__/AskPanel.test.tsx
-client/src/App.tsx
-client/src/styles/app.css
-client/src/styles/responsive.css
+client/src/components/ConnectAgentModal.tsx
+client/src/components/DomainBar.tsx
+client/src/components/PlaybackControls.tsx
+client/src/components/IntroOverlay.tsx
+client/src/demo/__tests__/demoTargets.test.tsx
 
 ## Summary
-This stage adds two things.
+The demo's fake pointer now has real things to point at. The app's buttons and fields now carry a hidden `data-demo-target` label that the pointer looks up. The labelled elements are:
+- the question box, the Search button, and the "Connect AI Agent" button
+- the two provider buttons, the provider key field, the JEV key field, and the Connect submit button
+- the three domain tabs
+- the play, step-back, and step-forward controls
+- the intro's "Jump in" button
 
-**Connect prompt under the joke answer.** When no AI agent is connected, the joke answer in the answer panel now ends with an underlined line: "Connect an AI agent for real answers." It is a button, and clicking it opens the Connect modal through `overlay.open(OVERLAY.connect)`.
-- The line only appears once the joke has finished typing.
-- It is hidden when an agent is connected, and also while the status is still `unknown`.
+When `?demo=ai` runs, the pointer now glides to each step's control and ripples on it. Every target the AI demo script uses points at exactly one element.
 
-**Starter chips.** When the search card is expanded and the field is empty, it shows three example questions:
-- "What happens when a payment fails?"
-- "Which team owns checkout?"
-- "Play the order flow"
+The labels change nothing else: no behaviour, no styling, no layout. Phones are unaffected because the pointer is hidden there anyway. Each label sits on the visible button or input itself, never on a wrapper, so the pointer lands on the control's centre.
 
-Clicking a chip fills the field and submits it through `onAsk`. The chips use `onMouseDown` + `preventDefault`, like the footer buttons, so the card doesn't collapse before the click registers. They disappear as soon as the visitor types. The card grows to fit them:
-- desktop: 150 → 180px
-- phone portrait: 230px
-- landscape phones: 190px
+One item from the A1 list is not done: the ownership legend toggle (`legend-ownership`). That button lives in `client/src/map/Map.tsx`. Adding it would have gone over the 6-file ceiling, and Map.tsx is already far over the 300-line ceiling. Stage 12 has to edit Map.tsx anyway to wire `toggleLegend`, so the label fits there (see Open questions).
 
-On touch devices the chips and the connect line are 40px tall.
+A new test renders every demo-facing component together. It checks that each target in the AI demo script resolves to exactly one element, and that every other known target except `legend-ownership` is on a button, input, or textarea. I added one cross-component test instead of extending the AskAgent and ConnectAgentModal tests, because that fit within the file ceiling. The test fails if anyone renames or drops one of these attributes.
 
-No new panel was added. On phones the Connect modal stacks over the answer panel, and closing it brings the answer back. On desktop, opening the modal closes the answer panel, because desktop keeps one overlay at a time.
+Checks:
+- `npm run typecheck`: clean.
+- `npm run lint`: 0 errors. The 1 warning in `client/src/map/Map.tsx` was already there; I did not touch that file.
+- Client tests: 118/118 pass across 17 files; 3 of the tests are new.
+- `npm run build`: succeeds.
 
-**Gates**
-
-| Check | Result |
-|---|---|
-| `npm run typecheck` | green |
-| `npm run build` | green |
-| `npm run validate` | 0 errors, no drift |
-| `npm test` | client 12/12 (4 new), server 2/2 |
-| `npm run lint` | 0 errors; only the 2 existing exhaustive-deps warnings (AskPanel.tsx, Map.tsx) |
-
-The new AskPanel tests are not vacuous: I forced the prompt to always render and both tests failed, then I restored the code.
-
-**Visual / runtime check.** I drove the app with Playwright on a separate Vite server (:5292), with `/api/ai/status` mocked as disconnected. I checked phone sizes first (390×844, 844×390), then desktop 1440×900.
-- **Chip layout:** 390px wraps to 3 rows, 844px fits 1 row, desktop wraps to 3 rows. Chips are 40px tall on touch and 22px on desktop.
-- **No horizontal scroll:** `scrollWidth` equalled the viewport width at every size.
-- **Show/hide:** chips hide after one keystroke and come back when the field is cleared.
-- **Chip submit:** tapping "Which team owns checkout?" fills the field, collapses the card, and opens the answer panel with that question.
-- **Connect prompt:** after the joke finishes, the prompt sits inside the answer panel and opens the modal.
-- **One card at a time:** while the modal was open, the modal was the only visible card at every size.
-- **Phones:** closing the modal restores the answer panel.
-- **Errors:** no page errors.
+**Not looked at in a browser.** The pointer actually landing on each control has not been seen; only the DOM attributes are tested.
 
 ## Commit message
-feat(client): add AI connect prompt under demo answers and starter chips
+feat(demo): tag demo-clickable controls with data-demo-target
 
-Visitors without an AI agent get a direct path from the joke answer to the
-Connect modal, and an empty search card now suggests example questions so
-first-time visitors know what to ask.
+The fake pointer finds what each demo step "clicks" by a data attribute.
+Without these labels it had nowhere to go, so it stayed hidden. A test
+locks every AI-demo target to exactly one real element.
 
 ## Key decisions
-- AskPanel stays presentational. It takes `showConnectPrompt` and `onConnectRequest` props. App passes `aiConnection.status === 'disconnected'` from the single `useAiConnection()` instance, plus the existing `handleConnectRequest`, which calls `overlay.open(OVERLAY.connect)`.
-- The prompt renders only when `phase === 'done'`, so it reads as a line under the finished joke, not something that appears mid-typing.
-- `STARTER_QUESTIONS` is exported from `AskAgent.tsx` so the tests reuse the same list. A chip submit calls `onAsk(starter)` directly instead of going through `submit()`, which reads stale `question` state.
-- The chips sit in the normal layout between the textarea and the footer, and the card height grows only while they are showing (`.lc-ask--starters`). The phone heights live in `responsive.css`, plus a short `max-height: 480px` block for landscape.
-- File count is **7** against the ceiling of 6. The work needed a new `AskPanel.test.tsx` (the brief asked for coverage in `__tests__/`), and the phone-only rules belong in `responsive.css` by project convention. Hand-written lines stayed at about 200, under the 250 target.
+- **Provider and domain ids are built from the data:** `connect-provider-${option}` (type-checked with `satisfies DemoTarget`) and `domain-${d.id}`. `DomainBar`'s `d.id` is a plain `string`, so domain ids are guarded only by the test, not by the compiler. No new ids were needed; every A1 item already had one in `DEMO_TARGETS`.
+- **`connect-open` is on the Ask box's "Connect AI Agent" button.** This is the only Connect entry point. It renders only while the Ask box is expanded and disconnected. The AI script keeps `demoExpanded` on through that step, so it is present when the pointer looks for it.
+- **`playback-play` is on the play/pause/restart button** (one element, whose label changes). The step dots and speed pills have no ids.
+- **For stage 12:**
+  - Add `data-demo-target="legend-ownership"` to the Ownership button in `client/src/map/Map.tsx` (the `lc-layout-btn` whose `onClick={toggleOwnershipMode}`, about line 1178). Then remove `'legend-ownership'` from `TARGETS_OUTSIDE_THESE_COMPONENTS` in `demoTargets.test.tsx`, so the test covers every `DEMO_TARGETS` id.
+  - The domain tabs render once, in the topbar on desktop and inside the mobile drawer on phones, so `querySelector` never finds a hidden duplicate.
+  - `intro-start` exists only while the intro is mounted, which is right for `pressIntro`.
+- **For stage 11:** nothing here affects the end card.
+
+## Open questions
+- `legend-ownership` has not been added yet: it lives in the oversized `client/src/map/Map.tsx` and would have been a 7th file. I propose that stage 12 add it, since stage 12 has to edit Map.tsx to wire `toggleLegend` anyway. This does not block anything now, because `AI_DEMO_SCRIPT` never targets it.

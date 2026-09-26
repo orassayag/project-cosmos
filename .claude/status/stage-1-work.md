@@ -1,93 +1,136 @@
-# Stage 1 work brief — M0: move the Vite app into `client/` + npm workspaces root
+# Stage 1 — Work brief
 
-Plan: `docs/plans/add-ai.md` (§1 — Milestone 0). No spec file for this run.
+Plan: docs/plans/demo-plan.md · Branch: feature/add-ai · Report: .claude/status/stage-1-report.md
 
-## This stage's scope (and only this)
+## Stage scope (from stage plan)
+§1/§2: `client/src/demo/types.ts` (step union, DemoTarget, DemoActions), `client/src/demo/demoMode.ts` (readDemoMode, speed clamp, shouldShowIntro) + `client/src/demo/__tests__/demoMode.test.ts`.
 
-1. **`git mv` the Vite app into `client/`** — `index.html`, `vite.config.ts`, `tsconfig.json`
-   (the app's), `public/`, `src/`. Use `git mv` for every move so history follows the files.
-   Expect ~86 pure renames; that is the known, accepted oversize of this stage.
-   Do **not** move: `drift-sync/`, `scripts/`, `versions/`, `docs/`, `.claude/`, `skills/`,
-   `images/`, `eslint.config.mjs` (stays at root, must cover `client/`), `vercel.json`
-   (rewritten in stage 6 — leave it untouched), the root community files
-   (README, CONTRIBUTING, LICENSE, etc.).
-2. **Root `package.json` becomes the npm workspaces root** — `"workspaces": ["client"]`
-   (add `"server"` in stage 3 when that folder exists; do not create `server/` now).
-   Orchestration scripts only:
-   - `dev:client` → plain Vite on :5173 in the client workspace.
-   - `dev` → per plan becomes `vercel dev` (both services), but `vercel.json` Services
-     config does not exist until stage 6. For now point `dev` at the client workspace
-     (same as `dev:client`) and note it under `## Key decisions`; stage 6 switches it.
-   - `build`, `lint`, `typecheck`, `test`-ready: `build`/`typecheck` fan out with
-     `--workspaces`. **Never use `--if-present` on a gate script.** `lint` may stay a
-     root `eslint .` since the eslint config stays at root — decide and record why.
-   - `validate` is **not** fanned out: it stays the root script
-     `tsx drift-sync/scripts/validate.ts`.
-   - All `sync*` and `fresh` scripts stay at root unchanged.
-   - Dependencies move into the workspace that uses them: `react`, `react-dom`,
-     `framer-motion`, `gsap`, `vite`, `@vitejs/plugin-react`, `@types/react*` → client.
-     `@anthropic-ai/sdk` and `tsx` stay at root for drift-sync. Shared lint/TS tooling
-     (`eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`,
-     `typescript`, `@types/node`) — keep wherever `npm run lint` and drift-sync
-     type-checking keep working; root is fine.
-   - Keep `engines`, `homepage`, `repository`, `license`, `description` on the root.
-3. **`client/package.json`** — new, `private`, `type: module`, scripts `dev`, `build`
-   (`tsc -b && vite build`), `preview`, `typecheck` (`tsc -b --noEmit`). Never plain `tsc`
-   without `-b`/`--noEmit` (emitted `.js` shadows `.tsx`).
-4. **`client/vite.config.ts`**: `readdirSync('versions')` → `'../versions'`, and the
-   `readFileSync(\`versions/...\`)` path likewise (lines 7 and 10 today). Make it robust to
-   the cwd (resolve relative to the config file, e.g. via `fileURLToPath(import.meta.url)`),
-   since `npm run build --workspaces` runs with cwd = `client/`.
-5. **`.gitignore`**: add `client/dist/`, `server/dist/`, `**/tsconfig.tsbuildinfo`.
-6. Run `npm install` at root so `package-lock.json` reflects the workspace layout
-   (the lockfile change is part of this stage's Files).
+Out of scope for this stage (later stages): runDemo.ts/runDemo.test (stage 2), useAiConnection/useDemoAiConnection (3), component props (4–6), scripts/scriptedAnswer (7), useDemoRunner + App.tsx wiring (8), pointer/caption/end card (9–11), demo=all (12), recorder (13). Do NOT touch App.tsx or any component in this stage.
 
-## Plan text (§1, pasted — authoritative)
+Notes for this stage:
+- `types.ts` must define the full step-kind union now (including the §7 kinds), the `DemoTarget` union covering every A1 target (Connect button, provider buttons, key fields incl. JEV, Connect submit, Search, domain buttons, play/step controls, legend toggle, intro button), and the `DemoActions` callback interface covering the §1 and §7 actions — later stages build on these types. Use the project's real ids/types (e.g. domain ids, AI provider type, AskAction) by importing them rather than redefining.
+- `shouldShowIntro(demoMode, storage)` must match the intro rule App.tsx uses today (read how App decides `showIntro` / `cosmos-intro-seen`) for the `null` case, and must never write storage.
 
-> **Target layout**
-> ```
-> project-cosmos/
-> ├── package.json          ← npm workspaces root: ["client", "server"]; orchestration scripts only
-> ├── client/               ← today's Vite app, moved as-is
-> │   ├── index.html  vite.config.ts  tsconfig.json  package.json
-> │   ├── public/
-> │   └── src/              ← scenarios/, incidents/, map/, components/, hooks/, styles/ …
-> ├── server/               ← new Node service (see §3)
-> ├── drift-sync/           ← stays at root, repointed at client/src/scenarios
-> ├── scripts/  versions/  docs/  .claude/  skills/
-> ├── vercel.json           ← Services config (§2)
-> └── eslint.config.mjs     ← stays at root, covers both workspaces
-> ```
->
-> - `client/vite.config.ts`: `readdirSync('versions')` becomes `'../versions'`.
-> - Root `package.json`: `dev` runs `vercel dev` (both services). `dev:client` keeps plain
->   Vite on :5173. `build`, `lint`, `typecheck`, and `test` fan out with `--workspaces`.
->   `validate` is **not** fanned out: it stays the root script
->   `tsx drift-sync/scripts/validate.ts` (repointed at `client/src/scenarios`), and the
->   snapshot-freshness check lives inside it. No workspace has a `validate` script, so
->   fanning it out would either fail or, with `--if-present`, silently run nothing.
->   **Never use `--if-present` on a gate script.** Dependencies move into the workspace that
->   uses them. `@anthropic-ai/sdk` stays at root for drift-sync.
-> - `.gitignore`: `client/dist/`, `server/dist/`, `**/tsconfig.tsbuildinfo`.
-> - `CLAUDE.md` warning about emitted `.js` shadowing `.tsx` still applies to `client/`, so keep it.
->
-> **Use `git mv` for every move** so history follows the files.
+## Plan text (verbatim)
 
-## Explicitly NOT this stage (later stages own them — do not touch)
+## Design
 
-- drift-sync imports/`WRITABLE_PATHS`/prompts/tsconfig/README, `scripts/fresh-start.mjs` → stage 2.
-- `server/`, snapshot, validate freshness check → stage 3.
-- Skills (`.claude/skills/*`, `skills/*`) → stage 4.
-- `CLAUDE.md`, `README.md`, `CONTRIBUTING.md`, `cosmos-sync.yml`, the full M0 verification
-  gate (grep gate, corruption proof, sync dry-run, screenshots) → stage 5.
-- `vercel.json`, Pages workflow → stage 6. Vitest/`npm test` → stage 7.
+Both demos are delivered together in one change (the developer's decision). The draft's scope
+challenge proposed shipping `demo=ai` first, so the build order still goes §1–§6, §8, §9 before
+§7, but nothing is released between them.
 
-## Verification for this stage
+### §1 — Runner (`client/src/demo/`)
 
-- Must pass: `npm install`, `npm run build`, `npm run lint`, `npm run typecheck`.
-- **Expected to break until stage 2** (report it, don't fix it): `npm run validate`,
-  `npx tsc -p drift-sync --noEmit`, `npm run fresh` — drift-sync still imports `../../src/…`.
-  State the exact failure in the report so stage 2 has a baseline.
-- Quick runtime smoke: `npm run dev:client` starts and serves on :5173 (a curl of `/` returning
-  the index HTML is enough; full browser verification is stage 5).
-- Confirm `git status` shows the moves as renames (`R`), not delete+add.
+- `demoMode.ts` has `readDemoMode(url): { mode: 'ai' | 'all'; speed: number } | null`.
+  Values other than `ai` or `all` return `null`, so the app loads as normal (I7).
+  `speed` comes from `?speed=`, is clamped to 1–8, and defaults to 1 (A5).
+- `types.ts` defines a typed step union. Every step has `durationMs` and an optional `caption`
+  (A3):
+  `{ kind: 'pressIntro' | 'pickDomain' | 'type' | 'openConnect' | 'pickProvider' | 'paste' |
+  'connect' | 'closeConnect' | 'ask' | 'answer' | 'playScenario' | 'stepBack' | 'stepForward' |
+  'openIncident' | 'toggleLegend' | 'wait' | 'endCard'; target?: DemoTarget; … }`.
+  `target` names a `data-demo-target` attribute that the pointer moves to (A1).
+- `runDemo.ts` has `runDemo(script, actions: DemoActions, { signal, speed })`. It runs the steps
+  one after another and awaits `sleep(durationMs / speed, signal)`. It changes the app only by
+  calling `DemoActions`, which are callbacks App supplies (`pickDomain`, `setQuestion`,
+  `openConnect`, `setConnectField`, `setAiStatus`, `ask`, `playScenario`, …). It never
+  dispatches DOM events. The app's buttons act on mouse-down, and the map's pan handler cancels
+  background presses, so synthetic clicks would do nothing (I7).
+- Abort (I8): `useDemoRunner` owns one `AbortController`. A `pointerdown` or `keydown` on
+  `window` with `event.isTrusted` aborts it. On abort or on finish it hides the pointer and
+  caption, drops the fake AI connection back to the real one (§3), and sets
+  `<html data-demo-state="aborted" | "done">`, which A4 waits for. Timers are cleared through
+  the signal, so none keep running.
+- Tests: `client/src/demo/__tests__/demoMode.test.ts` covers `ai`, `all`, an unknown value
+  (returns null), and speed clamping (`0`→1, `20`→8, `abc`→1). *Protects: a bad URL can never
+  start a half-configured demo.* `client/src/demo/__tests__/runDemo.test.ts` uses vitest fake
+  timers. Actions are called in script order. `speed: 4` finishes in a quarter of the time. An
+  abort mid-run means no later action is called and no timer is pending. A trusted `pointerdown`
+  aborts the run. *Protects: I7/I8. The run is deterministic and stoppable as one unit.* Unit
+  layer.
+
+### §2 — Entering demo mode and the intro (I6)
+
+In `App.tsx`, read `readDemoMode(window.location.href)` once at mount. Then:
+- `demo=ai` initializes `showIntro` to `false`.
+- `demo=all` keeps the intro, and its step 0 (`pressIntro`) calls the same handler the intro
+  button uses. The warp is counted in the time budget (4s).
+- In demo mode, `cosmos-intro-seen` is **never** written, so a later normal visit still gets the
+  intro. Put the rule in a small pure helper, `shouldShowIntro(demoMode, storage)`, in
+  `demoMode.ts`.
+- Test: `demoMode.test.ts` adds that `ai` returns false, `all` returns true in a fresh browser,
+  and `null` behaves as today. Storage is never written. *Protects: a fresh recording browser
+  starts on the map.* Unit layer.
+
+### §3 — Fake AI connection (I5)
+
+- `useAiConnection({ enabled })` gets an `enabled` option, true by default. When it is false,
+  the hook skips the `/api/ai/status` fetch and reports `disconnected`.
+- `useDemoAiConnection()` in `client/src/demo/` returns the same `AiConnection` shape. Its
+  status is driven by the runner (`disconnected → connecting → connected`) and its provider is
+  `anthropic`. Its `connect`/`disconnect` never touch the network.
+- App calls both hooks unconditionally, following the rules of hooks, and passes
+  `demo ? demoAi : realAi` down. While the demo is active, `realAi` is created with
+  `enabled: false`. After an abort, App switches back to `realAi`, which then re-checks status.
+- Tests: `client/src/hooks/__tests__/useAiConnection.test.ts` adds that `enabled: false` makes
+  no `fetch` call. *Protects: the demo never calls the AI server, for any visitor state.* The
+  runner test asserts that `fetch` is never called during a full `ai` script. Unit layer.
+
+### §7 — `demo=all` script (≤ 120s) (I2)
+
+| # | Segment | ms |
+|---|---------|----|
+| 0 | pressIntro + warp | 4,000 |
+| 1 | Domain switch: Shopping → Fulfillment → Shopping | 8,000 |
+| 2 | Play "Place an order" (`shopping.place-order`) | 30,000 |
+| 3 | Step back ×2, forward ×2 | 10,000 |
+| 4 | Open a recorded incident (the first in `INCIDENTS`) and let it play | 20,000 |
+| 5 | Ownership legend on, hold, off | 10,000 |
+| 6 | `demo=ai` sequence, shortened (skip steps 0, 1, 12; answer 7,000) | 25,000 |
+| 7 | endCard | 4,000 |
+| | **Total** | **111,000** |
+
+- New `DemoActions`: `pressIntro`, `playScenario`, `stepBack`, `stepForward`, `openIncident`,
+  `toggleLegend`. Each one is wired to the handler App already uses (`handlePlayScenario`,
+  `navPlay`, the overlay manager for `OVERLAY.mapOwnership`).
+- The `wait` for segments 2 and 4 must cover the real playback length of that scenario or
+  incident. Segment 2 sums the step durations from the scenario data, and the script builder
+  reads them from there, so a data change updates the budget automatically.
+- Test: `scripts.test.ts` (§9). Segment 2's time comes from the scenario data, not a constant.
+  *Protects: I2. The tour is fixed and stays within its limit.*
+
+### §8 — Accepted additions
+
+- **A1 — Fake pointer.** `DemoPointer.tsx` is one absolutely positioned SVG arrow in a portal.
+  Before each targeted step, it moves over 500ms to the center of
+  `document.querySelector('[data-demo-target="…"]').getBoundingClientRect()`, then shows a 300ms
+  ripple. Add `data-demo-target` to: the Connect button, the provider buttons, the key fields,
+  the Connect submit, Search, domain buttons, play/step controls, the legend toggle, and the
+  intro button. The pointer is hidden on phones (touch has no cursor) and has
+  `pointer-events: none`. Verify: visual, in the A4 recording.
+- **A2 — End card.** `DemoEndCard.tsx` reads "Built by Or Assayag · GitHub · LinkedIn". The
+  GitHub link points to the repo, using the URL from `package.json` `repository`. The LinkedIn link is
+  `https://www.linkedin.com/in/orassayag/`. The card joins the overlay
+  manager as `OVERLAY.demoEndCard` and has a top-right close button (mobile close-button
+  contract). It stays open after the run finishes. Test: `DemoEndCard.test.tsx` renders both
+  links with `rel="noopener noreferrer"`, and close calls the overlay close.
+- **A3 — Captions.** `DemoCaption.tsx` is a one-line bar at the bottom center with
+  `aria-live="polite"`. It shows the current step's `caption` and keeps the last one until a new
+  caption replaces it. It is a caption strip, not a panel. On phones it sits above the playback
+  controls and is hidden while a detail card is open, following the "one card at a time" block
+  in `responsive.css`. Verify: visual at 390px and desktop.
+- **A4 — Recorder.** `scripts/record-demo.mjs` (`npm run record:demo -- ai|all`), with
+  `playwright` as a root devDependency. It opens `${BASE_URL:-http://localhost:5173}/?demo=<mode>`
+  at 1920×1080 with `recordVideo`, waits for `html[data-demo-state="done"]`, and saves the video
+  to `recordings/demo-<mode>.webm` (gitignored). It **exits non-zero if the real elapsed time is
+  over 60s or 120s**, which is the real-time check for §9. Verify: run it for both modes.
+- **A5 — Speed dial.** `?speed=` is parsed in §1, and the runner divides every duration by it.
+  The pointer and caption animations scale too. Covered by `runDemo.test.ts`.
+
+### §9 — Time limits (I9)
+
+`client/src/demo/__tests__/scripts.test.ts` builds both scripts and sums `durationMs`. It
+asserts `ai ≤ 60_000` and `all ≤ 120_000`. It also asserts that every step `kind` has a handler
+in `DemoActions`, and every `target` exists in the `DemoTarget` union. *Protects: a timing edit
+cannot silently push a demo over its limit.* Unit layer. The A4 recorder is the real-time
+backstop, because the scenario playback in §7 runs on the app's own clock.

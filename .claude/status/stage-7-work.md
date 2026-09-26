@@ -1,51 +1,104 @@
-# Stage 7 work brief — Vitest harness in client + server, root test fan-out, CI npm test step
+# Stage 7 work brief — §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test
 
-Stage-plan line: `Stage 7: PLANNED — Vitest harness in client + server, root test fan-out, CI npm test step`
+## Stage scope (from docs/status/stage-plan.md)
+Stage 7: §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test (ai ≤ 60s, handler + target coverage)
 
-## Scope (files this stage owns)
-- `client/package.json` — add devDeps `vitest`, `@testing-library/react`, `@testing-library/jest-dom` (if used), `jsdom`; add a `test` script (`vitest run`).
-- `client/vitest.config.ts` (or a `test` block in `client/vite.config.ts` — pick whichever keeps the app build untouched and type-checks cleanly under `tsc -b`) — `environment: 'jsdom'`, include `src/**/__tests__/**/*.test.{ts,tsx}`.
-- `server/package.json` — add devDep `vitest`; add a `test` script (`vitest run`). Node environment.
-- `server/vitest.config.ts` only if needed (include `src/**/__tests__/**/*.test.ts`).
-- Root `package.json` — `"test": "npm run test --workspaces"`. **Never `--if-present`** on a gate script (plan §1): every workspace must have a real `test` script.
-- `.github/workflows/validate-on-pr.yml` — add a `Test` step running `npm test` (after Lint/Build, before or after Validate — keep it before Validate). Update the header comment that lists what runs, if it names the steps.
-- One harness-proof test per workspace, so `vitest run` never exits on "no test files" and the harness is proven live, not vacuous. **Do not use `passWithNoTests`** (same reasoning as never using `--if-present`). Keep each tiny and genuinely useful, e.g.:
-  - `server/src/__tests__/cosmosMap.test.ts`: the committed `src/generated/cosmos-map.json` loads and has non-empty services/scenarios with unique ids.
-  - `client/src/components/__tests__/<something>.test.tsx`: one small RTL render of an existing leaf component (proves jsdom + React + RTL are wired), OR a pure data test on `client/src/scenarios` — prefer the RTL render since stage 8+ rely on RTL working.
-- `package-lock.json` — will change from the installs; list it in `## Files`.
-- `.gitignore` — only if a Vitest artefact (e.g. `coverage/`) needs ignoring.
+Out of scope for this stage: `demo=all` script (stage 12), App wiring / useDemoRunner (stage 8), DemoPointer/Caption (9), data-demo-target attributes (10), end card (11). Only build the `demo=ai` script now; structure scripts.ts so stage 12 can add `demo=all` beside it.
 
-Test file locations follow the convention: `<subject>.test.ts(x)` in a `__tests__/` folder beside the subject.
+## Plan excerpts (verbatim, docs/plans/demo-plan.md)
 
-**Type-check / lint interplay (must stay green):**
-- `client` `build` is `tsc -b && vite build`; test files under `client/src` are included by the client tsconfig. Make sure test files type-check (Vitest types, jest-dom matchers if used) and that test-only code/deps do not get bundled into `vite build`. If including tests in `tsc -b` is a problem, exclude them from the app tsconfig and type-check them some other way — do not leave them unchecked silently; say what you chose.
-- `server` `typecheck` is `tsc -p . --noEmit && tsc -p scripts --noEmit` — test files must pass it.
-- `npm run lint` runs root `eslint .` — tests must lint clean. Prefer explicit `import { describe, it, expect } from 'vitest'` over globals so no eslint/tsconfig globals config is needed.
-- Engines: root `engines.node` is `>=20`, CI uses Node 22. Pick Vitest/jsdom versions that run on Node 22. Do not change `engines` here (stage 11 owns that per plan §3).
+### §1 — Runner (`client/src/demo/`)
 
-Out of scope: any of the plan's named feature tests (`AskAgent.test`, `cookieCrypto.test`, …) — those land in stages 8+ with their subjects. No server app code. Don't touch `client/vite.config.ts` `BASE_PATH` (stale comment noted in stage 6 ledger — leave it). Don't switch root `dev`.
+- `demoMode.ts` has `readDemoMode(url): { mode: 'ai' | 'all'; speed: number } | null`.
+  Values other than `ai` or `all` return `null`, so the app loads as normal (I7).
+  `speed` comes from `?speed=`, is clamped to 1–8, and defaults to 1 (A5).
+- `types.ts` defines a typed step union. Every step has `durationMs` and an optional `caption`
+  (A3):
+  `{ kind: 'pressIntro' | 'pickDomain' | 'type' | 'openConnect' | 'pickProvider' | 'paste' |
+  'connect' | 'closeConnect' | 'ask' | 'answer' | 'playScenario' | 'stepBack' | 'stepForward' |
+  'openIncident' | 'toggleLegend' | 'wait' | 'endCard'; target?: DemoTarget; … }`.
+  `target` names a `data-demo-target` attribute that the pointer moves to (A1).
+- `runDemo.ts` has `runDemo(script, actions: DemoActions, { signal, speed })`. It runs the steps
+  one after another and awaits `sleep(durationMs / speed, signal)`. It changes the app only by
+  calling `DemoActions`, which are callbacks App supplies (`pickDomain`, `setQuestion`,
+  `openConnect`, `setConnectField`, `setAiStatus`, `ask`, `playScenario`, …). It never
+  dispatches DOM events. The app's buttons act on mouse-down, and the map's pan handler cancels
+  background presses, so synthetic clicks would do nothing (I7).
+- Abort (I8): `useDemoRunner` owns one `AbortController`. A `pointerdown` or `keydown` on
+  `window` with `event.isTrusted` aborts it. On abort or on finish it hides the pointer and
+  caption, drops the fake AI connection back to the real one (§3), and sets
+  `<html data-demo-state="aborted" | "done">`, which A4 waits for. Timers are cleared through
+  the signal, so none keep running.
+- Tests: `client/src/demo/__tests__/demoMode.test.ts` covers `ai`, `all`, an unknown value
+  (returns null), and speed clamping (`0`→1, `20`→8, `abc`→1). *Protects: a bad URL can never
+  start a half-configured demo.* `client/src/demo/__tests__/runDemo.test.ts` uses vitest fake
+  timers. Actions are called in script order. `speed: 4` finishes in a quarter of the time. An
+  abort mid-run means no later action is called and no timer is pending. A trusted `pointerdown`
+  aborts the run. *Protects: I7/I8. The run is deterministic and stoppable as one unit.* Unit
+  layer.
 
-## Related plan excerpts (verbatim)
 
-Scope: "A Vitest test harness in both workspaces, run in CI."
+### §5 — Question and scripted answer (I3, I4)
 
-Issue resolution I11: "\"Test it\" has nowhere to run | Fixed | Vitest in both workspaces, wired into CI. Tests are named per task below."
+- `AskAgent` gets optional `demoQuestion?: string`, `demoExpanded?: boolean`, and
+  `demoSearchPressed?: boolean`. When `demoQuestion` is defined, it is the text shown and the
+  focus-clears-text path is bypassed. The `type` step grows the text one character per 55ms, so
+  it looks like a person typing. The `ask` step shows the Search button pressed for 250ms, then
+  the runner calls `onAsk(question)` directly.
+- Demo question: *"Which services does placing an order go through, and who owns them?"*
+  (69 characters, about 3.8s to type).
+- `AskPanel` gets an optional `scriptedAnswer?: { text: string; thinkingMs: number; wordMs:
+  number; actions?: AskAction[] }`. When it is set, the panel plays that text with fixed timing
+  (thinking 1500ms, 90ms per word) and fires `actions` when the answer starts. The joke list and
+  the connect prompt are skipped, and no request is made. The joke list is untouched for normal
+  visitors.
+- The answer is about 70 words of fictional AstroMart facts, taken from the
+  `shopping.place-order` steps and `owners.ts`. It lives in `client/src/demo/scriptedAnswer.ts`,
+  with a `highlight` action for the services it names.
+- Tests:
+  - `AskAgent.test.tsx`: `demoQuestion` renders, focusing the box does not clear it, and the
+    Search pressed state shows. *Protects: I4.*
+  - `AskPanel.test.tsx`: `scriptedAnswer` renders the exact text after `thinkingMs +
+    words × wordMs` with fake timers, `fetch` is never called, and `onAction` gets the highlight.
+    *Protects: I3/I5. The same answer every time, with no joke.*
+  - `client/src/demo/__tests__/scriptedAnswer.test.ts`: every highlighted id exists in
+    `SERVICES`. *Protects: the answer stays true to the map when services change.*
+  - All at the component/unit layer.
 
-Design intro: "Delivery runs in four milestones. Each one ends demonstrable and green on `npm run build`, `npm run lint`, `npm test`, and `npm run validate` before the next starts."
+### §6 — `demo=ai` script (≤ 60s)
 
-§1 path consumers:
-- "`.github/workflows/validate-on-pr.yml`: add the `npm test` step. Commands keep running from root through workspace scripts."
-- "Root `package.json`: `dev` runs `vercel dev` (both services). `dev:client` keeps plain Vite on :5173. `build`, `lint`, `typecheck`, and `test` fan out with `--workspaces`. `validate` is **not** fanned out: it stays the root script `tsx drift-sync/scripts/validate.ts` (repointed at `client/src/scenarios`), and the snapshot-freshness check lives inside it. No workspace has a `validate` script, so fanning it out would either fail or, with `--if-present`, silently run nothing. **Never use `--if-present` on a gate script.** Dependencies move into the workspace that uses them."
+| # | Step | ms | Caption |
+|---|------|----|---------|
+| 0 | wait (settle) | 800 | — |
+| 1 | pickDomain `shopping` | 1200 | "Exploring the Shopping domain" |
+| 2 | type question | 4000 | "Asking the map a question" |
+| 3 | wait | 600 | — |
+| 4 | openConnect (pointer → Connect) | 1100 | "Connecting an AI agent" |
+| 5 | pickProvider Claude | 600 | — |
+| 6 | paste Claude key | 900 | "Pasting a Claude key" |
+| 7 | paste JEV key | 900 | "Adding the JEV key (the site's question classifier)" |
+| 8 | connect (busy → connected) | 2500 | "Connecting…" |
+| 9 | closeConnect | 400 | — |
+| 10 | ask (Search pressed) | 800 | — |
+| 11 | answer (thinking + words) | 8500 | "The agent answers from the live map" |
+| 12 | wait (hold on highlight) | 3000 | — |
+| 13 | endCard | 4000 | — |
+| | **Total** | **29,300** | |
 
-§3 Tests: "`server/src/__tests__/`, Vitest, unit layer"
+That leaves about 30s of headroom under the 60s limit for re-timing after watching a recording.
+Each step that clicks something has a `target`, so the A1 pointer glides there first (inside the
+step's time).
 
-§4 Tests: "Vitest + React Testing Library + jsdom in `client/`, under `client/src/components/__tests__/`" — `ConnectAgentModal.test.tsx` will later render inside `OverlayProvider` with "the phone viewport mocked", so the jsdom setup should allow mocking `window.matchMedia` per test (a setup file stubbing `matchMedia` is welcome if an existing hook like `useViewport` needs it to render).
+### §9 — Time limits (I9)
 
-Final acceptance: "`/test` passes: type-check (`tsc -b` in client, `tsc --noEmit` in server and drift-sync), lint, `npm test` in both workspaces, build, and `npm run validate`".
+`client/src/demo/__tests__/scripts.test.ts` builds both scripts and sums `durationMs`. It
+asserts `ai ≤ 60_000` and `all ≤ 120_000`. It also asserts that every step `kind` has a handler
+in `DemoActions`, and every `target` exists in the `DemoTarget` union. *Protects: a timing edit
+cannot silently push a demo over its limit.* Unit layer. The A4 recorder is the real-time
+backstop, because the scenario playback in §7 runs on the app's own clock.
 
-## Verification expected in the report
-- `npm test` from root: runs both workspaces, both pass (paste counts, not output).
-- Prove non-vacuous: temporarily break one assertion in each workspace, confirm `npm test` exits non-zero, revert.
-- `npm run build`, `npm run typecheck`, `npm run lint`, `npm run validate` all pass.
-- Confirm `client/dist` contains no test code / testing-library strings after `vite build`.
-- `validate-on-pr.yml` parses as YAML and shows the new step.
+
+## Carried over from the ledger
+- Stage 3 deferred to this stage: a runner test that plays the full `demo=ai` script (fake timers, `runDemo`) and asserts `fetch` is never called.
+- Use the existing `DEMO_STEP_KINDS`, `DEMO_TARGETS`, `DEMO_STEP_ACTIONS` (client/src/demo/types.ts) for the §9 coverage assertions; `DemoScriptedAnswer { text; thinkingMs; wordMs; actions? }` is the answer's type (thinking 1500ms, 90ms/word per §5; the whole answer must fit the 8500ms `answer` step).
+- Service ids and owners come from client/src/scenarios/ (`services.ts`, `owners.ts`, `steps/shopping.ts` for `shopping.place-order`). Keep all facts fictional AstroMart.
