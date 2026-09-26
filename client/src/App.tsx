@@ -23,6 +23,7 @@ import { BrandStarfield } from './map/BrandStarfield';
 import { MobileMenu } from './components/MobileMenu';
 import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overlays/OverlayManager';
 import { useViewport } from './hooks/useViewport';
+import { useAiConnection } from './hooks/useAiConnection';
 
 import { DOMAINS, SCENARIOS_BY_ID, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
 import type { Incident, DriftEntry } from './scenarios/data';
@@ -378,6 +379,13 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     overlay.open(OVERLAY.ask);
   }, [overlay]);
   const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
+  const aiConnection = useAiConnection();
+  const { disconnect: disconnectAi } = aiConnection;
+  // No-op until the connect-agent modal exists to open here.
+  const handleConnectRequest = useCallback(() => {}, []);
+  const handleDisconnect = useCallback(() => {
+    void disconnectAi();
+  }, [disconnectAi]);
   const closeHelp = useCallback(() => overlay.close(OVERLAY.help), [overlay]);
 
   // The current step, exposed to the incident panel so its body tracks playback.
@@ -533,7 +541,16 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           </>
         );
 
-        const askAgent = <AskAgent onAsk={handleAsk} resetNonce={resetNonce} />;
+        const askAgent = (
+          <AskAgent
+            onAsk={handleAsk}
+            resetNonce={resetNonce}
+            aiStatus={aiConnection.status}
+            aiProvider={aiConnection.provider}
+            onConnectRequest={handleConnectRequest}
+            onDisconnect={handleDisconnect}
+          />
+        );
 
         const secondaryActions = (
           <>

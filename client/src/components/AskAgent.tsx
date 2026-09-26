@@ -1,18 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AI_PROVIDER_LABELS, type AiConnectionStatus, type AiProvider } from '../hooks/useAiConnection';
 
 interface AskAgentProps {
   onAsk: (question: string) => void;
   /** Bumped by the "Project Cosmos" reset / global Esc — clears the typed question. */
   resetNonce?: number;
+  aiStatus: AiConnectionStatus;
+  aiProvider: AiProvider | null;
+  onConnectRequest: () => void;
+  onDisconnect: () => void;
+}
+
+const DOT_MODIFIER: Record<AiConnectionStatus, string> = {
+  connected: 'on',
+  disconnected: 'off',
+  unknown: 'unknown',
+};
+
+function botLabel(status: AiConnectionStatus, provider: AiProvider | null): string {
+  if (status === 'connected') return `AI agent connected (${provider ? AI_PROVIDER_LABELS[provider] : 'unknown provider'})`;
+  if (status === 'disconnected') return 'No AI agent connected';
+  return 'Checking for an AI agent';
 }
 
 /**
  * Topbar "Ask the agent" field. Collapsed it reads as a one-line input with
  * no button; focusing it grows the field into a card holding the textarea and
- * a Go button at the bottom. Blur or Go collapses it back, keeping the text;
+ * a Search button at the bottom. Blur or Search collapses it back, keeping the text;
  * refocusing, Esc, or a galaxy reset clears it for a fresh question.
  */
-export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
+export function AskAgent({
+  onAsk,
+  resetNonce = 0,
+  aiStatus,
+  aiProvider,
+  onConnectRequest,
+  onDisconnect,
+}: AskAgentProps) {
   const [expanded, setExpanded] = useState(false);
   const [question, setQuestion] = useState('');
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,6 +88,8 @@ export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
     [submit],
   );
 
+  const statusLabel = botLabel(aiStatus, aiProvider);
+
   return (
     <div ref={rootRef} className={`lc-ask${expanded ? ' lc-ask--expanded' : ''}`} data-no-pan="true">
       <div className="lc-ask-shell">
@@ -83,8 +109,43 @@ export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}
         />
+        <span className="lc-ask-bot" role="img" aria-label={statusLabel} title={statusLabel}>
+          <span aria-hidden="true">🤖</span>
+          <span
+            className={`lc-status-dot lc-status-dot--${DOT_MODIFIER[aiStatus]}`}
+            data-testid="ai-status-dot"
+            aria-hidden="true"
+          />
+        </span>
         {expanded && (
           <div className="lc-ask-footer">
+            {aiStatus === 'disconnected' && (
+              <button
+                type="button"
+                className="lc-ask-go"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  areaRef.current?.blur();
+                  onConnectRequest();
+                }}
+                title="Connect an AI agent for real answers"
+              >
+                Connect AI Agent
+              </button>
+            )}
+            {aiStatus === 'connected' && (
+              <button
+                type="button"
+                className="lc-ask-go"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onDisconnect();
+                }}
+                title="Disconnect the AI agent and forget its key"
+              >
+                Disconnect AI Agent
+              </button>
+            )}
             <button
               type="button"
               className="lc-ask-go"
@@ -94,9 +155,9 @@ export function AskAgent({ onAsk, resetNonce = 0 }: AskAgentProps) {
                 e.preventDefault();
                 submit();
               }}
-              title="Ask the agent"
+              title="Search"
             >
-              Go!
+              Search
             </button>
           </div>
         )}

@@ -801,14 +801,24 @@ body:has(.lc-map-stage[data-panning='true']) * {
   border-color: color-mix(in srgb, var(--svc-green) 55%, var(--border));
 }
 .lc-drift-footer svg { opacity: 0.7; }
-.lc-drift-footer-dot {
+
+/* ── Status light (Drift Sync pill, AI agent bot) ──────────── */
+.lc-status-dot {
+  flex: none;
   width: 7px; height: 7px;
   border-radius: 50%;
+}
+.lc-status-dot--on {
   background: var(--svc-green);
   box-shadow: 0 0 8px 1px color-mix(in srgb, var(--svc-green) 80%, transparent);
-  animation: lc-drift-pulse 2.6s ease-in-out infinite;
+  animation: lc-status-pulse 2.6s ease-in-out infinite;
 }
-@keyframes lc-drift-pulse {
+.lc-status-dot--off {
+  background: var(--svc-red);
+  box-shadow: 0 0 6px 0 color-mix(in srgb, var(--svc-red) 60%, transparent);
+}
+.lc-status-dot--unknown { background: var(--text-faint); }
+@keyframes lc-status-pulse {
   0%, 100% { opacity: 0.45; }
   50%      { opacity: 1; }
 }
@@ -862,7 +872,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  padding: 6px 12px 6px 32px;
+  padding: 6px 36px 6px 32px;
   border: none;
   background: transparent;
   color: var(--text-1);
@@ -874,12 +884,26 @@ body:has(.lc-map-stage[data-panning='true']) * {
   overflow: hidden;
 }
 .lc-ask--expanded .lc-ask-field { overflow-y: auto; padding-left: 12px; }
+.lc-ask-bot {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: default;
+}
+.lc-ask:not(.lc-ask--expanded) .lc-ask-bot { top: 50%; transform: translateY(-50%); }
+.lc-ask-bot .lc-status-dot { width: 6px; height: 6px; }
 .lc-ask-field::placeholder { color: var(--text-2); opacity: 0.7; }
 .lc-ask-field:focus { outline: none; }
 .lc-ask-footer {
   flex: none;
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
   padding: 0 8px 8px;
 }
 .lc-ask-go {

@@ -14,7 +14,7 @@ export function DriftFooter() {
       rel="noopener noreferrer"
       title="Open the latest Drift Sync run on GitHub Actions"
     >
-      <span className="lc-drift-footer-dot" aria-hidden="true" />
+      <span className="lc-status-dot lc-status-dot--on" aria-hidden="true" />
       <span className="lc-drift-footer-label">Drift Sync</span>
       <svg width={9} height={9} viewBox="0 0 12 12" aria-hidden="true">
         <path
