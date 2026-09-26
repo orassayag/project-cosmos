@@ -17,7 +17,7 @@ the plan: §1–§6, §8, §9 before §7.
 - Stage 4: COMMITTED — §4: ConnectAgentModal `demo` prop (controlled dialog, JEV "site owner" field, no onConnect) + ConnectAgentModal.test cases
 - Stage 5: COMMITTED — §5: AskAgent demoQuestion/demoExpanded/demoSearchPressed props + AskAgent.test cases
 - Stage 6: COMMITTED — §5: AskPanel `scriptedAnswer` (fixed thinking/word pace, actions, no fetch, no joke) + AskPanel.test cases
-- Stage 7: PLANNED — §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test (ai ≤ 60s, handler + target coverage)
+- Stage 7: COMMITTED — §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test (ai ≤ 60s, handler + target coverage)
 - Stage 8: PLANNED — §1/§2/§3: demo/useDemoRunner.ts (AbortController, trusted-input abort, data-demo-state) + App.tsx wiring for `demo=ai` (intro skip, fake/real AI swap, DemoActions)
 - Stage 9: PLANNED — A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
 - Stage 10: PLANNED — A1: `data-demo-target` attributes on Connect, provider, key fields, submit, Search, domain buttons, play/step controls, legend toggle, intro button
