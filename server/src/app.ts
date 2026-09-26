@@ -1,5 +1,10 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { AI_NOT_CONFIGURED, getCookieSecret } from './config.js';
+import { AI_COOKIE_NAME, AI_COOKIE_OPTIONS, decryptCookiePayload, encryptCookiePayload } from './cookieCrypto.js';
 import { createLogger } from './logger.js';
+import { checkProviderKey } from './providerKeyCheck.js';
+import { ConnectRequestSchema } from './schemas/connectRequestSchema.js';
 
 const logger = createLogger('app');
 
@@ -13,6 +18,85 @@ app.notFound((context) => context.json({ errorCode: 'NOT_FOUND' }, 404));
 app.onError((_error, context) => {
   logger.error('Unhandled error in API route', { errorCode: 'INTERNAL_ERROR' });
   return context.json({ errorCode: 'INTERNAL_ERROR' }, 500);
+});
+
+function clearAiCookie(context: Context): void {
+  deleteCookie(context, AI_COOKIE_NAME, AI_COOKIE_OPTIONS);
+}
+
+function aiNotConfigured(context: Context) {
+  return context.json({ errorCode: AI_NOT_CONFIGURED }, 503);
+}
+
+async function readJsonBody(context: Context): Promise<unknown> {
+  try {
+    return await context.req.json();
+  } catch {
+    return undefined;
+  }
+}
+
+app.post('/ai/connect', async (context) => {
+  const secret = getCookieSecret();
+  if (!secret) {
+    return aiNotConfigured(context);
+  }
+  const body = await readJsonBody(context);
+  if (body === undefined) {
+    return context.json(
+      { errorCode: 'INVALID_REQUEST', field: 'body', message: 'Request body must be valid JSON' },
+      400,
+    );
+  }
+  const parsed = ConnectRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    const [issue] = parsed.error.issues;
+    return context.json(
+      { errorCode: 'INVALID_REQUEST', field: issue.path.join('.') || 'body', message: issue.message },
+      400,
+    );
+  }
+  const { provider, apiKey } = parsed.data;
+  const keyCheck = await checkProviderKey(provider, apiKey);
+  if (keyCheck === 'invalid') {
+    logger.warn('Provider rejected the submitted key', { errorCode: 'INVALID_KEY', provider });
+    return context.json({ errorCode: 'INVALID_KEY' }, 400);
+  }
+  if (keyCheck === 'unavailable') {
+    return context.json({ errorCode: 'PROVIDER_UNAVAILABLE' }, 502);
+  }
+  setCookie(context, AI_COOKIE_NAME, encryptCookiePayload({ provider, apiKey }, secret), AI_COOKIE_OPTIONS);
+  return context.json({ connected: true, provider });
+});
+
+// Deliberately independent of AI_COOKIE_SECRET: the client disconnects after an
+// INVALID_KEY, and that must work even when AI is not configured.
+app.post('/ai/disconnect', (context) => {
+  clearAiCookie(context);
+  return context.json({ connected: false });
+});
+
+app.get('/ai/status', async (context) => {
+  const secret = getCookieSecret();
+  if (!secret) {
+    return aiNotConfigured(context);
+  }
+  const cookieValue = getCookie(context, AI_COOKIE_NAME);
+  if (!cookieValue) {
+    return context.json({ connected: false });
+  }
+  const payload = decryptCookiePayload(cookieValue, secret);
+  if (!payload) {
+    clearAiCookie(context);
+    return context.json({ connected: false });
+  }
+  // An unavailable provider keeps the user connected: this check is advisory, only a 401 is proof.
+  if ((await checkProviderKey(payload.provider, payload.apiKey)) === 'invalid') {
+    logger.info('Stored key was revoked; clearing the AI cookie', { errorCode: 'KEY_REVOKED', provider: payload.provider });
+    clearAiCookie(context);
+    return context.json({ connected: false, reason: 'KEY_REVOKED' });
+  }
+  return context.json({ connected: true, provider: payload.provider });
 });
 
 export default app;
