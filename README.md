@@ -71,6 +71,12 @@ npm run dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
+Run the tests (client and server):
+
+```bash
+npm test
+```
+
 ### Run with AI locally
 
 `npm run dev:client` is the zero-setup path: the map works, with no AI. To run the client and the AI server together on one origin, use the [Vercel CLI](https://vercel.com/docs/cli). Link the project and pull its environment variables:
