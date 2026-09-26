@@ -12,6 +12,7 @@
     "dev:client": "npm run dev --workspace client",
     "build": "npm run build --workspaces",
     "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
     "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
     "snapshot": "npm run snapshot --workspace server",

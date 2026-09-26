@@ -16,7 +16,7 @@ snapshot JSON) → 20 stages at ≤250 LOC / ≤6 files each. The per-stage ceil
 - Stage 4: COMMITTED — M0: repoint skills (.claude/skills + skills/ add-service, add-scenario) to client/src
 - Stage 5: COMMITTED — M0: repoint CLAUDE.md, README, CONTRIBUTING, cosmos-sync.yml; run the M0 verification gate (grep, build/lint/validate, corruption proof, sync dry-run, 390px + desktop screenshots)
 - Stage 6: COMMITTED — Hosting: vercel.json Services, Pages redirect page + pages.yml, server/.env.example, README "Run with AI locally"
-- Stage 7: PLANNED — Vitest harness in client + server, root test fan-out, CI npm test step
+- Stage 7: COMMITTED — Vitest harness in client + server, root test fan-out, CI npm test step
 - Stage 8: PLANNED — M1: shared .lc-status-dot, useAiConnection hook, AskAgent (Search, bot light, Connect/Disconnect) + AskAgent.test
 - Stage 9: PLANNED — M1: ConnectAgentModal + OVERLAY.connect registration + responsive.css priority + ConnectAgentModal.test
 - Stage 10: PLANNED — M1: AskPanel connect prompt under joke answers + starter question chips

@@ -1,8 +1,8 @@
 name: Validate Project Cosmos
 
-# Runs typecheck + build + `npm run validate` on every PR (and on push to main) to make
-# sure Project Cosmos internal consistency never regresses. Designed to be
-# marked as a REQUIRED status check in repo branch protection — once
+# Runs lint + typecheck + build + `npm test` + `npm run validate` on every PR
+# (and on push to main) to make sure Project Cosmos internal consistency never
+# regresses. Designed to be marked as a REQUIRED status check in repo branch protection — once
 # you do that in the UI (Settings → Branches → main → Add rule), no
 # PR can merge without this passing, including auto-generated
 # cosmos-sync PRs from the nightly cron.
@@ -43,6 +43,9 @@ jobs:
 
       - name: Typecheck drift-sync
         run: npx tsc -p drift-sync --noEmit
+
+      - name: Test
+        run: npm test
 
       - name: Validate Project Cosmos
         run: npm run validate
