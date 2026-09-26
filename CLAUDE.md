@@ -52,6 +52,20 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
 
+## Demo tours (`?demo=ai`, `?demo=all`)
+
+The scripted tours live in `client/src/demo/scripts.ts` (steps), `client/src/demo/scriptedAnswer.ts`
+(the AI question + answer), and are recorded with `npm run record:demo -- ai|all`.
+
+- **Every important new feature joins `demo=all` in the same change (invariant).** Add a segment to
+  `buildAllDemoScript()` (plus any new `DemoActions` handler and `data-demo-target` attribute it needs).
+  The tour must stay ≤120s (`scripts.test.ts` guards it) — trim other segments to make room rather than
+  skipping the feature.
+- **Every AI change is reflected in `demo=ai` in the same change (invariant).** Any change to the Ask /
+  Connect-agent flow, providers, or answer behaviour updates `AI_DEMO_SCRIPT` and/or
+  `DEMO_SCRIPTED_ANSWER` so the tour shows the current behaviour; it must stay ≤60s.
+- After a demo change, run `npm test` and re-record both modes to confirm they finish under their limits.
+
 ## Responsive / mobile
 
 **Mobile-first (invariant).** Every new feature is built and verified on a phone-class
