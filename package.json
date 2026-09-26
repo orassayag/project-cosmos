@@ -35,7 +35,7 @@
     "typescript-eslint": "^8.68.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "description": "A living map of your architecture — services as stars, flows as playable comets, honesty as a nightly AI agent.",
   "license": "MIT",

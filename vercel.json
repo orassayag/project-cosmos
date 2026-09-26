@@ -8,7 +8,7 @@
       "root": "client",
       "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
     },
-    "server": { "root": "server" }
+    "server": { "root": "server", "entrypoint": "src/app.ts" }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "server" } },

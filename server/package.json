@@ -11,5 +11,8 @@
   },
   "devDependencies": {
     "vitest": "^5.0.2"
+  },
+  "dependencies": {
+    "hono": "^4.13.9"
   }
 }
