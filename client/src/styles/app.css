@@ -933,6 +933,12 @@ body:has(.lc-map-stage[data-panning='true']) * {
   color: var(--text-1);
   border-color: var(--border-strong);
 }
+.lc-ask-go--pressed {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--text-1) 14%, var(--bg-surface));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
 
 /* Example questions shown while the expanded field is empty. The card grows to
    make room and shrinks back as soon as the visitor starts typing. */

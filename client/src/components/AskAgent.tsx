@@ -9,6 +9,10 @@ interface AskAgentProps {
   aiProvider: AiProvider | null;
   onConnectRequest: () => void;
   onDisconnect: () => void;
+  /** Demo runner overrides: when set, these replace the visitor-driven state. */
+  demoQuestion?: string;
+  demoExpanded?: boolean;
+  demoSearchPressed?: boolean;
 }
 
 export const STARTER_QUESTIONS = [
@@ -43,9 +47,15 @@ export function AskAgent({
   aiProvider,
   onConnectRequest,
   onDisconnect,
+  demoQuestion,
+  demoExpanded,
+  demoSearchPressed = false,
 }: AskAgentProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [question, setQuestion] = useState('');
+  const [isExpandedInternal, setExpanded] = useState(false);
+  const [typedQuestion, setQuestion] = useState('');
+  const isDemoQuestion = demoQuestion !== undefined;
+  const expanded = demoExpanded ?? isExpandedInternal;
+  const question = demoQuestion ?? typedQuestion;
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +103,7 @@ export function AskAgent({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isDemoQuestion) return;
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         submit();
@@ -101,11 +112,11 @@ export function AskAgent({
         areaRef.current?.blur();
       }
     },
-    [submit],
+    [submit, isDemoQuestion],
   );
 
   const statusLabel = botLabel(aiStatus, aiProvider);
-  const showStarters = expanded && question === '';
+  const showStarters = expanded && question === '' && !isDemoQuestion;
 
   return (
     <div
@@ -124,8 +135,12 @@ export function AskAgent({
           placeholder="Explore Project Cosmos"
           rows={1}
           value={question}
+          readOnly={isDemoQuestion}
           spellCheck={false}
-          onFocus={() => { setExpanded(true); setQuestion(''); }}
+          onFocus={() => {
+            setExpanded(true);
+            if (!isDemoQuestion) setQuestion('');
+          }}
           onBlur={() => setExpanded(false)}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}
@@ -186,7 +201,7 @@ export function AskAgent({
             )}
             <button
               type="button"
-              className="lc-ask-go"
+              className={`lc-ask-go${demoSearchPressed ? ' lc-ask-go--pressed' : ''}`}
               // mousedown fires before the textarea's blur, so preventing default
               // keeps focus and lets submit() drive the collapse itself.
               onMouseDown={(e) => {
