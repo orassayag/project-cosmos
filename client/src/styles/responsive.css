@@ -22,6 +22,7 @@ html[data-touch='true'] .lc-map-stage,
 html[data-touch='true'] .lc-map-svg {
   touch-action: none;
 }
+html[data-touch='true'] .lc-demo-pointer { display: none; }
 
 /* ── Hamburger toggle + slide-over drawer ─────────────────────
    Markup exists at every size but is only rendered on phones. */
@@ -415,6 +416,14 @@ html[data-touch='true'] .lc-map-svg {
   .lc-stage:has(.lc-incident-panel) .lc-step-panel {
     display: none !important;
   }
+  /* The demo caption strip (portaled to <body>) is lowest of all: any detail card
+     or narration panel owns the bottom, so the caption waits behind it. */
+  body:has(
+    .lc-connect-overlay, .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card,
+    .lc-step-panel, .lc-incident-panel
+  ) .lc-demo-caption {
+    display: none !important;
+  }
 
   /* The bottom-sheet legends and the transport bar both live at the bottom
      edge, so they can never share it — the transport wins while playing. */
@@ -445,6 +454,13 @@ html[data-touch='true'] .lc-map-svg {
   .lc-controls .lc-pb-btn { width: 46px; height: 46px; }
   .lc-controls .lc-pb-play { width: 60px; height: 46px; }
   .lc-pb-share { margin-left: auto; }
+
+  /* ── Demo overlays ──────────────────────────────────────────
+     No cursor on touch, so the fake pointer never shows on phones. DemoCaption
+     lifts itself above the transport bar when one is showing. */
+  .lc-demo-pointer { display: none; }
+  .lc-demo-caption { bottom: calc(10px + var(--safe-bottom)); }
+  .lc-demo-caption-text { padding: 7px 14px; font-size: 12px; white-space: normal; text-align: center; }
 
   /* ── Modals fit the small viewport ──────────────────────── */
   .lc-help-modal { padding: 24px 20px 20px; max-height: 88dvh; overflow-y: auto; }

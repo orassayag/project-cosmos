@@ -3741,3 +3741,75 @@ body:has(.lc-map-stage[data-panning='true']) * {
 .lc-tech-chip-label {
   color: var(--text-1);
 }
+
+/* ── Demo overlays: fake pointer + caption strip ──────────────
+   Both sit above the Connect window (z 200) so the recording shows them
+   over it; neither ever takes input. */
+.lc-demo-pointer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 230;
+  pointer-events: none;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+  will-change: transform;
+}
+.lc-demo-pointer-arrow {
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+.lc-demo-pointer-ripple {
+  position: absolute;
+  top: -16px;
+  left: -16px;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation-name: lc-demo-ripple;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+@keyframes lc-demo-ripple {
+  from { opacity: 0.9; transform: scale(0.3); }
+  to   { opacity: 0;   transform: scale(1.6); }
+}
+
+.lc-demo-caption {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 220;
+  max-width: min(720px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.lc-demo-caption[data-visible='false'] { display: none; }
+.lc-demo-caption-text {
+  display: block;
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-1);
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation-name: lc-demo-caption-in;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+@keyframes lc-demo-caption-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-demo-pointer { transition: none; }
+  .lc-demo-caption-text { animation: none; }
+}

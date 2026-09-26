@@ -19,7 +19,7 @@ the plan: §1–§6, §8, §9 before §7.
 - Stage 6: COMMITTED — §5: AskPanel `scriptedAnswer` (fixed thinking/word pace, actions, no fetch, no joke) + AskPanel.test cases
 - Stage 7: COMMITTED — §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test (ai ≤ 60s, handler + target coverage)
 - Stage 8: COMMITTED — §1/§2/§3: demo/useDemoRunner.ts (AbortController, trusted-input abort, data-demo-state) + App.tsx wiring for `demo=ai` (intro skip, fake/real AI swap, DemoActions)
-- Stage 9: PLANNED — A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
+- Stage 9: COMMITTED — A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
 - Stage 10: PLANNED — A1: `data-demo-target` attributes on Connect, provider, key fields, submit, Search, domain buttons, play/step controls, legend toggle, intro button
 - Stage 11: PLANNED — A2: DemoEndCard.tsx + OVERLAY.demoEndCard + close button + DemoEndCard.test
 - Stage 12: PLANNED — §7: `demo=all` script (scenario-derived segment 2 time) + new DemoActions wired in App (pressIntro, playScenario, stepBack/Forward, openIncident, toggleLegend) + scripts.test (all ≤ 120s)

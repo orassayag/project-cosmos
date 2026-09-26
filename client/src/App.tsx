@@ -15,6 +15,8 @@ import { AskAgent } from './components/AskAgent';
 import { AskPanel } from './components/AskPanel';
 import type { AskAction } from './components/AskPanel';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
+import { DemoCaption } from './components/DemoCaption';
+import { DemoPointer } from './components/DemoPointer';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
@@ -337,6 +339,12 @@ export function App() {
   };
   const demoRunner = useDemoRunner({ script: demoScript, speed: demoSpeed, actions: demoActions, onEnd: handleDemoEnd });
   const isDemoActive = demoRunner.isActive;
+  const demoOverlays = demoScript && (
+    <>
+      <DemoPointer target={demoRunner.target} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
+      <DemoCaption caption={demoRunner.caption} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
+    </>
+  );
 
   // Checked only once the shell shows (as before the demo existed), and never while the demo runs.
   const realAi = useAiConnection({ enabled: !isDemoActive && !showIntro && !warping });
@@ -378,6 +386,7 @@ export function App() {
             onExitComplete={() => setShowIntro(false)}
           />
         )}
+        {demoOverlays}
       </>
     );
   }
@@ -426,6 +435,7 @@ export function App() {
         demoAsk={demoAsk}
         demoConnect={demoConnect}
       />
+      {demoOverlays}
     </OverlayProvider>
   );
 }
