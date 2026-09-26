@@ -229,7 +229,8 @@ step's time).
   intro button. The pointer is hidden on phones (touch has no cursor) and has
   `pointer-events: none`. Verify: visual, in the A4 recording.
 - **A2 — End card.** `DemoEndCard.tsx` reads "Built by Or Assayag · GitHub · LinkedIn". The
-  GitHub link points to the repo, using the URL from `package.json` `repository`. The card joins the overlay
+  GitHub link points to the repo, using the URL from `package.json` `repository`. The LinkedIn link is
+  `https://www.linkedin.com/in/orassayag/`. The card joins the overlay
   manager as `OVERLAY.demoEndCard` and has a top-right close button (mobile close-button
   contract). It stays open after the run finishes. Test: `DemoEndCard.test.tsx` renders both
   links with `rel="noopener noreferrer"`, and close calls the overlay close.
@@ -274,7 +275,3 @@ Verify manually at 390×844 portrait and 844×390 landscape with `?demo=ai&speed
 - Opening the site without `?demo=` behaves as it does today: the intro, a real AI status
   check, and the joke answer when disconnected.
 - Clicking anywhere mid-demo stops it, and the app is fully usable afterwards.
-
-## Open Questions
-
-- **LinkedIn URL (A2).** The end card needs the developer's LinkedIn profile URL.
