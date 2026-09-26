@@ -22,6 +22,6 @@ the plan: §1–§6, §8, §9 before §7.
 - Stage 9: COMMITTED — A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
 - Stage 10: COMMITTED — A1: `data-demo-target` attributes on Connect, provider, key fields, submit, Search, domain buttons, play/step controls, legend toggle, intro button
 - Stage 11: COMMITTED — A2: DemoEndCard.tsx + OVERLAY.demoEndCard + close button + DemoEndCard.test
-- Stage 12: AWAITING REVIEW — §7: `demo=all` script (scenario-derived segment 2 time) + new DemoActions wired in App (pressIntro, playScenario, stepBack/Forward, openIncident, toggleLegend) + scripts.test (all ≤ 120s)
+- Stage 12: COMMITTED — §7: `demo=all` script (scenario-derived segment 2 time) + new DemoActions wired in App (pressIntro, playScenario, stepBack/Forward, openIncident, toggleLegend) + scripts.test (all ≤ 120s)
 - Stage 13: PLANNED — A4: scripts/record-demo.mjs, `record:demo` npm script, playwright devDependency, recordings/ gitignored
 - Stage 14: PLANNED — Final acceptance: /test, record:demo ai + all under limits, 390×844 / 844×390 manual check, no-`?demo=` regression check
