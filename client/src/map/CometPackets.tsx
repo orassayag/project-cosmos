@@ -7,7 +7,7 @@ import { PROTO_COLOR } from './Edge';
 import { useEdgeRegistry } from './edge-registry';
 import { legsForStep } from './edge-resolver';
 import type { EdgeLeg } from './edge-resolver';
-import type { Protocol } from '../scenarios/types';
+import type { Protocol, Step } from '../scenarios/types';
 
 gsap.registerPlugin(MotionPathPlugin);
 
@@ -54,6 +54,25 @@ const PROTO_DURATION: Record<Protocol, number> = {
   http: 1.55,
   kafka: 1.7,
 };
+
+const LEG_GAP_S = 0.02;
+const STARDUST_FADE_IN_S = 0.18;
+const STARDUST_MAX_LIFE_S = 1.7;
+
+/**
+ * Upper bound, in ms at speed 1, of one shot's timeline — the time until the runner
+ * advances. The last leg's stardust outlives every other trailing effect, splash included.
+ */
+export function shotTimelineMs(steps: readonly Step[], expanded?: Set<string> | null): number {
+  let longestBranchS = 0;
+  for (const step of steps) {
+    const legs = legsForStep(step, expanded);
+    if (legs.length === 0) continue;
+    const flightS = legs.reduce((totalS, leg) => totalS + PROTO_DURATION[leg.proto], 0) + LEG_GAP_S * (legs.length - 1);
+    longestBranchS = Math.max(longestBranchS, flightS + STARDUST_FADE_IN_S + STARDUST_MAX_LIFE_S);
+  }
+  return Math.ceil(longestBranchS * 1000);
+}
 
 /**
  * Renders the comets for the current shot. Sits inside the SVG, in
@@ -187,7 +206,7 @@ export function CometPackets({ shot, speed, onShotComplete, expanded, cometScale
           tl.call(() => onStarHitRef.current?.(hitNode), undefined, cursor + dur);
         }
 
-        cursor += dur + 0.02;
+        cursor += dur + LEG_GAP_S;
       }
     }
 
@@ -306,9 +325,9 @@ function createStardust(
 
     // Head reaches this fraction at cursor + dur*fraction — spawn there.
     const bornAt = cursor + dur * fraction;
-    const life = rand(0.9, 1.7);
+    const life = rand(0.9, STARDUST_MAX_LIFE_S);
 
-    tl.to(star, { opacity: rand(0.75, 1), scale: 1, duration: 0.18, ease: 'power2.out' }, bornAt);
+    tl.to(star, { opacity: rand(0.75, 1), scale: 1, duration: STARDUST_FADE_IN_S, ease: 'power2.out' }, bornAt);
     tl.to(
       star,
       {
@@ -320,7 +339,7 @@ function createStardust(
         duration: life,
         ease: 'power1.out',
       },
-      bornAt + 0.18,
+      bornAt + STARDUST_FADE_IN_S,
     );
   }
 

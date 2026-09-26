@@ -1178,6 +1178,7 @@ export function ProjectCosmosMap({
                 type="button"
                 className={`lc-layout-btn${ownershipMode ? ' lc-layout-btn--done' : ''}`}
                 onClick={toggleOwnershipMode}
+                data-demo-target="legend-ownership"
                 title="Toggle the ownership overlay (O)"
                 aria-pressed={ownershipMode}
               >

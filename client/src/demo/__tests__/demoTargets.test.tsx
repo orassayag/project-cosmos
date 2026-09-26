@@ -5,14 +5,12 @@ import { ConnectAgentModal } from '../../components/ConnectAgentModal';
 import { DomainBar } from '../../components/DomainBar';
 import { IntroOverlay } from '../../components/IntroOverlay';
 import { PlaybackControls } from '../../components/PlaybackControls';
+import { ProjectCosmosMap } from '../../map/Map';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { RunnerApi } from '../../scenarios/runner';
 import type { Scenario, Step } from '../../scenarios/types';
-import { AI_DEMO_SCRIPT } from '../scripts';
-import { DEMO_TARGETS, type DemoConnectState, type DemoTarget } from '../types';
-
-// The ownership toggle lives in map/Map.tsx, which gets its attribute when stage 12 wires `toggleLegend`.
-const TARGETS_OUTSIDE_THESE_COMPONENTS: DemoTarget[] = ['legend-ownership'];
+import { DEMO_SCRIPTS } from '../scripts';
+import { DEMO_TARGETS, type DemoConnectState } from '../types';
 
 const DEMO_CONNECT_STATE: DemoConnectState = {
   provider: 'anthropic',
@@ -58,6 +56,7 @@ function DemoSurfaces() {
         onJump={vi.fn()}
         onRestart={vi.fn()}
       />
+      <ProjectCosmosMap />
     </OverlayProvider>
   );
 }
@@ -73,21 +72,20 @@ function findTargets(target: string) {
 }
 
 describe('data-demo-target attributes', () => {
-  it('resolves every target the AI demo script points at to exactly one element', () => {
+  it.each(Object.entries(DEMO_SCRIPTS))('resolves every target the %s demo script points at to exactly one element', (_mode, script) => {
     renderDemoSurfaces();
 
-    const scriptTargets = AI_DEMO_SCRIPT.flatMap((step) => (step.target ? [step.target] : []));
+    const scriptTargets = script.flatMap((step) => (step.target ? [step.target] : []));
     expect(scriptTargets.length).toBeGreaterThan(0);
     for (const target of scriptTargets) {
       expect(findTargets(target), target).toHaveLength(1);
     }
   });
 
-  it('marks every other known target on the element the pointer should click', () => {
+  it('marks every known target on the element the pointer should click', () => {
     renderDemoSurfaces();
 
-    const expectedTargets = DEMO_TARGETS.filter((target) => !TARGETS_OUTSIDE_THESE_COMPONENTS.includes(target));
-    for (const target of expectedTargets) {
+    for (const target of DEMO_TARGETS) {
       const matches = findTargets(target);
       expect(matches, target).toHaveLength(1);
       expect(['BUTTON', 'INPUT', 'TEXTAREA'], target).toContain(matches[0].tagName);
@@ -102,5 +100,6 @@ describe('data-demo-target attributes', () => {
     expect(findTargets('domain-fulfillment')[0].textContent).toContain('Fulfillment');
     expect(findTargets('ask-search')[0].textContent).toBe('Search');
     expect(findTargets('connect-submit')[0].getAttribute('type')).toBe('submit');
+    expect(findTargets('legend-ownership')[0].textContent).toBe('Ownership');
   });
 });

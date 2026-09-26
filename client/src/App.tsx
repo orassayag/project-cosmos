@@ -313,7 +313,9 @@ export function App() {
   const demoAi = useDemoAiConnection();
   const demoView = useDemoView(demoSpeed);
   const demoActions: DemoActions = {
-    pressIntro: handleIntroStart,
+    // The intro's own handler also fades the intro out and unmounts it; its button is a plain
+    // click handler, so a programmatic click runs exactly that path (and is a no-op once disabled).
+    pressIntro: () => document.querySelector<HTMLButtonElement>('[data-demo-target="intro-start"]')?.click(),
     pickDomain: handlePickDomain,
     setQuestion: demoView.typeQuestion,
     openConnect: () => overlay.open(OVERLAY.connect),
@@ -327,9 +329,11 @@ export function App() {
     playScenario: handlePlayScenario,
     stepBack: navPrev,
     stepForward: navNext,
-    openIncident: handlePickScenario,
-    // The legend toggles live inside the map; the `all` script's stage wires them.
-    toggleLegend: () => undefined,
+    openIncident: handlePlayScenario,
+    toggleLegend: (isVisible) => {
+      if (isVisible) overlay.open(OVERLAY.mapOwnership);
+      else overlay.close(OVERLAY.mapOwnership);
+    },
     showEndCard: () => {
       demoView.requestEndCard();
       overlay.open(OVERLAY.demoEndCard);
