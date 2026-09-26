@@ -8,8 +8,8 @@ import {
   scaledDuration,
   sleep,
   TARGET_TIMEOUT_MS,
-  TYPING_CHARACTER_MS,
 } from '../runDemo';
+import { typingDelaysMs } from '../humanMotion';
 import type { DemoStep } from '../types';
 
 function fakeInputTarget() {
@@ -132,7 +132,7 @@ describe('runDemo', () => {
     await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS);
     expect(field.value).toBe('H');
     expect(document.activeElement).toBe(field);
-    await vi.advanceTimersByTimeAsync(TYPING_CHARACTER_MS);
+    await vi.advanceTimersByTimeAsync(typingDelaysMs('Hi!')[0]);
     expect(field.value).toBe('Hi');
 
     await vi.advanceTimersByTimeAsync(2000);
@@ -203,7 +203,7 @@ describe('runDemo', () => {
     const controller = new AbortController();
     const result = run([{ kind: 'type', target: 'ask-input', text: 'hello', durationMs: 2000 }], { signal: controller.signal });
 
-    await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS + TYPING_CHARACTER_MS);
+    await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS + typingDelaysMs('hello')[0]);
     controller.abort();
 
     await expect(result).resolves.toBe('aborted');

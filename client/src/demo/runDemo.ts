@@ -1,3 +1,4 @@
+import { typingDelaysMs } from './humanMotion';
 import type { DemoScript, DemoStep, DemoTarget } from './types';
 
 export type DemoRunResult = 'done' | 'aborted';
@@ -13,11 +14,8 @@ export interface DemoRunOptions {
   root?: ParentNode;
 }
 
-/** How long the pointer glides to a target before pressing it, at speed 1. */
-export const POINTER_MOVE_MS = 500;
-
-/** One typed character every 55ms at speed 1, so the question looks typed by a person. */
-export const TYPING_CHARACTER_MS = 55;
+/** From the pointer setting off to the press, at speed 1: the move itself plus a beat of aiming. */
+export const POINTER_MOVE_MS = 700;
 
 /** How long a step waits for its target to render (a menu opening, the intro warp ending), at speed 1. */
 export const TARGET_TIMEOUT_MS = 6000;
@@ -178,9 +176,10 @@ async function runStep(step: DemoStep, options: DemoRunOptions, root: ParentNode
     if (step.kind === 'paste') insertText(asTextField(element, step.target), step.text, 'insertFromPaste');
     if (step.kind === 'type') {
       const field = asTextField(element, step.target);
-      for (const character of step.text) {
+      const delaysMs = typingDelaysMs(step.text);
+      for (const [index, character] of [...step.text].entries()) {
         typeCharacter(field, character);
-        if (!(await clock.wait(TYPING_CHARACTER_MS))) return false;
+        if (!(await clock.wait(delaysMs[index]))) return false;
       }
     }
   }

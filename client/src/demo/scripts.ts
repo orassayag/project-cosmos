@@ -3,6 +3,7 @@ import { shotTimelineMs } from '../map/CometPackets';
 import { PLAYABLE_BY_ID, stepsForScenario } from '../scenarios/data';
 import type { Step } from '../scenarios/types';
 import { DEMO_QUESTION, DEMO_SCRIPTED_ANSWER } from './scriptedAnswer';
+import { typingDurationMs } from './humanMotion';
 import { POINTER_MOVE_MS } from './runDemo';
 import type { DemoModeName, DemoScript, DemoScriptedAnswer, DemoStep } from './types';
 
@@ -71,7 +72,7 @@ function connectAndAskSteps(): DemoStep[] {
     { kind: 'paste', target: 'connect-jev-key', text: DEMO_JEV_KEY, durationMs: 1100, caption: "Adding the JEV key (the site's question classifier)" },
     { kind: 'click', target: 'connect-submit', durationMs: 2800, caption: 'Connecting…' },
     { kind: 'click', target: 'ask-input', durationMs: 900, caption: 'Asking the map a question' },
-    { kind: 'type', target: 'ask-input', text: DEMO_QUESTION, durationMs: 4400 },
+    { kind: 'type', target: 'ask-input', text: DEMO_QUESTION, durationMs: POINTER_MOVE_MS + typingDurationMs(DEMO_QUESTION) + 300 },
     { kind: 'click', target: 'ask-search', durationMs: 800 },
     { kind: 'wait', durationMs: answerMs, caption: 'The agent answers from the live map' },
   ];

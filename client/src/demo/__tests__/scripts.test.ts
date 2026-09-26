@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { INCIDENTS } from '../../incidents/data';
 import { shotTimelineMs } from '../../map/CometPackets';
 import { PLAYABLE_BY_ID, stepsForScenario } from '../../scenarios/data';
-import { POINTER_MOVE_MS, TYPING_CHARACTER_MS } from '../runDemo';
+import { typingDurationMs } from '../humanMotion';
+import { POINTER_MOVE_MS } from '../runDemo';
 import { DEMO_QUESTION, DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
 import {
   ALL_DEMO_SCENARIO_ID,
@@ -43,7 +44,7 @@ describe('demo scripts', () => {
   it.each(VARIANTS)('gives every gesture in the %s demo (%s) time for the pointer glide and its typing', (_mode, _layout, script) => {
     for (const step of script) {
       if (step.kind === 'wait') continue;
-      const typingMs = step.kind === 'type' ? step.text.length * TYPING_CHARACTER_MS : 0;
+      const typingMs = step.kind === 'type' ? typingDurationMs(step.text) : 0;
       expect(step.durationMs, step.target).toBeGreaterThanOrEqual(POINTER_MOVE_MS + typingMs);
     }
   });
