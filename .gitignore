@@ -27,6 +27,9 @@ tsconfig.tsbuildinfo
 # cosmos-sync dry-run reports (kept locally for review, not committed)
 drift-sync/dry-runs/
 
+# demo videos from npm run record:demo
+recordings/
+
 # logs & coverage
 *.log
 npm-debug.log*

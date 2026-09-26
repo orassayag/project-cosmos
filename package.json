@@ -22,7 +22,8 @@
     "sync:nightly": "tsx drift-sync/scripts/sync-nightly.ts",
     "sync:apply": "tsx drift-sync/scripts/apply-edits.ts",
     "sync:clone-repos": "tsx drift-sync/scripts/clone-repos.ts",
-    "fresh": "node scripts/fresh-start.mjs"
+    "fresh": "node scripts/fresh-start.mjs",
+    "record:demo": "node scripts/record-demo.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
@@ -30,6 +31,7 @@
     "@types/node": "^26.4.0",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "playwright": "^1.63.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0"
