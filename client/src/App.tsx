@@ -26,6 +26,13 @@ import { MobileMenu } from './components/MobileMenu';
 import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overlays/OverlayManager';
 import { useViewport } from './hooks/useViewport';
 import { useAiConnection } from './hooks/useAiConnection';
+import type { AiConnection } from './hooks/useAiConnection';
+import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from './demo/demoMode';
+import { DEMO_SCRIPTS } from './demo/scripts';
+import type { DemoActions, DemoConnectState, DemoScriptedAnswer } from './demo/types';
+import { useDemoAiConnection } from './demo/useDemoAiConnection';
+import { useDemoRunner } from './demo/useDemoRunner';
+import { useDemoView } from './demo/useDemoView';
 
 import { DOMAINS, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
 import type { Incident, DriftEntry } from './scenarios/data';
@@ -36,12 +43,24 @@ import { readInitialDeepLink, resolvePlayableId, useDeepLink } from './hooks/use
 
 interface ActivityEntry { idx: number; step: Step }
 
+/**
+ * Holds the answer panel on its thinking dots from the demo's Search press until the scripted
+ * answer arrives; without it the panel would ask the server or play the joke answer.
+ */
+const DEMO_AWAITING_ANSWER: DemoScriptedAnswer = { text: '', thinkingMs: 60_000, wordMs: 0 };
+
+interface DemoAskState { question: string; isSearchPressed: boolean }
+
 export function App() {
   const initial = useMemo(readInitialDeepLink, []);
-  const [showIntro, setShowIntro] = useState(
-    () => initial.scenario == null && initial.incident == null && initial.domain == null
-      && !localStorage.getItem('cosmos-intro-seen'),
-  );
+  const demoMode = useMemo(() => readDemoMode(window.location.href), []);
+  const demoScript = demoMode ? DEMO_SCRIPTS[demoMode.mode] : undefined;
+  const demoSpeed = demoMode?.speed ?? 1;
+  const [showIntro, setShowIntro] = useState(() => shouldShowIntro(
+    demoMode,
+    localStorage,
+    initial.scenario != null || initial.incident != null || initial.domain != null,
+  ));
   // Plays the hyperspace warp between the intro CTA and the cosmos shell.
   const [warping, setWarping] = useState(false);
   const [activeDomain, setActiveDomain] = useState(() => initial.domain ?? DOMAINS[0].id);
@@ -253,6 +272,93 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleResetGalaxy]);
 
+  // The ask state lives here, not in the shell, because the demo runner asks questions too.
+  const [askQuestion, setAskQuestion] = useState<string | null>(null);
+  const [askNonce, setAskNonce] = useState(0);
+  // The nodes the map "focuses" on while the answer shows. Disconnected, the
+  // canned demo picks one random node per question; connected, the list starts
+  // empty and the agent's highlight actions fill it. The focus only engages
+  // once the answer starts (not during "thinking").
+  const [askFocusIds, setAskFocusIds] = useState<string[]>([]);
+  const [askAnswering, setAskAnswering] = useState(false);
+  const [askScriptedAnswer, setAskScriptedAnswer] = useState<DemoScriptedAnswer | undefined>(undefined);
+  const openAskPanel = useCallback(
+    (question: string, focusIds: string[], scriptedAnswer?: DemoScriptedAnswer) => {
+      setAskQuestion(question);
+      setAskNonce((n) => n + 1);
+      setAskFocusIds(focusIds);
+      setAskScriptedAnswer(scriptedAnswer);
+      setAskAnswering(false);
+      overlay.open(OVERLAY.ask);
+    },
+    [overlay],
+  );
+  const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
+  const handleAskAction = useCallback((action: AskAction) => {
+    if (action.kind === 'highlight') {
+      setAskFocusIds(action.serviceIds.filter((id) => SERVICES_BY_ID[id] || TOPICS_BY_ID[id]));
+    } else {
+      handlePlayScenario(action.scenarioId);
+    }
+  }, [handlePlayScenario]);
+
+  const handleIntroStart = useCallback(() => {
+    if (!demoMode) localStorage.setItem(INTRO_SEEN_STORAGE_KEY, '1');
+    setWarping(true);
+  }, [demoMode]);
+
+  const demoAi = useDemoAiConnection();
+  const demoView = useDemoView(demoSpeed);
+  const demoActions: DemoActions = {
+    pressIntro: handleIntroStart,
+    pickDomain: handlePickDomain,
+    setQuestion: demoView.typeQuestion,
+    openConnect: () => overlay.open(OVERLAY.connect),
+    pickProvider: demoView.pickProvider,
+    setConnectField: demoView.setConnectField,
+    setAiStatus: demoAi.setDemoStatus,
+    closeConnect: () => overlay.close(OVERLAY.connect),
+    setSearchPressed: demoView.setSearchPressed,
+    ask: (question) => openAskPanel(question, [], DEMO_AWAITING_ANSWER),
+    playAnswer: (answer) => setAskScriptedAnswer(answer),
+    playScenario: handlePlayScenario,
+    stepBack: navPrev,
+    stepForward: navNext,
+    openIncident: handlePickScenario,
+    // The legend toggles live inside the map; the `all` script's stage wires them.
+    toggleLegend: () => undefined,
+    showEndCard: demoView.requestEndCard,
+  };
+  const handleDemoEnd = () => {
+    demoAi.setDemoStatus('disconnected');
+    demoView.reset();
+    overlay.close(OVERLAY.connect);
+    if (askScriptedAnswer === DEMO_AWAITING_ANSWER) overlay.close(OVERLAY.ask);
+  };
+  const demoRunner = useDemoRunner({ script: demoScript, speed: demoSpeed, actions: demoActions, onEnd: handleDemoEnd });
+  const isDemoActive = demoRunner.isActive;
+
+  // Checked only once the shell shows (as before the demo existed), and never while the demo runs.
+  const realAi = useAiConnection({ enabled: !isDemoActive && !showIntro && !warping });
+  const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
+  const isAiConnected = aiConnection.status === 'connected';
+  const handleAsk = useCallback((question: string) => {
+    openAskPanel(question, isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
+  }, [openAskPanel, isAiConnected]);
+
+  const demoAsk: DemoAskState | undefined = isDemoActive && demoView.view.question !== undefined
+    ? { question: demoView.view.question, isSearchPressed: demoView.view.isSearchPressed }
+    : undefined;
+  const demoConnect: DemoConnectState | undefined = isDemoActive
+    ? {
+      provider: demoView.view.provider,
+      providerKey: demoView.view.providerKey,
+      jevKey: demoView.view.jevKey,
+      showJevField: true,
+      isBusy: demoAi.isConnecting,
+    }
+    : undefined;
+
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow
   // is the only thing the eye lands on.
@@ -268,10 +374,7 @@ export function App() {
         {warping && <WarpTransition onDone={() => setWarping(false)} />}
         {showIntro && (
           <IntroOverlay
-            onStart={() => {
-              localStorage.setItem('cosmos-intro-seen', '1');
-              setWarping(true);
-            }}
+            onStart={handleIntroStart}
             onExitComplete={() => setShowIntro(false)}
           />
         )}
@@ -293,7 +396,6 @@ export function App() {
         setPanelOpen={setPanelOpen}
         handlePickDomain={handlePickDomain}
         handlePickScenario={handlePickScenario}
-        onPlayScenario={handlePlayScenario}
         handleShotComplete={handleShotComplete}
         isolate={isolate}
         setHistory={setHistory}
@@ -313,6 +415,16 @@ export function App() {
         onSelectDrift={handleSelectDrift}
         resetNonce={resetNonce}
         activeIncident={activeIncident}
+        aiConnection={aiConnection}
+        askQuestion={askQuestion}
+        askNonce={askNonce}
+        askFocusIds={askAnswering ? askFocusIds : []}
+        askScriptedAnswer={askScriptedAnswer}
+        onAsk={handleAsk}
+        onAnswerStart={handleAnswerStart}
+        onAskAction={handleAskAction}
+        demoAsk={demoAsk}
+        demoConnect={demoConnect}
       />
     </OverlayProvider>
   );
@@ -330,7 +442,6 @@ interface ProjectCosmosShellProps {
   setPanelOpen: (v: boolean) => void;
   handlePickDomain: (d: string) => void;
   handlePickScenario: (s: string) => void;
-  onPlayScenario: (playableId: string) => void;
   handleShotComplete: (token: number) => void;
   isolate: boolean;
   setHistory: (v: ActivityEntry[]) => void;
@@ -350,6 +461,16 @@ interface ProjectCosmosShellProps {
   onSelectDrift: (entry: DriftEntry) => void;
   resetNonce: number;
   activeIncident: Incident | null;
+  aiConnection: AiConnection;
+  askQuestion: string | null;
+  askNonce: number;
+  askFocusIds: string[];
+  askScriptedAnswer: DemoScriptedAnswer | undefined;
+  onAsk: (question: string) => void;
+  onAnswerStart: () => void;
+  onAskAction: (action: AskAction) => void;
+  demoAsk: DemoAskState | undefined;
+  demoConnect: DemoConnectState | undefined;
 }
 
 function ProjectCosmosShell(p: ProjectCosmosShellProps) {
@@ -362,12 +483,14 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
   const {
     activeDomain, runner, state, steps, scenario, shot, history,
-    panelOpen, setPanelOpen, handlePickDomain, handlePickScenario, onPlayScenario,
+    panelOpen, setPanelOpen, handlePickDomain, handlePickScenario,
     handleShotComplete, isolate, setHistory, navPlay, navPrev, navNext, navJump, navRestart,
     spotlightTarget, setSpotlightTarget,
     warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, projectCosmosState, resetNonce,
     driftDate, onSelectDrift,
     activeIncident,
+    aiConnection, askQuestion, askNonce, askFocusIds, askScriptedAnswer,
+    onAsk, onAnswerStart, onAskAction, demoAsk, demoConnect,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
@@ -385,35 +508,9 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   // through this single-slot manager so none can override another.
   const overlay = useOverlay();
 
-  // The "Ask the agent" demo: the current question drives the answer panel;
-  // the nonce forces a fresh panel (new thinking + typing) on a repeat ask.
-  // The panel is a managed overlay so it can never stack with the star
+  // The answer panel is a managed overlay so it can never stack with the star
   // inspector or any other surface — opening one closes the rest.
-  const [askQuestion, setAskQuestion] = useState<string | null>(null);
-  const [askNonce, setAskNonce] = useState(0);
-  // The nodes the map "focuses" on while the answer shows. Disconnected, the
-  // canned demo picks one random node per question; connected, the list starts
-  // empty and the agent's highlight actions fill it. The focus only engages
-  // once the answer starts (not during "thinking").
-  const [askFocusIds, setAskFocusIds] = useState<string[]>([]);
-  const [askAnswering, setAskAnswering] = useState(false);
-  const aiConnection = useAiConnection();
   const isAiConnected = aiConnection.status === 'connected';
-  const handleAsk = useCallback((question: string) => {
-    setAskQuestion(question);
-    setAskNonce((n) => n + 1);
-    setAskFocusIds(isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
-    setAskAnswering(false);
-    overlay.open(OVERLAY.ask);
-  }, [overlay, isAiConnected]);
-  const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
-  const handleAskAction = useCallback((action: AskAction) => {
-    if (action.kind === 'highlight') {
-      setAskFocusIds(action.serviceIds.filter((id) => SERVICES_BY_ID[id] || TOPICS_BY_ID[id]));
-    } else {
-      onPlayScenario(action.scenarioId);
-    }
-  }, [onPlayScenario]);
   const { disconnect: disconnectAi } = aiConnection;
   const handleConnectRequest = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
   const handleDisconnect = useCallback(() => {
@@ -576,12 +673,15 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
         const askAgent = (
           <AskAgent
-            onAsk={handleAsk}
+            onAsk={onAsk}
             resetNonce={resetNonce}
             aiStatus={aiConnection.status}
             aiProvider={aiConnection.provider}
             onConnectRequest={handleConnectRequest}
             onDisconnect={handleDisconnect}
+            demoQuestion={demoAsk?.question}
+            demoExpanded={demoAsk ? true : undefined}
+            demoSearchPressed={demoAsk?.isSearchPressed}
           />
         );
 
@@ -672,7 +772,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           spotlightTarget={spotlightTarget}
           onSpotlightConsumed={() => setSpotlightTarget(null)}
           resetNonce={resetNonce}
-          askFocusIds={askAnswering ? askFocusIds : []}
+          askFocusIds={askFocusIds}
           incidentActive={!!activeIncident}
           explodeNodeId={explodedStarId}
           explodeTargetId={explodeTargetId}
@@ -712,12 +812,13 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             question={askQuestion}
             hidden={!overlay.isOpen(OVERLAY.ask)}
             onClose={() => overlay.close(OVERLAY.ask)}
-            onAnswerStart={handleAnswerStart}
+            onAnswerStart={onAnswerStart}
             showConnectPrompt={aiConnection.status === 'disconnected'}
             onConnectRequest={handleConnectRequest}
             isAiConnected={isAiConnected}
-            onAction={handleAskAction}
+            onAction={onAskAction}
             onKeyRejected={handleDisconnect}
+            scriptedAnswer={askScriptedAnswer}
           />
         )}
 
@@ -755,7 +856,11 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
       <HelpModal open={overlay.isOpen(OVERLAY.help)} onClose={closeHelp} />
 
-      <ConnectAgentModal currentProvider={aiConnection.provider} onConnect={aiConnection.connect} />
+      <ConnectAgentModal
+        currentProvider={aiConnection.provider}
+        onConnect={aiConnection.connect}
+        demo={demoConnect}
+      />
 
       <ChangelogPanel
         open={overlay.isOpen(OVERLAY.changelog) && !warping}
