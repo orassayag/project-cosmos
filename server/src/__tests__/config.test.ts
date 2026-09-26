@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-// The `ask` → 503 case joins this suite with the /api/ai/ask route (stage 17).
 describe('app without AI configuration', () => {
   let app: typeof import('../app.js').default;
   let consoleError: Mock;
@@ -46,6 +45,18 @@ describe('app without AI configuration', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ errorCode: 'AI_NOT_CONFIGURED' });
     expect(response.headers.get('set-cookie')).toBeNull();
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it('answers ask with 503 AI_NOT_CONFIGURED', async () => {
+    const response = await app.request('/api/ai/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'How does checkout work?' }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ errorCode: 'AI_NOT_CONFIGURED' });
     expect(providerFetch).not.toHaveBeenCalled();
   });
 
