@@ -1,4 +1,4 @@
-import { experimental_evaluate as evaluate } from 'ai';
+import { createGateway, experimental_evaluate as evaluate } from 'ai';
 import { getGatewayApiKey } from '../config.js';
 import { createLogger } from '../logger.js';
 import { localRelevance } from './localRelevance.js';
@@ -61,7 +61,7 @@ function buildQuestions(snapshot: CosmosMapSnapshot) {
   } as const;
 }
 
-async function evaluateWithTimeout(question: string, snapshot: CosmosMapSnapshot): Promise<Classification> {
+async function evaluateWithTimeout(question: string, snapshot: CosmosMapSnapshot, gatewayApiKey: string): Promise<Classification> {
   const abortController = new AbortController();
   let rejectOnTimeout: (error: JevTimeoutError) => void = () => {};
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -77,7 +77,7 @@ async function evaluateWithTimeout(question: string, snapshot: CosmosMapSnapshot
     // The race guarantees the 3s budget even if the provider ignores the abort signal.
     const result = await Promise.race([
       evaluate({
-        model: JEV_MODEL_ID,
+        model: createGateway({ apiKey: gatewayApiKey }).evaluationModel(JEV_MODEL_ID),
         state: {
           question,
           serviceNames: snapshot.services.map((service) => service.name),
@@ -109,9 +109,18 @@ function fallBackToLocalRelevance(question: string, snapshot: CosmosMapSnapshot)
   return { source: 'localRelevance', onTopic: localRelevance(question, snapshot) };
 }
 
-/** Classifies a question for `decideRoute`; never calls the visitor's model, and falls back to the free keyword check. */
-export async function classifyQuestion(question: string, snapshot: CosmosMapSnapshot): Promise<RouteInput> {
-  if (!getGatewayApiKey()) {
+/**
+ * Classifies a question for `decideRoute`; never calls the visitor's model, and falls back to the free keyword check.
+ * A gateway key the visitor supplied is billed instead of the site owner's.
+ */
+export async function classifyQuestion(
+  question: string,
+  snapshot: CosmosMapSnapshot,
+  visitorGatewayApiKey?: string,
+): Promise<RouteInput> {
+  const gatewayApiKey = visitorGatewayApiKey ?? getGatewayApiKey();
+  const keySource = visitorGatewayApiKey ? 'visitor' : 'site';
+  if (!gatewayApiKey) {
     if (!hasWarnedMissingGatewayKey) {
       hasWarnedMissingGatewayKey = true;
       logger.warn('AI_GATEWAY_API_KEY is not set; classifying with localRelevance', { errorCode: JEV_UNAVAILABLE });
@@ -120,11 +129,11 @@ export async function classifyQuestion(question: string, snapshot: CosmosMapSnap
   }
 
   try {
-    return { source: 'classifier', classification: await evaluateWithTimeout(question, snapshot) };
+    return { source: 'classifier', classification: await evaluateWithTimeout(question, snapshot, gatewayApiKey) };
   } catch (error) {
     // Logged per failure (not once) so gateway outages show up as a spike.
     const reason = error instanceof JevTimeoutError ? error.message : `JEV evaluation failed (${errorName(error)})`;
-    logger.warn(`${reason}; classifying with localRelevance`, { errorCode: JEV_UNAVAILABLE });
+    logger.warn(`${reason} with the ${keySource} gateway key; classifying with localRelevance`, { errorCode: JEV_UNAVAILABLE });
     return fallBackToLocalRelevance(question, snapshot);
   }
 }

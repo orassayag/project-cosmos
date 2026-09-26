@@ -104,16 +104,17 @@ export function DemoPointer({ pointer, isVisible, speed }: DemoPointerProps) {
         key={`arrow-${moveId}`}
         className="lc-demo-pointer-arrow"
         style={moveId > 0 ? pressStyle : undefined}
-        width={22}
-        height={28}
-        viewBox="0 0 22 28"
+        width={12}
+        height={19}
+        viewBox="0 0 12 19"
       >
         <path
-          d="M1.5 1.5 L1.5 22.5 L7 17.5 L10.8 26 L14.4 24.4 L10.7 16.2 L18.5 16.2 Z"
-          fill="#F5F7FF"
-          stroke="#04060A"
-          strokeWidth={1.6}
+          d="M1 1 L1 15.2 L4.3 12.2 L7.6 18 L9.6 17 L6.5 11.3 L10.9 11.1 Z"
+          fill="#000000"
+          stroke="#FFFFFF"
+          strokeWidth={1.1}
           strokeLinejoin="round"
+          paintOrder="stroke"
         />
       </svg>
     </div>,

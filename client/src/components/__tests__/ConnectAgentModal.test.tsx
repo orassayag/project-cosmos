@@ -3,14 +3,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ConnectAgentModal } from '../ConnectAgentModal';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { ConnectResult } from '../../hooks/useAiConnection';
-function Harness({ onConnect, showJevField }: { onConnect: () => Promise<ConnectResult>; showJevField?: boolean }) {
+function Harness({ onConnect }: { onConnect: () => Promise<ConnectResult> }) {
   const overlay = useOverlayManager();
   return (
     <OverlayProvider value={overlay}>
       <output data-testid="active-overlay">{overlay.active ?? 'none'}</output>
       <button type="button" onClick={() => overlay.open(OVERLAY.ask)}>Open answer</button>
       <button type="button" onClick={() => overlay.open(OVERLAY.connect)}>Open connect</button>
-      <ConnectAgentModal currentProvider={null} onConnect={onConnect} showJevField={showJevField} />
+      <ConnectAgentModal currentProvider={null} onConnect={onConnect} />
     </OverlayProvider>
   );
 }
@@ -70,28 +70,30 @@ describe('ConnectAgentModal', () => {
     expect(screen.getByTestId('active-overlay').textContent).toBe(OVERLAY.ask);
   });
 
-  it('shows an editable site-owner JEV field in the demo and submits through onConnect', () => {
+  it('always shows the optional JEV field and sends its key with the connect', () => {
     const onConnect = vi.fn(() => new Promise<ConnectResult>(() => {}));
-    render(<Harness onConnect={onConnect} showJevField />);
+    render(<Harness onConnect={onConnect} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
 
-    const jevKeyInput = screen.getByLabelText<HTMLInputElement>(/site owner/);
+    const jevKeyInput = screen.getByLabelText<HTMLInputElement>(/Vercel AI Gateway key/);
     expect(jevKeyInput.type).toBe('password');
-    fireEvent.change(jevKeyInput, { target: { value: 'jev-demo-key' } });
-    expect(jevKeyInput.value).toBe('jev-demo-key');
+    fireEvent.change(jevKeyInput, { target: { value: '  jev-demo-key  ' } });
+
+    fireEvent.change(screen.getByLabelText('Claude API key'), { target: { value: 'sk-ant-demo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    expect(onConnect).toHaveBeenCalledWith('anthropic', 'sk-ant-demo', 'jev-demo-key');
+    expect(screen.getByRole('button', { name: 'Connecting…' })).toHaveProperty('disabled', true);
+  });
+
+  it('connects without a gateway key when the JEV field is left blank', () => {
+    const onConnect = vi.fn(() => new Promise<ConnectResult>(() => {}));
+    render(<Harness onConnect={onConnect} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
 
     fireEvent.change(screen.getByLabelText('Claude API key'), { target: { value: 'sk-ant-demo' } });
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
     expect(onConnect).toHaveBeenCalledWith('anthropic', 'sk-ant-demo');
-    expect(screen.getByRole('button', { name: 'Connecting…' })).toHaveProperty('disabled', true);
-  });
-
-  it('never shows the JEV field to real visitors', () => {
-    render(<Harness onConnect={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
-
-    expect(screen.queryByLabelText(/site owner/)).toBeNull();
-    expect(screen.queryByLabelText(/Vercel AI Gateway/)).toBeNull();
   });
 });

@@ -27,7 +27,7 @@ const logger = createLogger('ask');
  */
 export async function* answerQuestion({ question, payload, snapshot, signal }: AskAnswerInput): AsyncGenerator<AskStreamEvent> {
   try {
-    const decision = decideRoute(await classifyQuestion(question, snapshot), snapshot);
+    const decision = decideRoute(await classifyQuestion(question, snapshot, payload.gatewayApiKey), snapshot);
     if (decision.kind === 'offTopic') {
       yield { type: 'token', text: decision.answer };
     } else if (decision.kind === 'directAction') {

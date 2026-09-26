@@ -8,9 +8,7 @@ import type { DemoTarget } from '../demo/types';
 
 interface ConnectAgentModalProps {
   currentProvider: AiProvider | null;
-  onConnect: (provider: AiProvider, apiKey: string) => Promise<ConnectResult>;
-  /** The demo's extra field for the site owner's AI Gateway key; never shown to a real visitor. */
-  showJevField?: boolean;
+  onConnect: (provider: AiProvider, apiKey: string, gatewayApiKey?: string) => Promise<ConnectResult>;
 }
 
 const PROVIDERS: AiProvider[] = ['anthropic', 'openai'];
@@ -29,14 +27,13 @@ const ERROR_MESSAGES: Record<ConnectErrorCode, string> = {
 
 /** Visibility and every open/close go through the overlay manager, so on phones it
  *  stacks over the answer panel and closing it brings that panel back intact. */
-export function ConnectAgentModal({ currentProvider, onConnect, showJevField = false }: ConnectAgentModalProps) {
+export function ConnectAgentModal({ currentProvider, onConnect }: ConnectAgentModalProps) {
   const overlay = useOverlay();
   if (!overlay.isOpen(OVERLAY.connect)) return null;
   return createPortal(
     <ConnectAgentDialog
       currentProvider={currentProvider}
       onConnect={onConnect}
-      showJevField={showJevField}
       onClose={() => overlay.close(OVERLAY.connect)}
     />,
     document.body,
@@ -47,7 +44,7 @@ interface ConnectAgentDialogProps extends ConnectAgentModalProps {
   onClose: () => void;
 }
 
-function ConnectAgentDialog({ currentProvider, onConnect, showJevField, onClose }: ConnectAgentDialogProps) {
+function ConnectAgentDialog({ currentProvider, onConnect, onClose }: ConnectAgentDialogProps) {
   const titleId = useId();
   const [provider, setProvider] = useState<AiProvider>(currentProvider ?? 'anthropic');
   const [apiKey, setApiKey] = useState('');
@@ -74,7 +71,8 @@ function ConnectAgentDialog({ currentProvider, onConnect, showJevField, onClose 
     if (!trimmedKey || isBusy) return;
     setIsBusy(true);
     setErrorCode(null);
-    const result = await onConnect(provider, trimmedKey);
+    const trimmedGatewayKey = jevKey.trim();
+    const result = await (trimmedGatewayKey ? onConnect(provider, trimmedKey, trimmedGatewayKey) : onConnect(provider, trimmedKey));
     if (result.ok) {
       onClose();
       return;
@@ -145,21 +143,21 @@ function ConnectAgentDialog({ currentProvider, onConnect, showJevField, onClose 
             />
           </label>
 
-          {showJevField && (
-            <label className="lc-connect-field">
-              <span className="lc-connect-label">Vercel AI Gateway key (JEV, site owner)</span>
-              <input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                className="lc-connect-input"
-                data-demo-target="connect-jev-key"
-                value={jevKey}
-                onChange={(event) => setJevKey(event.target.value)}
-                disabled={isBusy}
-              />
-            </label>
-          )}
+          <label className="lc-connect-field">
+            <span className="lc-connect-label">
+              Vercel AI Gateway key (JEV) <span className="lc-connect-optional">optional</span>
+            </span>
+            <input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              className="lc-connect-input"
+              data-demo-target="connect-jev-key"
+              value={jevKey}
+              onChange={(event) => setJevKey(event.target.value)}
+              disabled={isBusy}
+            />
+          </label>
 
           {errorCode && <p className="lc-connect-error" role="alert">{ERROR_MESSAGES[errorCode]}</p>}
 

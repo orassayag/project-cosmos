@@ -33,8 +33,8 @@ function botLabel(status: AiConnectionStatus, provider: AiProvider | null): stri
 /**
  * Topbar "Ask the agent" field. Collapsed it reads as a one-line input with
  * no button; focusing it grows the field into a card holding the textarea and
- * a Search button at the bottom. Blur or Search collapses it back, keeping the text;
- * refocusing, Esc, or a galaxy reset clears it for a fresh question.
+ * a Search button at the bottom. Collapsed it always shows the placeholder; the last
+ * question is kept and reappears on refocus. Esc or a galaxy reset clears it.
  */
 export function AskAgent({
   onAsk,
@@ -124,12 +124,9 @@ export function AskAgent({
           data-demo-target="ask-input"
           placeholder="Explore Project Cosmos"
           rows={1}
-          value={question}
+          value={expanded ? question : ''}
           spellCheck={false}
-          onFocus={() => {
-            setExpanded(true);
-            setQuestion('');
-          }}
+          onFocus={() => setExpanded(true)}
           onBlur={() => setExpanded(false)}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}

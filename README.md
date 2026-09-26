@@ -94,7 +94,7 @@ cp server/.env.example server/.env
 vercel dev -L
 ```
 
-Both keys are optional. Without `AI_COOKIE_SECRET` the AI routes report "not configured", and without `AI_GATEWAY_API_KEY` question matching falls back to a local heuristic.
+Both keys are optional. Without `AI_COOKIE_SECRET` the AI routes report "not configured", and without `AI_GATEWAY_API_KEY` question matching falls back to a local heuristic. A visitor can also paste their own Vercel AI Gateway key in the Connect window (the optional JEV field); it is sealed in the same encrypted cookie and used for question matching instead of the site's key.
 
 ### Driving it from the keyboard
 

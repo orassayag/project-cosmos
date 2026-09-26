@@ -12,7 +12,8 @@ export type ConnectResult =
 export interface AiConnection {
   status: AiConnectionStatus;
   provider: AiProvider | null;
-  connect: (provider: AiProvider, apiKey: string) => Promise<ConnectResult>;
+  /** `gatewayApiKey` is the visitor's optional Vercel AI Gateway key for the JEV classifier. */
+  connect: (provider: AiProvider, apiKey: string, gatewayApiKey?: string) => Promise<ConnectResult>;
   disconnect: () => Promise<boolean>;
 }
 
@@ -82,14 +83,14 @@ export function useAiConnection({ enabled = true }: UseAiConnectionOptions = {})
     return () => controller.abort();
   }, [enabled]);
 
-  const connect = useCallback(async (nextProvider: AiProvider, apiKey: string): Promise<ConnectResult> => {
+  const connect = useCallback(async (nextProvider: AiProvider, apiKey: string, gatewayApiKey?: string): Promise<ConnectResult> => {
     let response: Response;
     try {
       response = await fetch('/api/ai/connect', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: nextProvider, apiKey }),
+        body: JSON.stringify(gatewayApiKey ? { provider: nextProvider, apiKey, gatewayApiKey } : { provider: nextProvider, apiKey }),
       });
     } catch {
       return { ok: false, errorCode: 'NETWORK_ERROR' };

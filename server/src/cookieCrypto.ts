@@ -5,6 +5,7 @@ import { AI_PROVIDERS, createLogger, type AiProvider } from './logger.js';
 export interface AiCookiePayload {
   provider: AiProvider;
   apiKey: string;
+  gatewayApiKey?: string;
 }
 
 export const AI_COOKIE_NAME = 'cosmos_ai';
@@ -27,9 +28,12 @@ function isAiCookiePayload(value: unknown): value is AiCookiePayload {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const { provider, apiKey } = value as Record<string, unknown>;
+  const { provider, apiKey, gatewayApiKey } = value as Record<string, unknown>;
   return (
-    AI_PROVIDERS.includes(provider as AiProvider) && typeof apiKey === 'string' && apiKey.length > 0
+    AI_PROVIDERS.includes(provider as AiProvider) &&
+    typeof apiKey === 'string' &&
+    apiKey.length > 0 &&
+    (gatewayApiKey === undefined || (typeof gatewayApiKey === 'string' && gatewayApiKey.length > 0))
   );
 }
 
@@ -37,7 +41,7 @@ function isAiCookiePayload(value: unknown): value is AiCookiePayload {
 export function encryptCookiePayload(payload: AiCookiePayload, secret: Buffer): string {
   const iv = randomBytes(IV_BYTE_LENGTH);
   const cipher = createCipheriv(CIPHER_ALGORITHM, secret, iv, { authTagLength: AUTH_TAG_BYTE_LENGTH });
-  const plaintext = JSON.stringify({ provider: payload.provider, apiKey: payload.apiKey });
+  const plaintext = JSON.stringify({ provider: payload.provider, apiKey: payload.apiKey, gatewayApiKey: payload.gatewayApiKey });
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   return Buffer.concat([iv, ciphertext, cipher.getAuthTag()]).toString('base64url');
 }
@@ -64,7 +68,9 @@ export function decryptCookiePayload(cookieValue: string, secret: Buffer): AiCoo
       logger.warn('AI cookie decrypted to an unexpected shape', { errorCode: 'AI_COOKIE_REJECTED' });
       return null;
     }
-    return { provider: payload.provider, apiKey: payload.apiKey };
+    return payload.gatewayApiKey
+      ? { provider: payload.provider, apiKey: payload.apiKey, gatewayApiKey: payload.gatewayApiKey }
+      : { provider: payload.provider, apiKey: payload.apiKey };
   } catch {
     // GCM authentication failure (tampered bytes or wrong secret); the error text carries nothing useful to log.
     logger.warn('AI cookie failed authentication', { errorCode: 'AI_COOKIE_REJECTED' });

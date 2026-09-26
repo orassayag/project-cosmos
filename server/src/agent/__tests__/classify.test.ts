@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
 import { decideRoute } from '../route.js';
 
-vi.mock('ai', () => ({ experimental_evaluate: vi.fn() }));
+vi.mock('ai', () => ({
+  experimental_evaluate: vi.fn(),
+  createGateway: vi.fn(({ apiKey }: { apiKey: string }) => ({
+    evaluationModel: (modelId: string) => ({ modelId, apiKey }),
+  })),
+}));
 
 const OFF_TOPIC_QUESTION = "what's the weather";
 const ON_TOPIC_QUESTION = 'what does payments-gateway do';
@@ -126,7 +131,7 @@ describe('classifyQuestion', () => {
       },
     });
     const call = evaluateStub.mock.calls[0][0];
-    expect(call.model).toBe('typesafe-ai/jev');
+    expect(call.model).toEqual({ modelId: 'typesafe-ai/jev', apiKey: 'gateway-test-key' });
     expect(Object.keys(call.state).sort()).toEqual(['domainNames', 'question', 'serviceNames', 'topicNames']);
     expect(Object.keys(call.questions.targetScenario.criteria)).toHaveLength(
       1 + cosmosMap.scenarios.length + cosmosMap.incidents.length,
@@ -154,6 +159,45 @@ describe('classifyQuestion', () => {
         targetScenarioId: null,
         targetScenarioProbability: 0,
       },
+    });
+  });
+
+  describe('with a gateway key the visitor supplied', () => {
+    const ON_TOPIC_ANSWERS = {
+      answers: {
+        onTopic: { type: 'boolean', probability: 0.9 },
+        intent: { type: 'choice', choice: 'explainFlow' },
+        targetScenario: { type: 'choice', choice: 'none' },
+      },
+    };
+
+    it("bills the visitor's key instead of the site's", async () => {
+      evaluateStub.mockResolvedValue(ON_TOPIC_ANSWERS);
+
+      await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'visitor-gateway-key');
+
+      expect(evaluateStub.mock.calls[0][0].model).toEqual({ modelId: 'typesafe-ai/jev', apiKey: 'visitor-gateway-key' });
+    });
+
+    it('still runs JEV when the site has no gateway key of its own', async () => {
+      vi.stubEnv('AI_GATEWAY_API_KEY', undefined);
+      evaluateStub.mockResolvedValue(ON_TOPIC_ANSWERS);
+
+      const routeInput = await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'visitor-gateway-key');
+
+      expect(routeInput.source).toBe('classifier');
+      expect(jevWarnings()).toHaveLength(0);
+    });
+
+    it('falls back to localRelevance and names the visitor key when it is rejected', async () => {
+      evaluateStub.mockRejectedValue(new Error('gateway 401'));
+
+      const routeInput = await classifyModule.classifyQuestion(OFF_TOPIC_QUESTION, cosmosMap, 'bad-visitor-key');
+
+      expect(routeInput).toEqual({ source: 'localRelevance', onTopic: false });
+      const [warning] = jevWarnings() as { message: string }[];
+      expect(warning.message).toContain('visitor gateway key');
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('bad-visitor-key');
     });
   });
 });

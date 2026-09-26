@@ -60,6 +60,35 @@ describe('POST /api/ai/connect', () => {
     expect(decryptCookiePayload(cookieValue, secret)).toEqual({ provider: 'anthropic', apiKey: API_KEY });
   });
 
+  it('seals an optional gateway key into the same cookie, never echoing it', async () => {
+    const response = await postConnect({ provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: '  vck_gateway_key  ' });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ connected: true, provider: 'anthropic' });
+    const setCookieHeader = response.headers.get('set-cookie') ?? '';
+    expect(setCookieHeader).not.toContain('vck_gateway_key');
+    const cookieValue = setCookieHeader.split(';')[0].slice('cosmos_ai='.length);
+    expect(decryptCookiePayload(cookieValue, secret)).toEqual({
+      provider: 'anthropic',
+      apiKey: API_KEY,
+      gatewayApiKey: 'vck_gateway_key',
+    });
+  });
+
+  it('treats a blank gateway key as not given', async () => {
+    const response = await postConnect({ provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: '   ' });
+
+    const cookieValue = (response.headers.get('set-cookie') ?? '').split(';')[0].slice('cosmos_ai='.length);
+    expect(decryptCookiePayload(cookieValue, secret)).toEqual({ provider: 'anthropic', apiKey: API_KEY });
+  });
+
+  it('rejects a gateway key that is not a string', async () => {
+    const response = await postConnect({ provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: 42 });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ errorCode: 'INVALID_REQUEST', field: 'gatewayApiKey' });
+  });
+
   it('checks OpenAI keys with a bearer token', async () => {
     const response = await postConnect({ provider: 'openai', apiKey: 'sk-openai-test' });
 

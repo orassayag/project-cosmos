@@ -51,6 +51,28 @@ describe('useAiConnection', () => {
     expect((await settledStatus()).status).toBe('disconnected');
   });
 
+  it('posts the optional gateway key only when one is given', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url === '/api/ai/connect'
+        ? Response.json({ connected: true, provider: 'anthropic' })
+        : Response.json({ connected: false }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useAiConnection());
+    await waitFor(() => expect(result.current.status).toBe('disconnected'));
+
+    await result.current.connect('anthropic', 'sk-ant-key', 'vck-gateway-key');
+    await result.current.connect('anthropic', 'sk-ant-key');
+
+    const connectBodies = fetchMock.mock.calls
+      .filter(([url]) => url === '/api/ai/connect')
+      .map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
+    expect(connectBodies).toEqual([
+      { provider: 'anthropic', apiKey: 'sk-ant-key', gatewayApiKey: 'vck-gateway-key' },
+      { provider: 'anthropic', apiKey: 'sk-ant-key' },
+    ]);
+  });
+
   describe('when disabled', () => {
     it('never calls fetch and reports disconnected', async () => {
       const fetchMock = vi.fn(async () => Response.json({ connected: true, provider: 'openai' }));

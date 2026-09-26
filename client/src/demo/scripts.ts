@@ -69,7 +69,7 @@ function connectAndAskSteps(): DemoStep[] {
     { kind: 'click', target: 'connect-open', durationMs: 1100 },
     { kind: 'click', target: 'connect-provider-anthropic', durationMs: 800 },
     { kind: 'paste', target: 'connect-provider-key', text: DEMO_CLAUDE_KEY, durationMs: 1100, caption: 'Pasting a Claude key' },
-    { kind: 'paste', target: 'connect-jev-key', text: DEMO_JEV_KEY, durationMs: 1100, caption: "Adding the JEV key (the site's question classifier)" },
+    { kind: 'paste', target: 'connect-jev-key', text: DEMO_JEV_KEY, durationMs: 1100, caption: 'Adding an optional Vercel AI Gateway key for the question classifier' },
     { kind: 'click', target: 'connect-submit', durationMs: 2800, caption: 'Connecting…' },
     { kind: 'click', target: 'ask-input', durationMs: 900, caption: 'Asking the map a question' },
     { kind: 'type', target: 'ask-input', text: DEMO_QUESTION, durationMs: POINTER_MOVE_MS + typingDurationMs(DEMO_QUESTION) + 300 },

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APP_VERSION } from 'virtual:app-version';
 
 import { ProjectCosmosMap } from './map/Map';
 import { DomainBar } from './components/DomainBar';
@@ -394,7 +395,6 @@ export function App() {
         onAsk={handleAsk}
         onAnswerStart={handleAnswerStart}
         onAskAction={handleAskAction}
-        showDemoJevField={isDemoActive}
       />
       {demoOverlays}
     </OverlayProvider>
@@ -440,7 +440,6 @@ interface ProjectCosmosShellProps {
   onAsk: (question: string) => void;
   onAnswerStart: () => void;
   onAskAction: (action: AskAction) => void;
-  showDemoJevField: boolean;
 }
 
 function ProjectCosmosShell(p: ProjectCosmosShellProps) {
@@ -460,7 +459,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     driftDate, onSelectDrift,
     activeIncident,
     aiConnection, askQuestion, askNonce, askFocusIds, askScriptedAnswer,
-    onAsk, onAnswerStart, onAskAction, showDemoJevField,
+    onAsk, onAnswerStart, onAskAction,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
@@ -569,17 +568,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
               title="Reset the galaxy — clear the current scenario, filters and URL"
             >
               Project Cosmos
-              <span
-                style={{
-                  marginLeft: 10,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.62em',
-                  letterSpacing: '0.18em',
-                  opacity: 0.55,
-                }}
-              >
-                v{__APP_VERSION__}
-              </span>
+              <span className="lc-topbar-version">v{APP_VERSION}</span>
             </button>
             {(projectCosmosState || driftDate) && (
               <span
@@ -828,7 +817,6 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
       <ConnectAgentModal
         currentProvider={aiConnection.provider}
         onConnect={aiConnection.connect}
-        showJevField={showDemoJevField}
       />
 
       <ChangelogPanel

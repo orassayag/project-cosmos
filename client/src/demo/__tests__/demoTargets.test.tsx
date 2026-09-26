@@ -43,7 +43,7 @@ function DemoSurfaces() {
         onConnectRequest={vi.fn()}
         onDisconnect={vi.fn()}
       />
-      <ConnectAgentModal currentProvider={null} onConnect={vi.fn()} showJevField />
+      <ConnectAgentModal currentProvider={null} onConnect={vi.fn()} />
       <PlaybackControls
         runner={STUB_RUNNER}
         steps={STUB_STEPS}

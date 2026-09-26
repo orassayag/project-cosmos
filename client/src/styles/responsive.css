@@ -205,12 +205,100 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
 }
 .lc-panel-x:active { color: var(--text-1); background: var(--bg-surface-2); }
 
+/* Topbar labels are single-line pills; a wrapped "Drift / Sync" or "Project / Cosmos" breaks the bar. */
+.lc-topbar-brand,
+.lc-domain-tab,
+.lc-incident-trigger,
+.lc-drift-footer,
+.lc-present-btn { white-space: nowrap; flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════════
+   COMPACT DESKTOP — below ~1660px the centred three-column bar needs
+   more room than it has (each side is ~675px + the status pill), so the
+   status pill slid under the incidents picker. Flatten the two sides
+   into one wrapping flex row and split it into two deliberate rows:
+     row 1: brand · domains · incidents ········ Explore
+     row 2: scenario status ···· Drift Sync · Changelog · Present · ?
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 1659px) and (min-width: 769px) and (min-height: 481px) {
+  .lc-topbar:not(.lc-topbar--mobile) .lc-topbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 8px;
+    padding: 10px 16px;
+  }
+  .lc-topbar:not(.lc-topbar--mobile) :is(.lc-topbar-side, .lc-topbar-center) { display: contents; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-topbar-row::after {
+    content: '';
+    order: 5;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-topbar-brand { order: 1; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-cosmos-state { order: 1; margin-left: 0; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-domain-bar { order: 2; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-incident-bar { order: 3; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-ask { order: 4; margin-left: auto; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-scenario-status {
+    order: 6;
+    /* Zero basis so the pill never pushes row 2 onto a third line; it grows back to its content when there is room. */
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: max-content;
+    padding: 5px 14px 5px 12px;
+  }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-scenario-status-label { font-size: 14px; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-drift-footer { order: 7; margin-left: auto; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-present-btn,
+  .lc-topbar:not(.lc-topbar--mobile) .lc-help-btn { order: 8; }
+}
+/* Desktop: the step panel (right column, 360px + 14px inset) used to cover the map steppers. */
+@media (min-width: 769px) and (min-height: 481px) {
+  .lc-stage:has(.lc-step-panel) .lc-map-stepper--zoom { right: 388px; }
+  .lc-stage:has(.lc-step-panel) .lc-map-stepper--traffic { right: 430px; }
+}
+/* Compact desktop while a scenario is loaded: the centred 640px transport no longer
+   fits between the left column (activity log, view chips) and the step panel, so
+   everything else docks above its band (22px inset + 100px tall + 12px gap). */
+@media (max-width: 1659px) and (min-width: 769px) and (min-height: 481px) {
+  .lc-stage:has(.lc-controls) {
+    --lc-transport-clearance: 134px;
+  }
+  .lc-stage:has(.lc-controls) .lc-step-panel { bottom: var(--lc-transport-clearance); }
+  .lc-stage:has(.lc-controls) .lc-layout-controls { bottom: var(--lc-transport-clearance); }
+  .lc-stage:has(.lc-controls) .lc-activity {
+    bottom: calc(var(--lc-transport-clearance) + 40px);
+    max-height: 160px;
+  }
+  .lc-stage:has(.lc-controls) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { bottom: var(--lc-transport-clearance); }
+}
+/* No room for the steppers beside the view chips while playing; wheel and pinch still zoom. */
+@media (max-width: 1100px) and (min-width: 769px) and (min-height: 481px) {
+  .lc-stage:has(.lc-controls):has(.lc-step-panel) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
+  .lc-stage:has(.lc-step-panel) .lc-layout-controls {
+    flex-wrap: wrap;
+    max-width: calc(100% - min(320px, 42vw) - 42px);
+  }
+}
+/* Below ~885px those chips wrap to a second row, so the activity log climbs one more row. */
+@media (max-width: 884px) and (min-width: 769px) and (min-height: 481px) {
+  .lc-stage:has(.lc-controls):has(.lc-step-panel) .lc-activity { bottom: calc(var(--lc-transport-clearance) + 76px); }
+}
+/* Too narrow for Explore beside the domains: it joins row 2 and the status pill ellipsizes. */
+@media (max-width: 900px) and (min-width: 769px) and (min-height: 481px) {
+  .lc-topbar:not(.lc-topbar--mobile) .lc-ask { order: 6; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-drift-footer { margin-left: 0; }
+}
+
 /* ════════════════════════════════════════════════════════════
    TABLET — ≤1024px: keep the desktop shape, just stop it clipping.
    ════════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
   .lc-topbar-row { gap: 8px; padding: 10px 14px; }
   .lc-topbar-side { gap: 8px; }
+  .lc-topbar:not(.lc-topbar--mobile) .lc-domain-tab { padding: 7px 10px; letter-spacing: 0.12em; }
   .lc-scenario-status-label { max-width: 22ch; }
   .lc-step-panel { width: min(320px, 42vw); }
   .lc-map-panel, .lc-ask-panel { width: min(320px, 62vw); }
@@ -241,6 +329,13 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   }
   .lc-topbar--mobile .lc-topbar-side { flex: 0 0 auto; gap: 8px; }
   .lc-topbar-brand { font-size: 15px; }
+  .lc-topbar--mobile .lc-topbar-brand {
+    display: inline-flex;
+    align-items: baseline;
+    white-space: nowrap;
+    line-height: 1.15;
+  }
+  .lc-topbar--mobile .lc-topbar-version { margin-left: 6px; font-size: 9px; letter-spacing: 0.1em; }
   .lc-topbar--mobile .lc-topbar-side--left { flex: 0 1 auto; min-width: 0; }
   .lc-topbar--mobile .lc-topbar-side--right { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
   .lc-topbar--mobile .lc-scenario-status {

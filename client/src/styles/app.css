@@ -9,6 +9,8 @@
   inset: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  /* minmax(0, …) so an unshrinkable topbar can never widen the whole shell past the viewport. */
+  grid-template-columns: minmax(0, 1fr);
   background: #04060A;
   overflow: hidden;
 }
@@ -132,6 +134,13 @@
   font-weight: 600;
   letter-spacing: -0.012em;
   color: var(--text-1);
+}
+.lc-topbar-version {
+  margin-left: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  letter-spacing: 0.18em;
+  opacity: 0.55;
 }
 .lc-topbar-eyebrow {
   font-family: var(--font-mono);
@@ -826,7 +835,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
 /* ── Ask the agent field (topbar-right) ────────────────────── */
 .lc-ask {
   position: relative;
-  width: 200px;
+  width: 224px;
   height: 30px;
   flex: none;
 }
@@ -837,7 +846,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   top: 0;
   right: 0;
   z-index: 40;
-  width: 200px;
+  width: 224px;
   height: 30px;
   display: flex;
   flex-direction: column;
@@ -884,6 +893,9 @@ body:has(.lc-map-stage[data-panning='true']) * {
   overflow: hidden;
 }
 .lc-ask--expanded .lc-ask-field { overflow-y: auto; padding-left: 12px; }
+/* Collapsed it is a one-line pill: never wrap the placeholder or a kept question onto a hidden second line. */
+.lc-ask:not(.lc-ask--expanded) .lc-ask-field { white-space: nowrap; text-overflow: ellipsis; }
+.lc-ask:not(.lc-ask--expanded) .lc-ask-field::placeholder { text-overflow: ellipsis; }
 .lc-ask-bot {
   position: absolute;
   top: 7px;
@@ -3279,6 +3291,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   gap: 14px;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 /* Topbar eyebrow color punch. */
@@ -3650,6 +3663,12 @@ body:has(.lc-map-stage[data-panning='true']) * {
   text-transform: uppercase;
   color: var(--text-3);
 }
+.lc-connect-optional {
+  margin-left: 6px;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  opacity: 0.75;
+}
 .lc-connect-input {
   min-height: 42px;
   padding: 0 12px;
@@ -3749,8 +3768,8 @@ body:has(.lc-map-stage[data-panning='true']) * {
 }
 .lc-demo-pointer-arrow {
   display: block;
-  transform-origin: 2px 2px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  transform-origin: 1px 1px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
   animation-name: lc-demo-press;
   animation-timing-function: ease-out;
 }
@@ -3760,10 +3779,10 @@ body:has(.lc-map-stage[data-panning='true']) * {
 }
 .lc-demo-pointer-ripple {
   position: absolute;
-  top: -9px;
-  left: -9px;
-  width: 18px;
-  height: 18px;
+  top: -6px;
+  left: -6px;
+  width: 12px;
+  height: 12px;
   border: 1.5px solid color-mix(in srgb, var(--text-1) 70%, transparent);
   border-radius: 50%;
   opacity: 0;

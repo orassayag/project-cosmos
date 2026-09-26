@@ -86,17 +86,18 @@ describe('AskAgent', () => {
     fireEvent.mouseDown(screen.getByRole('button', { name: 'Which team owns checkout?' }));
 
     expect(onAsk).toHaveBeenCalledWith('Which team owns checkout?');
-    expect(screen.getByPlaceholderText('Explore Project Cosmos')).toHaveProperty('value', 'Which team owns checkout?');
   });
 
-  it('clears the previous question when the field is focused again', () => {
+  it('shows the placeholder while collapsed and restores the question on refocus', () => {
     renderAskAgent('connected', 'anthropic');
     const field = screen.getByPlaceholderText('Explore Project Cosmos');
     fireEvent.change(field, { target: { value: 'Who owns' } });
     fireEvent.blur(field);
 
+    expect(field).toHaveProperty('value', '');
+
     fireEvent.focus(field);
 
-    expect(field).toHaveProperty('value', '');
+    expect(field).toHaveProperty('value', 'Who owns');
   });
 });

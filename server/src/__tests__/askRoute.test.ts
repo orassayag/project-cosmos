@@ -158,6 +158,20 @@ describe('POST /api/ai/ask', () => {
     );
   });
 
+  it("classifies with the visitor's gateway key when the cookie holds one", async () => {
+    const secret = randomBytes(32);
+    vi.stubEnv('AI_COOKIE_SECRET', secret.toString('base64'));
+    const cookieWithGatewayKey = encryptCookiePayload(
+      { provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: 'visitor-gateway-key' },
+      secret,
+    );
+    streamAgentAnswerMock.mockImplementation(agentEvents([]));
+
+    await readEvents(await ask({ question: 'How does checkout work?' }, cookieWithGatewayKey));
+
+    expect(classifyQuestionMock).toHaveBeenCalledWith('How does checkout work?', cosmosMap, 'visitor-gateway-key');
+  });
+
   it('turns a ProviderError into an error line, then done, and logs only safe fields', async () => {
     streamAgentAnswerMock.mockImplementation(
       agentEvents(

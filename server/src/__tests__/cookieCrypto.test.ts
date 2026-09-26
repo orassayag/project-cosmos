@@ -32,6 +32,13 @@ describe('cookieCrypto', () => {
     expect(decryptCookiePayload(cookieValue, secret)).toEqual(payload);
   });
 
+  it('round-trips an optional gateway key without exposing it', () => {
+    const withGatewayKey = { ...payload, gatewayApiKey: 'vck_gateway_key' };
+    const cookieValue = encryptCookiePayload(withGatewayKey, secret);
+    expect(cookieValue).not.toContain('vck_gateway_key');
+    expect(decryptCookiePayload(cookieValue, secret)).toEqual(withGatewayKey);
+  });
+
   it('rejects a flipped byte in the ciphertext', () => {
     const cookieValue = encryptCookiePayload(payload, secret);
     expect(decryptCookiePayload(flipByteAt(cookieValue, IV_BYTE_LENGTH), secret)).toBeNull();

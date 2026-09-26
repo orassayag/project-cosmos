@@ -1,7 +1,8 @@
 /**
- * Makes the demo's pointer and typing read as a person's: curved, unevenly paced moves that land
- * off-centre and sometimes overshoot, and a typing rhythm that stumbles. Every "random" choice is
- * seeded, so a given move or phrase always plays the same way (recordings and tests stay stable).
+ * Makes the demo's pointer and typing read as a person's: curved, shaky, unevenly paced moves that
+ * sometimes wander off first, land off-centre and sometimes overshoot, and a typing rhythm that
+ * stumbles. Every "random" choice is seeded, so a given move or phrase always plays the same way
+ * (recordings and tests stay stable).
  */
 
 export interface Point {
@@ -72,40 +73,118 @@ export interface PointerPath {
 /** Share of the move spent on the final correction after an overshoot. */
 const CORRECTION_SHARE = 0.18;
 
+interface PathLeg {
+  from: Point;
+  to: Point;
+  control1: Point;
+  control2: Point;
+  share: number;
+}
+
+function bowedLeg(from: Point, to: Point, random: () => number): Omit<PathLeg, 'share'> {
+  const deltaX = to.x - from.x;
+  const deltaY = to.y - from.y;
+  const length = Math.hypot(deltaX, deltaY) || 1;
+  const normalX = -deltaY / length;
+  const normalY = deltaX / length;
+  const bow = length * between(random, 0.06, 0.2) * (random() < 0.5 ? -1 : 1);
+  return {
+    from,
+    to,
+    control1: { x: from.x + deltaX * 0.3 + normalX * bow, y: from.y + deltaY * 0.3 + normalY * bow },
+    control2: { x: from.x + deltaX * 0.75 + normalX * bow * 0.45, y: from.y + deltaY * 0.75 + normalY * bow * 0.45 },
+  };
+}
+
+/** A point off the straight line in a random direction: the hand drifts toward the wrong spot first. */
+function detourPoint(from: Point, to: Point, distance: number, random: () => number): Point {
+  const along = between(random, 0.25, 0.6);
+  const angle = random() * Math.PI * 2;
+  const reach = distance * between(random, 0.12, 0.3);
+  return {
+    x: from.x + (to.x - from.x) * along + Math.cos(angle) * reach,
+    y: from.y + (to.y - from.y) * along + Math.sin(angle) * reach,
+  };
+}
+
+/** Hand shake: a slow drift plus a few sharp jitter bursts, fading to nothing at both ends. */
+function planShake(random: () => number): (progress: number) => Point {
+  const waves = Array.from({ length: 3 }, () => ({
+    frequency: between(random, 9, 31),
+    phaseX: random() * Math.PI * 2,
+    phaseY: random() * Math.PI * 2,
+    amplitude: between(random, 0.5, 1.6),
+  }));
+  const bursts = Array.from({ length: random() < 0.7 ? 1 + Math.floor(random() * 2) : 0 }, () => ({
+    center: between(random, 0.15, 0.8),
+    width: between(random, 0.05, 0.12),
+    amplitude: between(random, 1.5, 3.5),
+    phase: random() * Math.PI * 2,
+  }));
+  return (progress) => {
+    const envelope = Math.sin(progress * Math.PI);
+    let x = 0;
+    let y = 0;
+    for (const wave of waves) {
+      x += wave.amplitude * Math.sin(progress * wave.frequency + wave.phaseX);
+      y += wave.amplitude * Math.sin(progress * wave.frequency * 1.3 + wave.phaseY);
+    }
+    for (const burst of bursts) {
+      const strength = Math.max(0, 1 - Math.abs(progress - burst.center) / burst.width);
+      x += burst.amplitude * strength * Math.sin(progress * 180 + burst.phase);
+      y += burst.amplitude * strength * Math.cos(progress * 150 + burst.phase);
+    }
+    return { x: x * envelope, y: y * envelope };
+  };
+}
+
 /**
  * A human-looking move from `from` to `to` that fits within `maxDurationMs` at speed 1. Longer
- * moves take longer (Fitts's law), the path bows to one side, and it may overshoot then settle.
+ * moves take longer (Fitts's law), each leg bows to one side, the hand sometimes wanders off in a
+ * random direction before heading for the target, shakes on the way, and may overshoot then settle.
  */
 export function planPointerPath(from: Point, to: Point, random: () => number, maxDurationMs: number): PointerPath {
   const deltaX = to.x - from.x;
   const deltaY = to.y - from.y;
   const distance = Math.hypot(deltaX, deltaY);
-  const durationMs = Math.min(maxDurationMs, 170 + 95 * Math.log2(1 + distance / 18) + between(random, -30, 40));
-  if (distance < 2) return { durationMs: Math.max(0, durationMs), at: () => to };
+  if (distance < 2) return { durationMs: Math.max(0, Math.min(maxDurationMs, 170 + between(random, -30, 40))), at: () => to };
 
   const unitX = deltaX / distance;
   const unitY = deltaY / distance;
-  const side = random() < 0.5 ? -1 : 1;
-  const bow = distance * between(random, 0.06, 0.2) * side;
   const overshoot = distance > 80 && random() < 0.6 ? Math.min(14, distance * between(random, 0.02, 0.05)) : 0;
   const end = { x: to.x + unitX * overshoot, y: to.y + unitY * overshoot };
-  const control1 = { x: from.x + deltaX * 0.3 - unitY * bow, y: from.y + deltaY * 0.3 + unitX * bow };
-  const control2 = { x: from.x + deltaX * 0.75 - unitY * bow * 0.45, y: from.y + deltaY * 0.75 + unitX * bow * 0.45 };
-  const tremorPhase = random() * Math.PI * 2;
+  const waypoints = distance > 60 && random() < 0.5 ? [from, detourPoint(from, to, distance, random), end] : [from, end];
+
+  const legShapes = waypoints.slice(1).map((waypoint, index) => bowedLeg(waypoints[index], waypoint, random));
+  const legLengths = legShapes.map((leg) => Math.hypot(leg.to.x - leg.from.x, leg.to.y - leg.from.y));
+  const pathLength = legLengths.reduce((total, length) => total + length, 0);
+  const legs: PathLeg[] = legShapes.map((leg, index) => ({ ...leg, share: legLengths[index] / pathLength }));
+  const durationMs = Math.min(maxDurationMs, 170 + 95 * Math.log2(1 + pathLength / 18) + between(random, -30, 40));
+  const shake = planShake(random);
   const mainShare = overshoot > 0 ? 1 - CORRECTION_SHARE : 1;
+
+  const onLegs = (along: number): Point => {
+    let legStart = 0;
+    for (const leg of legs) {
+      if (along <= legStart + leg.share || leg === legs[legs.length - 1]) {
+        const legProgress = Math.min(1, (along - legStart) / leg.share);
+        return cubicBezier(leg.from, leg.control1, leg.control2, leg.to, minimumJerk(legProgress));
+      }
+      legStart += leg.share;
+    }
+    return end;
+  };
 
   const at = (progress: number): Point => {
     const clamped = Math.min(1, Math.max(0, progress));
     if (clamped >= 1) return to;
+    const jitter = shake(clamped);
     if (clamped > mainShare) {
       const settle = minimumJerk((clamped - mainShare) / CORRECTION_SHARE);
-      return { x: end.x + (to.x - end.x) * settle, y: end.y + (to.y - end.y) * settle };
+      return { x: end.x + (to.x - end.x) * settle + jitter.x, y: end.y + (to.y - end.y) * settle + jitter.y };
     }
-    const along = clamped / mainShare;
-    const point = cubicBezier(from, control1, control2, end, minimumJerk(along));
-    // A hand never moves perfectly smoothly: a faint wobble, fading out at both ends.
-    const tremor = Math.sin(along * Math.PI) * 0.9 * Math.sin(along * 23 + tremorPhase);
-    return { x: point.x - unitY * tremor, y: point.y + unitX * tremor };
+    const point = onLegs(clamped / mainShare);
+    return { x: point.x + jitter.x, y: point.y + jitter.y };
   };
   return { durationMs, at };
 }

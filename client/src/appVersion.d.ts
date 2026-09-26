@@ -1,1 +1,3 @@
-declare const __APP_VERSION__: string;
+declare module 'virtual:app-version' {
+  export const APP_VERSION: string;
+}

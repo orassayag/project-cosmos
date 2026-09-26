@@ -101,7 +101,7 @@ app.post('/ai/connect', async (context) => {
   if (!validated.success) {
     return validated.response;
   }
-  const { provider, apiKey } = validated.data;
+  const { provider, apiKey, gatewayApiKey } = validated.data;
   const keyCheck = await checkProviderKey(provider, apiKey);
   if (keyCheck === 'invalid') {
     logger.warn('Provider rejected the submitted key', { errorCode: 'INVALID_KEY', provider });
@@ -110,7 +110,8 @@ app.post('/ai/connect', async (context) => {
   if (keyCheck === 'unavailable') {
     return context.json({ errorCode: 'PROVIDER_UNAVAILABLE' }, 502);
   }
-  setCookie(context, AI_COOKIE_NAME, encryptCookiePayload({ provider, apiKey }, secret), AI_COOKIE_OPTIONS);
+  const cookiePayload: AiCookiePayload = gatewayApiKey ? { provider, apiKey, gatewayApiKey } : { provider, apiKey };
+  setCookie(context, AI_COOKIE_NAME, encryptCookiePayload(cookiePayload, secret), AI_COOKIE_OPTIONS);
   return context.json({ connected: true, provider });
 });
 
