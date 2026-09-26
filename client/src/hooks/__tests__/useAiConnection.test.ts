@@ -50,4 +50,35 @@ describe('useAiConnection', () => {
     stubStatus(() => Promise.reject(new TypeError('offline')));
     expect((await settledStatus()).status).toBe('disconnected');
   });
+
+  describe('when disabled', () => {
+    it('never calls fetch and reports disconnected', async () => {
+      const fetchMock = vi.fn(async () => Response.json({ connected: true, provider: 'openai' }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { result } = renderHook(() => useAiConnection({ enabled: false }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('disconnected');
+      expect(result.current.provider).toBeNull();
+    });
+
+    it('re-checks the status once enabled again', async () => {
+      const fetchMock = vi.fn(async () => Response.json({ connected: true, provider: 'anthropic' }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { result, rerender } = renderHook(({ enabled }) => useAiConnection({ enabled }), {
+        initialProps: { enabled: false },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      rerender({ enabled: true });
+
+      await waitFor(() => expect(result.current.status).toBe('connected'));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith('/api/ai/status', expect.anything());
+      expect(result.current.provider).toBe('anthropic');
+    });
+  });
 });

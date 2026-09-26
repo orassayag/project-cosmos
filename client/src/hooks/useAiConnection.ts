@@ -16,6 +16,11 @@ export interface AiConnection {
   disconnect: () => Promise<boolean>;
 }
 
+export interface UseAiConnectionOptions {
+  /** When false (the scripted demo is running) the server is never asked and the status reads `disconnected`. */
+  enabled?: boolean;
+}
+
 export const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Claude',
   openai: 'OpenAI',
@@ -50,11 +55,12 @@ function toConnectErrorCode(errorCode: string | undefined): ConnectErrorCode {
  * all (`notConfigured`, no connect affordances); any other failed or non-OK
  * check (routes absent, offline) resolves to `disconnected` rather than throwing.
  */
-export function useAiConnection(): AiConnection {
+export function useAiConnection({ enabled = true }: UseAiConnectionOptions = {}): AiConnection {
   const [status, setStatus] = useState<AiConnectionStatus>('unknown');
   const [provider, setProvider] = useState<AiProvider | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     fetch('/api/ai/status', { credentials: 'same-origin', signal: controller.signal })
       .then(async (response) => {
@@ -74,7 +80,7 @@ export function useAiConnection(): AiConnection {
         setProvider(null);
       });
     return () => controller.abort();
-  }, []);
+  }, [enabled]);
 
   const connect = useCallback(async (nextProvider: AiProvider, apiKey: string): Promise<ConnectResult> => {
     let response: Response;
@@ -109,5 +115,6 @@ export function useAiConnection(): AiConnection {
     return true;
   }, []);
 
+  if (!enabled) return { status: 'disconnected', provider: null, connect, disconnect };
   return { status, provider, connect, disconnect };
 }
