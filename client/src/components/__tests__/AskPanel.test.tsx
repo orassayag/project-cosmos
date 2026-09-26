@@ -210,3 +210,81 @@ describe('AskPanel (connected)', () => {
     expect(screen.queryByText(/Connect an AI agent/)).toBeNull();
   });
 });
+
+describe('AskPanel (scripted answer)', () => {
+  const highlight: AskAction = { type: 'action', kind: 'highlight', serviceIds: ['checkout', 'payments-gateway'] };
+  const scriptedAnswer = {
+    text: 'Checkout calls the *Payments Gateway* first.',
+    thinkingMs: 1500,
+    wordMs: 90,
+    actions: [highlight],
+  };
+  const wordTotal = scriptedAnswer.text.split(' ').length;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  function advance(ms: number) {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  }
+
+  it('plays the exact text on a fixed pace, fires the highlight as it starts, and never fetches', () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const onAction = vi.fn();
+    const onAnswerStart = vi.fn();
+    render(
+      <AskPanel
+        question="What happens when a payment fails?"
+        onClose={() => undefined}
+        isAiConnected
+        showConnectPrompt
+        onConnectRequest={() => undefined}
+        onAction={onAction}
+        onAnswerStart={onAnswerStart}
+        scriptedAnswer={scriptedAnswer}
+      />,
+    );
+
+    advance(scriptedAnswer.thinkingMs - 1);
+    expect(screen.getByLabelText('Thinking')).toBeTruthy();
+    expect(onAction).not.toHaveBeenCalled();
+
+    advance(1);
+    expect(onAnswerStart).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledWith(highlight);
+
+    advance(wordTotal * scriptedAnswer.wordMs - 1);
+    expect(document.querySelector('.lc-ask-caret')).not.toBeNull();
+
+    advance(1);
+    const answer = document.querySelector('.lc-ask-answer');
+    expect(answer?.textContent).toBe('Checkout calls the Payments Gateway first.');
+    expect(answer?.querySelector('em')?.textContent).toBe('Payments Gateway');
+    expect(document.querySelector('.lc-ask-caret')).toBeNull();
+    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('stops the scripted answer when unmounted mid-answer', () => {
+    const onAction = vi.fn();
+    const { unmount } = render(
+      <AskPanel question="Q" onClose={() => undefined} onAction={onAction} scriptedAnswer={scriptedAnswer} />,
+    );
+    advance(scriptedAnswer.thinkingMs / 2);
+    unmount();
+    advance(scriptedAnswer.thinkingMs + wordTotal * scriptedAnswer.wordMs);
+    expect(onAction).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});

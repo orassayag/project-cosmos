@@ -30,3 +30,9 @@ Plan: docs/plans/demo-plan.md
 **What was built:** `AskAgent` takes optional `demoQuestion`, `demoExpanded`, `demoSearchPressed`. With `demoQuestion` set the input is read-only, shows that text, focus expands but doesn't clear it, Enter/Escape inert, starter questions hidden. `demoExpanded` overrides expanded state. `demoSearchPressed` adds `lc-ask-go--pressed` (new rule in `app.css`, inset shadow, all viewports). No demo props → unchanged.
 **Key decisions:** Same pattern as stage 4 — internal state `isExpandedInternal`/`typedQuestion`, rendered `demoX ?? internal`. Demo mode = `demoQuestion !== undefined` — **stage 8 must pass `''` (not `undefined`) at the start of a `type` step.** Pressed style uses box-shadow, not `transform` (entrance animation holds `transform` with `forwards`). Search button renders only while expanded — **stage 8 must keep `demoExpanded: true` through the `ask` step.**
 **User overrides during review:** none.
+
+## Stage 6 — AskPanel scripted answer (committed 2026-09-26T10:18:58Z)
+**Files:** client/src/components/AskPanel.tsx, client/src/components/__tests__/AskPanel.test.tsx
+**What was built:** `AskPanel` takes optional `scriptedAnswer` (`DemoScriptedAnswer` from `demo/types.ts`). When set: thinking dots for `thinkingMs`, then words revealed one per `wordMs`; `onAnswerStart` + every action fire once together at `thinkingMs`; no fetch (even with `isAiConnected`), no joke, no Connect prompt. All timers scheduled up front and cleared on unmount / prop change. No prop → unchanged.
+**Key decisions:** Scripted mode = `scriptedAnswer !== undefined`, overrides the live path (`isLive` false). Reused `DemoScriptedAnswer.actions?: AskAction[]` unchanged. **Stage 8: effect is keyed on `scriptedAnswer` object identity — keep it referentially stable (state, not an inline literal) or each re-render restarts the answer.**
+**User overrides during review:** none.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AskStreamEvent } from './askStream';
+import type { DemoScriptedAnswer } from '../demo/types';
 import { DISCONNECTING_ERROR_CODES, formatUsage, splitEmphasis, streamAskAnswer, toAskErrorMessage } from './askStream';
 
 interface AskPanelProps {
@@ -18,6 +19,8 @@ interface AskPanelProps {
   onAction?: (action: AskAction) => void;
   /** The server rejected the stored key mid-answer; the caller clears it so the light turns red. */
   onKeyRejected?: () => void;
+  /** Demo mode: plays this fixed answer instead of streaming or the joke; `actions` fire as it starts. */
+  scriptedAnswer?: DemoScriptedAnswer;
 }
 
 export type AskAction =
@@ -71,9 +74,13 @@ export function AskPanel({
   isAiConnected = false,
   onAction,
   onKeyRejected,
+  scriptedAnswer,
 }: AskPanelProps) {
-  const [isLive] = useState(isAiConnected);
-  const answer = useMemo(() => DEMO_ANSWERS[Math.floor(Math.random() * DEMO_ANSWERS.length)], []);
+  const isScripted = scriptedAnswer !== undefined;
+  const [isAiConnectedAtMount] = useState(isAiConnected);
+  const isLive = isAiConnectedAtMount && !isScripted;
+  const jokeAnswer = useMemo(() => DEMO_ANSWERS[Math.floor(Math.random() * DEMO_ANSWERS.length)], []);
+  const answer = scriptedAnswer?.text ?? jokeAnswer;
   const words = useMemo(() => answer.split(' '), [answer]);
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -121,7 +128,27 @@ export function AskPanel({
   }, [isLive, question]);
 
   useEffect(() => {
-    if (isLive) return;
+    if (!scriptedAnswer) return;
+    const { thinkingMs, wordMs, actions = [] } = scriptedAnswer;
+    const wordTotal = scriptedAnswer.text.split(' ').length;
+    setPhase('loading');
+    setWordCount(0);
+    const timeoutIds = [
+      window.setTimeout(() => {
+        setPhase('typing');
+        callbacksRef.current.onAnswerStart?.();
+        actions.forEach((action) => callbacksRef.current.onAction?.(action));
+      }, thinkingMs),
+    ];
+    for (let wordIndex = 1; wordIndex <= wordTotal; wordIndex += 1) {
+      timeoutIds.push(window.setTimeout(() => setWordCount(wordIndex), thinkingMs + wordIndex * wordMs));
+    }
+    timeoutIds.push(window.setTimeout(() => setPhase('done'), thinkingMs + wordTotal * wordMs));
+    return () => timeoutIds.forEach((id) => window.clearTimeout(id));
+  }, [scriptedAnswer]);
+
+  useEffect(() => {
+    if (isLive || isScripted) return;
     const thinkMs = 3000 + Math.random() * 1000;
     const startTyping = window.setTimeout(() => {
       setPhase('typing');
@@ -132,10 +159,10 @@ export function AskPanel({
       timers.current.forEach((id) => window.clearTimeout(id));
       timers.current = [];
     };
-  }, [isLive]);
+  }, [isLive, isScripted]);
 
   useEffect(() => {
-    if (isLive || phase !== 'typing') return;
+    if (isLive || isScripted || phase !== 'typing') return;
     if (wordCount >= words.length) {
       setPhase('done');
       return;
@@ -143,7 +170,7 @@ export function AskPanel({
     const id = window.setTimeout(() => setWordCount((c) => c + 1), 55 + Math.random() * 70);
     timers.current.push(id);
     return () => window.clearTimeout(id);
-  }, [isLive, phase, wordCount, words.length]);
+  }, [isLive, isScripted, phase, wordCount, words.length]);
 
   const revealed = isLive ? liveAnswer : words.slice(0, wordCount).join(' ');
 
@@ -183,7 +210,7 @@ export function AskPanel({
         {phase === 'done' && usage !== null && errorMessage === null && (
           <p className="lc-ask-usage">{formatUsage(usage.inputTokens, usage.outputTokens)}</p>
         )}
-        {phase === 'done' && showConnectPrompt && onConnectRequest && (
+        {phase === 'done' && showConnectPrompt && !isScripted && onConnectRequest && (
           <button type="button" className="lc-ask-connect" onClick={onConnectRequest}>
             Connect an AI agent for real answers.
           </button>
