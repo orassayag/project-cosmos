@@ -3542,6 +3542,88 @@ body:has(.lc-map-stage[data-panning='true']) * {
   flex-shrink: 0;
 }
 
+/* ── Connect an AI agent modal (shares the help modal shell) ─ */
+.lc-connect-modal { width: min(440px, calc(100vw - 32px)); }
+.lc-connect-lede,
+.lc-connect-note {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.lc-connect-note {
+  padding: 8px 12px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.lc-connect-form { display: flex; flex-direction: column; gap: 14px; }
+.lc-connect-providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+}
+.lc-connect-provider {
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-display);
+  font-size: 13px;
+  cursor: pointer;
+}
+.lc-connect-provider[aria-checked='true'] { background: var(--accent); color: var(--accent-fg); }
+.lc-connect-field { display: flex; flex-direction: column; gap: 6px; }
+.lc-connect-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lc-connect-input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 16px;
+}
+.lc-connect-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.lc-connect-input[aria-invalid='true'] { border-color: var(--svc-red); }
+.lc-connect-error {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--svc-red);
+}
+.lc-connect-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lc-connect-link { font-family: var(--font-display); font-size: 13px; color: var(--accent); }
+.lc-connect-submit {
+  min-width: 120px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.lc-connect-submit:disabled,
+.lc-connect-provider:disabled,
+.lc-help-close:disabled { opacity: 0.5; cursor: default; }
+
 /* ── Tech stack row in service panel ───────────────────────── */
 .lc-tech-row {
   display: flex;

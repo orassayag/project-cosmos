@@ -95,6 +95,7 @@ export const OVERLAY = {
   ask: 'ask',
   changelog: 'changelog',
   help: 'help',
+  connect: 'connect-agent',
   mapOwnership: 'map-ownership',
   mapChanges: 'map-changes',
   mapBlast: 'map-blast',

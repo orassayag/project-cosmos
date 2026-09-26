@@ -393,7 +393,12 @@ html[data-touch='true'] .lc-map-svg {
      side; on a phone that pair would collide, so a detail card takes over and
      the context panels behind it are hidden. Close the card (its corner ×) to
      bring the previous one back. Priority, high → low:
-       inspector / ask / health card  >  step + incident narration  >  legends. */
+       connect-agent modal  >  inspector / ask / health card  >  step + incident
+       narration  >  legends. The modal is portaled to <body>, hence `body:has`. */
+  body:has(.lc-connect-overlay) .lc-stage :is(
+    .lc-map-panel, .lc-ask-panel, .lc-health-card,
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
+  ),
   .lc-stage:has(.lc-map-panel) :is(
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
   ),
@@ -440,6 +445,7 @@ html[data-touch='true'] .lc-map-svg {
   /* ── Modals fit the small viewport ──────────────────────── */
   .lc-help-modal { padding: 24px 20px 20px; max-height: 88dvh; overflow-y: auto; }
   .lc-help-title { font-size: 22px; }
+  .lc-connect-modal { padding: 20px 18px 18px; }
   .lc-changelog { width: 100vw; }
   .lc-spotlight-backdrop { padding-top: 72px; }
 

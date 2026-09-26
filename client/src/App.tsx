@@ -13,6 +13,7 @@ import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
 import { AskAgent } from './components/AskAgent';
 import { AskPanel } from './components/AskPanel';
+import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
@@ -381,8 +382,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
   const aiConnection = useAiConnection();
   const { disconnect: disconnectAi } = aiConnection;
-  // No-op until the connect-agent modal exists to open here.
-  const handleConnectRequest = useCallback(() => {}, []);
+  const handleConnectRequest = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
   const handleDisconnect = useCallback(() => {
     void disconnectAi();
   }, [disconnectAi]);
@@ -716,6 +716,8 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
       />
 
       <HelpModal open={overlay.isOpen(OVERLAY.help)} onClose={closeHelp} />
+
+      <ConnectAgentModal currentProvider={aiConnection.provider} onConnect={aiConnection.connect} />
 
       <ChangelogPanel
         open={overlay.isOpen(OVERLAY.changelog) && !warping}
