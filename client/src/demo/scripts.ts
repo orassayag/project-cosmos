@@ -19,7 +19,7 @@ export const DEMO_TIME_LIMITS_MS: Record<DemoModeName, number> = {
 
 export const AI_DEMO_SCRIPT: DemoScript = [
   { kind: 'wait', durationMs: 800 },
-  { kind: 'pickDomain', domainId: 'shopping', durationMs: 1200, target: 'domain-shopping', caption: 'Exploring the Shopping domain' },
+  { kind: 'pickDomain', domainId: 'fulfillment', durationMs: 1200, target: 'domain-fulfillment', caption: 'Exploring the Fulfillment domain' },
   { kind: 'type', text: DEMO_QUESTION, durationMs: 4000, target: 'ask-input', caption: 'Asking the map a question' },
   { kind: 'wait', durationMs: 600 },
   { kind: 'openConnect', durationMs: 1100, target: 'connect-open', caption: 'Connecting an AI agent' },

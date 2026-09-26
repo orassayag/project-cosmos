@@ -90,7 +90,7 @@ describe('AskAgent', () => {
   });
 
   describe('demo props', () => {
-    const DEMO_QUESTION = 'What changed in the Shipping Galaxy over the past 24 hours?';
+    const DEMO_QUESTION = 'What changed in the Fulfillment Galaxy over the past 24 hours?';
 
     function renderDemo(props: { demoQuestion?: string; demoExpanded?: boolean; demoSearchPressed?: boolean }) {
       const onAsk = vi.fn();
