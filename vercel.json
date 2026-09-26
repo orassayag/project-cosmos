@@ -4,11 +4,14 @@
     "deploymentEnabled": false
   },
   "services": {
-    "client": {
-      "root": "client",
-      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-    },
-    "server": { "root": "server", "entrypoint": "src/app.ts" }
+    "client": { "root": "client" },
+    "server": {
+      "root": "server",
+      "entrypoint": "src/app.ts",
+      "functions": {
+        "src/app.ts": { "includeFiles": "node_modules/openai/lib/**" }
+      }
+    }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "server" } },

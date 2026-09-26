@@ -116,6 +116,50 @@ function ConnectedHarness({ onAction, onAnswerStart }: { onAction?: (action: Ask
   );
 }
 
+function StatusDrivenHarness() {
+  const aiConnection = useAiConnection();
+  const overlay = useOverlayManager();
+  if (aiConnection.status === 'unknown') return null;
+  return (
+    <OverlayProvider value={overlay}>
+      <AskPanel
+        question="Which team owns checkout?"
+        onClose={() => undefined}
+        isAiConnected={aiConnection.status === 'connected'}
+        showConnectPrompt={aiConnection.status === 'disconnected'}
+        onConnectRequest={() => overlay.open(OVERLAY.connect)}
+      />
+    </OverlayProvider>
+  );
+}
+
+describe('AskPanel (AI not configured)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('gives the joke answer with no Connect prompt when the server reports AI_NOT_CONFIGURED', async () => {
+    const fetchMock = vi.fn(async (input: FetchInput) => {
+      if (String(input) === '/api/ai/status') return Response.json({ errorCode: 'AI_NOT_CONFIGURED' }, { status: 503 });
+      throw new Error(`Unexpected fetch ${String(input)}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    render(<StatusDrivenHarness />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('.lc-ask-panel')).not.toBeNull();
+
+    finishJokeAnswer();
+
+    expect(document.querySelector('.lc-ask-answer')?.textContent?.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('AskPanel (connected)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();

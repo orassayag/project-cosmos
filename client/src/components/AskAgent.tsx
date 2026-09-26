@@ -20,12 +20,13 @@ export const STARTER_QUESTIONS = [
 const DOT_MODIFIER: Record<AiConnectionStatus, string> = {
   connected: 'on',
   disconnected: 'off',
+  notConfigured: 'off',
   unknown: 'unknown',
 };
 
 function botLabel(status: AiConnectionStatus, provider: AiProvider | null): string {
   if (status === 'connected') return `AI agent connected (${provider ? AI_PROVIDER_LABELS[provider] : 'unknown provider'})`;
-  if (status === 'disconnected') return 'No AI agent connected';
+  if (status === 'disconnected' || status === 'notConfigured') return 'No AI agent connected';
   return 'Checking for an AI agent';
 }
 

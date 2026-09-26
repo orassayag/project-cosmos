@@ -58,6 +58,16 @@ describe('AskAgent', () => {
     expect(screen.queryByRole('button', { name: 'Disconnect AI Agent' })).toBeNull();
   });
 
+  it('shows a red light but no Connect button when AI is not configured on the server', () => {
+    renderAskAgent('notConfigured');
+
+    expect(screen.getByTestId('ai-status-dot').className).toBe('lc-status-dot lc-status-dot--off');
+    expect(screen.getByRole('img', { name: 'No AI agent connected' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Connect AI Agent' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Disconnect AI Agent' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy();
+  });
+
   it('shows starter questions while the field is empty and hides them once typing starts', () => {
     renderAskAgent('disconnected');
 

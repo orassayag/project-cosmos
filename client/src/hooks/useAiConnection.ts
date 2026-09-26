@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type AiProvider = 'anthropic' | 'openai';
-export type AiConnectionStatus = 'unknown' | 'connected' | 'disconnected';
+export type AiConnectionStatus = 'unknown' | 'connected' | 'disconnected' | 'notConfigured';
 
 export type ConnectErrorCode = 'INVALID_KEY' | 'AI_NOT_CONFIGURED' | 'NETWORK_ERROR' | 'UNEXPECTED_RESPONSE';
 
@@ -46,8 +46,9 @@ function toConnectErrorCode(errorCode: string | undefined): ConnectErrorCode {
 
 /**
  * The AI key lives in an httpOnly cookie, so the server is the only source of
- * truth. Any failed or non-OK status check (routes absent, 503
- * AI_NOT_CONFIGURED, offline) resolves to `disconnected` rather than throwing.
+ * truth. A 503 AI_NOT_CONFIGURED status means this deployment cannot connect at
+ * all (`notConfigured`, no connect affordances); any other failed or non-OK
+ * check (routes absent, offline) resolves to `disconnected` rather than throwing.
  */
 export function useAiConnection(): AiConnection {
   const [status, setStatus] = useState<AiConnectionStatus>('unknown');
@@ -57,8 +58,13 @@ export function useAiConnection(): AiConnection {
     const controller = new AbortController();
     fetch('/api/ai/status', { credentials: 'same-origin', signal: controller.signal })
       .then(async (response) => {
-        const body = response.ok ? await readBody(response) : {};
-        const isConnected = body.connected === true && isAiProvider(body.provider);
+        const body = await readBody(response);
+        if (response.status === 503 && body.errorCode === 'AI_NOT_CONFIGURED') {
+          setStatus('notConfigured');
+          setProvider(null);
+          return;
+        }
+        const isConnected = response.ok && body.connected === true && isAiProvider(body.provider);
         setStatus(isConnected ? 'connected' : 'disconnected');
         setProvider(isConnected ? (body.provider as AiProvider) : null);
       })
