@@ -60,7 +60,7 @@ Every architecture diagram starts dying the moment it's born. The wiki page is f
 
 ## Quickstart
 
-Requires Node ≥ 20.
+Requires Node ≥ 22.
 
 ```bash
 git clone https://github.com/orassayag/project-cosmos.git
