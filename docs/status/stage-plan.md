@@ -14,7 +14,7 @@ the plan: §1–§6, §8, §9 before §7.
 - Stage 1: COMMITTED — §1/§2: demo/types.ts (step union, DemoTarget, DemoActions), demoMode.ts (readDemoMode, speed clamp, shouldShowIntro) + demoMode.test
 - Stage 2: COMMITTED — §1/A5: runDemo.ts (sequential steps, abortable sleep, speed divisor) + runDemo.test (fake timers, order, speed, abort, trusted pointerdown)
 - Stage 3: COMMITTED — §3: useAiConnection `enabled` option + test, demo/useDemoAiConnection.ts (runner-driven fake connection, no network)
-- Stage 4: PLANNED — §4: ConnectAgentModal `demo` prop (controlled dialog, JEV "site owner" field, no onConnect) + ConnectAgentModal.test cases
+- Stage 4: COMMITTED — §4: ConnectAgentModal `demo` prop (controlled dialog, JEV "site owner" field, no onConnect) + ConnectAgentModal.test cases
 - Stage 5: PLANNED — §5: AskAgent demoQuestion/demoExpanded/demoSearchPressed props + AskAgent.test cases
 - Stage 6: PLANNED — §5: AskPanel `scriptedAnswer` (fixed thinking/word pace, actions, no fetch, no joke) + AskPanel.test cases
 - Stage 7: PLANNED — §5/§6/§9: demo/scriptedAnswer.ts + test, demo/scripts.ts (`demo=ai` table) + scripts.test (ai ≤ 60s, handler + target coverage)

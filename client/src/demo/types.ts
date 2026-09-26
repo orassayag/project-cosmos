@@ -51,6 +51,15 @@ export type DemoConnectField = 'providerKey' | 'jevKey';
 /** The fake connection's lifecycle; `connecting` is what renders the Connect window as busy. */
 export type DemoAiStatus = 'disconnected' | 'connecting' | 'connected';
 
+/** Drives the Connect window during a demo; the JEV key is the site owner's AI Gateway key, never a visitor field. */
+export interface DemoConnectState {
+  provider: AiProvider;
+  providerKey: string;
+  jevKey: string;
+  showJevField: boolean;
+  isBusy: boolean;
+}
+
 export interface DemoScriptedAnswer {
   text: string;
   thinkingMs: number;

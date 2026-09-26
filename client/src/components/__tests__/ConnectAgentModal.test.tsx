@@ -3,15 +3,24 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ConnectAgentModal } from '../ConnectAgentModal';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { ConnectResult } from '../../hooks/useAiConnection';
+import type { DemoConnectState } from '../../demo/types';
 
-function Harness({ onConnect }: { onConnect: () => Promise<ConnectResult> }) {
+const DEMO_CONNECT_STATE: DemoConnectState = {
+  provider: 'anthropic',
+  providerKey: 'sk-ant-demo-••••••••',
+  jevKey: 'vck-demo-••••••••',
+  showJevField: true,
+  isBusy: false,
+};
+
+function Harness({ onConnect, demo }: { onConnect: () => Promise<ConnectResult>; demo?: DemoConnectState }) {
   const overlay = useOverlayManager();
   return (
     <OverlayProvider value={overlay}>
       <output data-testid="active-overlay">{overlay.active ?? 'none'}</output>
       <button type="button" onClick={() => overlay.open(OVERLAY.ask)}>Open answer</button>
       <button type="button" onClick={() => overlay.open(OVERLAY.connect)}>Open connect</button>
-      <ConnectAgentModal currentProvider={null} onConnect={onConnect} />
+      <ConnectAgentModal currentProvider={null} onConnect={onConnect} demo={demo} />
     </OverlayProvider>
   );
 }
@@ -69,5 +78,37 @@ describe('ConnectAgentModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByTestId('active-overlay').textContent).toBe(OVERLAY.ask);
+  });
+
+  it('renders the site-owner JEV field with both pasted keys and never submits in demo mode', () => {
+    const onConnect = vi.fn(() => Promise.resolve<ConnectResult>({ ok: true, provider: 'anthropic' }));
+    render(<Harness onConnect={onConnect} demo={DEMO_CONNECT_STATE} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
+
+    const providerKeyInput = screen.getByLabelText<HTMLInputElement>('Claude API key');
+    const jevKeyInput = screen.getByLabelText<HTMLInputElement>(/site owner/);
+    expect(providerKeyInput.type).toBe('password');
+    expect(providerKeyInput.value).toBe('sk-ant-demo-••••••••');
+    expect(jevKeyInput.type).toBe('password');
+    expect(jevKeyInput.value).toBe('vck-demo-••••••••');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(onConnect).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('takes its busy state from the demo prop', () => {
+    render(<Harness onConnect={vi.fn()} demo={{ ...DEMO_CONNECT_STATE, isBusy: true }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
+
+    expect(screen.getByRole('button', { name: 'Connecting…' })).toHaveProperty('disabled', true);
+  });
+
+  it('never shows the JEV field to real visitors', () => {
+    render(<Harness onConnect={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
+
+    expect(screen.queryByLabelText(/site owner/)).toBeNull();
+    expect(screen.queryByLabelText(/Vercel AI Gateway/)).toBeNull();
   });
 });
