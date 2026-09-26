@@ -23,7 +23,7 @@ snapshot JSON) → 20 stages at ≤250 LOC / ≤6 files each. The per-stage ceil
 - Stage 11: COMMITTED — M2: Hono app, config (AI_NOT_CONFIGURED), structured logger, cookieCrypto + cookieCrypto.test
 - Stage 12: COMMITTED — M2: connect / disconnect / status routes + ConnectRequestSchema + key check + route/config tests
 - Stage 13: COMMITTED — §5: route.ts decision, localRelevance, OFF_TOPIC_ANSWERS + route/localRelevance tests
-- Stage 14: PLANNED — §5: classify.ts (JEV evaluate, 3s timeout, fallback, warn-once) + classify.test
+- Stage 14: COMMITTED — §5: classify.ts (JEV evaluate, 3s timeout, fallback, warn-once) + classify.test
 - Stage 15: PLANNED — M3: context digest, systemPrompt, models, providerErrors + context/providerErrors tests
 - Stage 16: PLANNED — M3: LangGraph graph + highlight_services / play_scenario tools + graph.test
 - Stage 17: PLANNED — §7: POST /api/ai/ask NDJSON stream (classify → off-topic / direct / agent, usage, errors)
