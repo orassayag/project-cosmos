@@ -28,5 +28,5 @@ snapshot JSON) → 20 stages at ≤250 LOC / ≤6 files each. The per-stage ceil
 - Stage 16: COMMITTED — M3: LangGraph graph + highlight_services / play_scenario tools + graph.test
 - Stage 17: COMMITTED — §7: POST /api/ai/ask NDJSON stream (classify → off-topic / direct / agent, usage, errors)
 - Stage 18: COMMITTED — M3 client: computeAskTouches extract, Map askFocusIds, App action wiring (highlight + playScenario) + askTouches.test
-- Stage 19: PLANNED — §7 client: AskPanel stream reader, usage line, error messages, INVALID_KEY disconnect + AskPanel.test
+- Stage 19: COMMITTED — §7 client: AskPanel stream reader, usage line, error messages, INVALID_KEY disconnect + AskPanel.test
 - Stage 20: PLANNED — Final acceptance: /test + preview-deploy end-to-end at 390px then desktop

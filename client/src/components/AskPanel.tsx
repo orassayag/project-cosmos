@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AskStreamEvent } from './askStream';
+import { DISCONNECTING_ERROR_CODES, formatUsage, splitEmphasis, streamAskAnswer, toAskErrorMessage } from './askStream';
 
 interface AskPanelProps {
   question: string;
@@ -10,8 +12,12 @@ interface AskPanelProps {
   /** True while no AI agent is connected — the canned joke then ends with a Connect prompt. */
   showConnectPrompt?: boolean;
   onConnectRequest?: () => void;
-  /** Map actions the live agent streams alongside its answer (wired by the stream reader). */
+  /** Read once at mount: connected streams a real answer, otherwise the canned joke plays. */
+  isAiConnected?: boolean;
+  /** Map actions the live agent streams alongside its answer. */
   onAction?: (action: AskAction) => void;
+  /** The server rejected the stored key mid-answer; the caller clears it so the light turns red. */
+  onKeyRejected?: () => void;
 }
 
 export type AskAction =
@@ -35,10 +41,25 @@ const DEMO_ANSWERS = [
 
 type Phase = 'loading' | 'typing' | 'done';
 
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+function EmphasizedText({ text }: { text: string }) {
+  return (
+    <>
+      {splitEmphasis(text).map((segment, index) =>
+        segment.isEmphasized ? <em key={index}>{segment.text}</em> : segment.text,
+      )}
+    </>
+  );
+}
+
 /**
- * Left-side answer panel mirroring the star inspector. Fakes an agent
- * "thinking" for a random 3–4s, then reveals a canned answer word by word
- * the way a chat UI streams tokens.
+ * Left-side answer panel mirroring the star inspector. Connected, it streams
+ * the agent's NDJSON answer; otherwise it fakes an agent "thinking" for a
+ * random 3–4s, then reveals a canned answer word by word.
  */
 export function AskPanel({
   question,
@@ -47,29 +68,74 @@ export function AskPanel({
   onAnswerStart,
   showConnectPrompt = false,
   onConnectRequest,
+  isAiConnected = false,
+  onAction,
+  onKeyRejected,
 }: AskPanelProps) {
+  const [isLive] = useState(isAiConnected);
   const answer = useMemo(() => DEMO_ANSWERS[Math.floor(Math.random() * DEMO_ANSWERS.length)], []);
   const words = useMemo(() => answer.split(' '), [answer]);
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [wordCount, setWordCount] = useState(0);
+  const [liveAnswer, setLiveAnswer] = useState('');
+  const [usage, setUsage] = useState<TokenUsage | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
+  const callbacksRef = useRef({ onAnswerStart, onAction, onKeyRejected });
+  useEffect(() => {
+    callbacksRef.current = { onAnswerStart, onAction, onKeyRejected };
+  });
 
   useEffect(() => {
+    if (!isLive) return;
+    const controller = new AbortController();
+    let hasStartedAnswer = false;
+    const handleEvent = (event: AskStreamEvent) => {
+      switch (event.type) {
+        case 'token':
+          if (!hasStartedAnswer) {
+            hasStartedAnswer = true;
+            setPhase('typing');
+            callbacksRef.current.onAnswerStart?.();
+          }
+          setLiveAnswer((previous) => previous + event.text);
+          break;
+        case 'action':
+          callbacksRef.current.onAction?.(event);
+          break;
+        case 'usage':
+          setUsage({ inputTokens: event.inputTokens, outputTokens: event.outputTokens });
+          break;
+        case 'error':
+          setErrorMessage(toAskErrorMessage(event.errorCode));
+          if (DISCONNECTING_ERROR_CODES.has(event.errorCode)) callbacksRef.current.onKeyRejected?.();
+          break;
+        case 'done':
+          setPhase('done');
+          break;
+      }
+    };
+    void streamAskAnswer(question, controller.signal, handleEvent);
+    return () => controller.abort();
+  }, [isLive, question]);
+
+  useEffect(() => {
+    if (isLive) return;
     const thinkMs = 3000 + Math.random() * 1000;
     const startTyping = window.setTimeout(() => {
       setPhase('typing');
-      onAnswerStart?.();
+      callbacksRef.current.onAnswerStart?.();
     }, thinkMs);
     timers.current.push(startTyping);
     return () => {
       timers.current.forEach((id) => window.clearTimeout(id));
       timers.current = [];
     };
-  }, []);
+  }, [isLive]);
 
   useEffect(() => {
-    if (phase !== 'typing') return;
+    if (isLive || phase !== 'typing') return;
     if (wordCount >= words.length) {
       setPhase('done');
       return;
@@ -77,9 +143,9 @@ export function AskPanel({
     const id = window.setTimeout(() => setWordCount((c) => c + 1), 55 + Math.random() * 70);
     timers.current.push(id);
     return () => window.clearTimeout(id);
-  }, [phase, wordCount, words.length]);
+  }, [isLive, phase, wordCount, words.length]);
 
-  const revealed = words.slice(0, wordCount).join(' ');
+  const revealed = isLive ? liveAnswer : words.slice(0, wordCount).join(' ');
 
   return (
     <div className="lc-ask-panel" data-no-pan="true" hidden={hidden} onClick={(e) => e.stopPropagation()}>
@@ -102,10 +168,20 @@ export function AskPanel({
             <span className="lc-ask-dot" />
           </div>
         ) : (
-          <p className="lc-ask-answer">
-            {revealed}
-            {phase === 'typing' && <span className="lc-ask-caret" aria-hidden="true" />}
+          (revealed !== '' || phase === 'typing') && (
+            <p className="lc-ask-answer">
+              <EmphasizedText text={revealed} />
+              {phase === 'typing' && <span className="lc-ask-caret" aria-hidden="true" />}
+            </p>
+          )
+        )}
+        {errorMessage !== null && (
+          <p className="lc-ask-error" role="alert">
+            {errorMessage}
           </p>
+        )}
+        {phase === 'done' && usage !== null && errorMessage === null && (
+          <p className="lc-ask-usage">{formatUsage(usage.inputTokens, usage.outputTokens)}</p>
         )}
         {phase === 'done' && showConnectPrompt && onConnectRequest && (
           <button type="button" className="lc-ask-connect" onClick={onConnectRequest}>

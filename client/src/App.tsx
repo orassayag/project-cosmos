@@ -715,7 +715,9 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             onAnswerStart={handleAnswerStart}
             showConnectPrompt={aiConnection.status === 'disconnected'}
             onConnectRequest={handleConnectRequest}
+            isAiConnected={isAiConnected}
             onAction={handleAskAction}
+            onKeyRejected={handleDisconnect}
           />
         )}
 

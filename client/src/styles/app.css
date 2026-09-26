@@ -1021,6 +1021,20 @@ body:has(.lc-map-stage[data-panning='true']) * {
   cursor: pointer;
 }
 .lc-ask-connect:hover { color: var(--accent); }
+.lc-ask-answer em { color: var(--text-1); font-style: italic; }
+.lc-ask-error {
+  margin: 12px 0 0;
+  color: var(--svc-red);
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.lc-ask-usage {
+  margin: 10px 0 0;
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 .lc-ask-caret {
   display: inline-block;
   width: 7px;
