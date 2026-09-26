@@ -149,6 +149,7 @@ export function DomainBar({
                 data-empty={total === 0 ? 'true' : 'false'}
                 data-open={isActive && open ? 'true' : 'false'}
                 className="lc-domain-tab"
+                data-demo-target={`domain-${d.id}`}
                 onClick={() => handleTabClick(d.id)}
               >
                 <span className="lc-domain-tab-label">{d.label}</span>

@@ -164,7 +164,7 @@ export function IntroOverlay({ onStart, onExitComplete }: IntroOverlayProps) {
           {BRAND.tagline}
         </motion.p>
         <motion.div variants={child} className="lc-intro-cta-row">
-          <button type="button" className="lc-intro-cta" onClick={handleStart} disabled={exiting}>
+          <button type="button" className="lc-intro-cta" data-demo-target="intro-start" onClick={handleStart} disabled={exiting}>
             Jump in
             <span className="lc-intro-cta-glyph">→</span>
           </button>

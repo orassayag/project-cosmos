@@ -132,6 +132,7 @@ export function AskAgent({
         <textarea
           ref={areaRef}
           className="lc-ask-field"
+          data-demo-target="ask-input"
           placeholder="Explore Project Cosmos"
           rows={1}
           value={question}
@@ -176,6 +177,7 @@ export function AskAgent({
               <button
                 type="button"
                 className="lc-ask-go"
+                data-demo-target="connect-open"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   areaRef.current?.blur();
@@ -202,6 +204,7 @@ export function AskAgent({
             <button
               type="button"
               className={`lc-ask-go${demoSearchPressed ? ' lc-ask-go--pressed' : ''}`}
+              data-demo-target="ask-search"
               // mousedown fires before the textarea's blur, so preventing default
               // keeps focus and lets submit() drive the collapse itself.
               onMouseDown={(e) => {

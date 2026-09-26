@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { OVERLAY, useOverlay } from '../overlays/OverlayManager';
 import { AI_PROVIDER_LABELS } from '../hooks/useAiConnection';
 import type { AiProvider, ConnectErrorCode, ConnectResult } from '../hooks/useAiConnection';
-import type { DemoConnectState } from '../demo/types';
+import type { DemoConnectState, DemoTarget } from '../demo/types';
 
 interface ConnectAgentModalProps {
   currentProvider: AiProvider | null;
@@ -126,6 +126,7 @@ function ConnectAgentDialog({ currentProvider, onConnect, demo, onClose }: Conne
                 role="radio"
                 aria-checked={provider === option}
                 className="lc-connect-provider"
+                data-demo-target={`connect-provider-${option}` satisfies DemoTarget}
                 onClick={() => pickProvider(option)}
                 disabled={isBusy}
               >
@@ -141,6 +142,7 @@ function ConnectAgentDialog({ currentProvider, onConnect, demo, onClose }: Conne
               autoComplete="off"
               spellCheck={false}
               className="lc-connect-input"
+              data-demo-target="connect-provider-key"
               value={apiKey}
               onChange={(event) => { setTypedKey(event.target.value); setErrorCode(null); }}
               readOnly={isDemo}
@@ -157,6 +159,7 @@ function ConnectAgentDialog({ currentProvider, onConnect, demo, onClose }: Conne
                 autoComplete="off"
                 spellCheck={false}
                 className="lc-connect-input"
+                data-demo-target="connect-jev-key"
                 value={demo.jevKey}
                 readOnly
                 disabled={isBusy}
@@ -170,7 +173,7 @@ function ConnectAgentDialog({ currentProvider, onConnect, demo, onClose }: Conne
             <a className="lc-connect-link" href={KEY_PAGE_URLS[provider]} target="_blank" rel="noopener noreferrer">
               Get a key
             </a>
-            <button type="submit" className="lc-connect-submit" disabled={isBusy || !apiKey.trim()}>
+            <button type="submit" className="lc-connect-submit" data-demo-target="connect-submit" disabled={isBusy || !apiKey.trim()}>
               {isBusy ? 'Connecting…' : 'Connect'}
             </button>
           </div>

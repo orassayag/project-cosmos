@@ -57,6 +57,7 @@ export function PlaybackControls({
           type="button"
           className="lc-pb-btn"
           onClick={onPrev}
+          data-demo-target="playback-step-back"
           disabled={atStart}
           aria-label="Previous step"
         >
@@ -67,6 +68,7 @@ export function PlaybackControls({
           className="lc-pb-btn lc-pb-play"
           data-finished={finished ? 'true' : 'false'}
           onClick={playHandler}
+          data-demo-target="playback-play"
           aria-label={playLabel}
         >
           {playGlyph}
@@ -75,6 +77,7 @@ export function PlaybackControls({
           type="button"
           className="lc-pb-btn"
           onClick={onNext}
+          data-demo-target="playback-step-forward"
           disabled={atEnd}
           aria-label="Next step"
         >
