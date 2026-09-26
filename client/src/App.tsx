@@ -680,6 +680,8 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             hidden={!overlay.isOpen(OVERLAY.ask)}
             onClose={() => overlay.close(OVERLAY.ask)}
             onAnswerStart={handleAnswerStart}
+            showConnectPrompt={aiConnection.status === 'disconnected'}
+            onConnectRequest={handleConnectRequest}
           />
         )}
 

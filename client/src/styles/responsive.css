@@ -264,6 +264,10 @@ html[data-touch='true'] .lc-map-svg {
   .lc-topbar-search .lc-ask { width: 100%; height: auto; }
   .lc-topbar-search .lc-ask-shell { position: relative; width: 100%; height: 34px; border-radius: 17px; }
   .lc-topbar-search .lc-ask--expanded .lc-ask-shell { height: 150px; }
+  .lc-topbar-search .lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 230px; }
+  .lc-ask-starter { min-height: 40px; padding: 6px 14px; font-size: 12px; }
+  .lc-ask-starters { gap: 6px; }
+  .lc-ask-connect { min-height: 40px; }
   .lc-topbar-search .lc-ask-icon { top: 11px; }
   .lc-topbar-search .lc-ask-field { padding-top: 8px; }
   /* The commit/branch pill can eat the whole row — let it wrap under brand. */
@@ -452,6 +456,12 @@ html[data-touch='true'] .lc-map-svg {
   /* Keyboard hints mean nothing on touch; the corner × exits instead. */
   .lc-present-hint { display: none; }
   .lc-present-exit { width: 40px; height: 40px; opacity: 0.85; }
+}
+
+/* Landscape phones fit the starter chips on one or two rows — don't spend
+   scarce height on the portrait card size. */
+@media (max-height: 480px) {
+  .lc-topbar-search .lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 190px; }
 }
 
 /* Very small phones — tighten transport so the row never overflows. */

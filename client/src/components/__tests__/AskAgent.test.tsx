@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { AskAgent } from '../AskAgent';
+import { AskAgent, STARTER_QUESTIONS } from '../AskAgent';
 import type { AiConnectionStatus, AiProvider } from '../../hooks/useAiConnection';
 
 function renderAskAgent(aiStatus: AiConnectionStatus, aiProvider: AiProvider | null = null) {
+  const onAsk = vi.fn();
   const onConnectRequest = vi.fn();
   const onDisconnect = vi.fn();
   render(
     <AskAgent
-      onAsk={vi.fn()}
+      onAsk={onAsk}
       aiStatus={aiStatus}
       aiProvider={aiProvider}
       onConnectRequest={onConnectRequest}
@@ -16,7 +17,7 @@ function renderAskAgent(aiStatus: AiConnectionStatus, aiProvider: AiProvider | n
     />,
   );
   fireEvent.focus(screen.getByPlaceholderText('Explore Project Cosmos'));
-  return { onConnectRequest, onDisconnect };
+  return { onAsk, onConnectRequest, onDisconnect };
 }
 
 describe('AskAgent', () => {
@@ -55,5 +56,26 @@ describe('AskAgent', () => {
     expect(screen.getByTestId('ai-status-dot').className).toBe('lc-status-dot lc-status-dot--unknown');
     expect(screen.queryByRole('button', { name: 'Connect AI Agent' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Disconnect AI Agent' })).toBeNull();
+  });
+
+  it('shows starter questions while the field is empty and hides them once typing starts', () => {
+    renderAskAgent('disconnected');
+
+    for (const starter of STARTER_QUESTIONS) {
+      expect(screen.getByRole('button', { name: starter })).toBeTruthy();
+    }
+
+    fireEvent.change(screen.getByPlaceholderText('Explore Project Cosmos'), { target: { value: 'Who owns' } });
+
+    expect(screen.queryByRole('group', { name: 'Example questions' })).toBeNull();
+  });
+
+  it('fills the field and submits when a starter question is picked', () => {
+    const { onAsk } = renderAskAgent('disconnected');
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Which team owns checkout?' }));
+
+    expect(onAsk).toHaveBeenCalledWith('Which team owns checkout?');
+    expect(screen.getByPlaceholderText('Explore Project Cosmos')).toHaveProperty('value', 'Which team owns checkout?');
   });
 });

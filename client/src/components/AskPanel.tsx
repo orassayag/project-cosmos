@@ -7,6 +7,9 @@ interface AskPanelProps {
   onClose: () => void;
   /** Fired once when the "thinking" phase ends and the answer starts typing. */
   onAnswerStart?: () => void;
+  /** True while no AI agent is connected — the canned joke then ends with a Connect prompt. */
+  showConnectPrompt?: boolean;
+  onConnectRequest?: () => void;
 }
 
 // Same running joke, ten ways: this is a portfolio demo with no live model
@@ -31,7 +34,14 @@ type Phase = 'loading' | 'typing' | 'done';
  * "thinking" for a random 3–4s, then reveals a canned answer word by word
  * the way a chat UI streams tokens.
  */
-export function AskPanel({ question, hidden = false, onClose, onAnswerStart }: AskPanelProps) {
+export function AskPanel({
+  question,
+  hidden = false,
+  onClose,
+  onAnswerStart,
+  showConnectPrompt = false,
+  onConnectRequest,
+}: AskPanelProps) {
   const answer = useMemo(() => DEMO_ANSWERS[Math.floor(Math.random() * DEMO_ANSWERS.length)], []);
   const words = useMemo(() => answer.split(' '), [answer]);
 
@@ -90,6 +100,11 @@ export function AskPanel({ question, hidden = false, onClose, onAnswerStart }: A
             {revealed}
             {phase === 'typing' && <span className="lc-ask-caret" aria-hidden="true" />}
           </p>
+        )}
+        {phase === 'done' && showConnectPrompt && onConnectRequest && (
+          <button type="button" className="lc-ask-connect" onClick={onConnectRequest}>
+            Connect an AI agent for real answers.
+          </button>
         )}
       </div>
     </div>

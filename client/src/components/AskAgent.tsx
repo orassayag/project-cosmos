@@ -11,6 +11,12 @@ interface AskAgentProps {
   onDisconnect: () => void;
 }
 
+export const STARTER_QUESTIONS = [
+  'What happens when a payment fails?',
+  'Which team owns checkout?',
+  'Play the order flow',
+];
+
 const DOT_MODIFIER: Record<AiConnectionStatus, string> = {
   connected: 'on',
   disconnected: 'off',
@@ -75,6 +81,15 @@ export function AskAgent({
     areaRef.current?.blur();
   }, [question, onAsk]);
 
+  const askStarter = useCallback(
+    (starter: string) => {
+      setQuestion(starter);
+      onAsk(starter);
+      areaRef.current?.blur();
+    },
+    [onAsk],
+  );
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -89,9 +104,14 @@ export function AskAgent({
   );
 
   const statusLabel = botLabel(aiStatus, aiProvider);
+  const showStarters = expanded && question === '';
 
   return (
-    <div ref={rootRef} className={`lc-ask${expanded ? ' lc-ask--expanded' : ''}`} data-no-pan="true">
+    <div
+      ref={rootRef}
+      className={`lc-ask${expanded ? ' lc-ask--expanded' : ''}${showStarters ? ' lc-ask--starters' : ''}`}
+      data-no-pan="true"
+    >
       <div className="lc-ask-shell">
         <svg className="lc-ask-icon" width={13} height={13} viewBox="0 0 16 16" aria-hidden="true">
           <circle cx={6.5} cy={6.5} r={5} stroke="currentColor" strokeWidth={1.5} fill="none" />
@@ -117,6 +137,23 @@ export function AskAgent({
             aria-hidden="true"
           />
         </span>
+        {showStarters && (
+          <div className="lc-ask-starters" role="group" aria-label="Example questions">
+            {STARTER_QUESTIONS.map((starter) => (
+              <button
+                key={starter}
+                type="button"
+                className="lc-ask-starter"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  askStarter(starter);
+                }}
+              >
+                {starter}
+              </button>
+            ))}
+          </div>
+        )}
         {expanded && (
           <div className="lc-ask-footer">
             {aiStatus === 'disconnected' && (

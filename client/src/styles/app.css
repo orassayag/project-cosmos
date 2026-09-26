@@ -934,6 +934,40 @@ body:has(.lc-map-stage[data-panning='true']) * {
   border-color: var(--border-strong);
 }
 
+/* Example questions shown while the expanded field is empty. The card grows to
+   make room and shrinks back as soon as the visitor starts typing. */
+.lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 180px; }
+.lc-ask-starters {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 8px 8px;
+}
+.lc-ask-starter {
+  min-height: 22px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  animation: lc-ask-go-in var(--dur-fast) var(--ease-std) 0.5s forwards;
+  transition:
+    color var(--dur-fast) var(--ease-std),
+    border-color var(--dur-fast) var(--ease-std);
+}
+.lc-ask-starter:hover {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
 /* ── Ask the agent answer panel (left inspector clone) ──────── */
 .lc-ask-panel {
   position: absolute;
@@ -972,6 +1006,21 @@ body:has(.lc-map-stage[data-panning='true']) * {
   font-size: 12.5px;
   line-height: 1.65;
 }
+.lc-ask-connect {
+  display: block;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.lc-ask-connect:hover { color: var(--accent); }
 .lc-ask-caret {
   display: inline-block;
   width: 7px;
