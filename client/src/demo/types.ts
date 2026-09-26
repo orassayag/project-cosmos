@@ -1,12 +1,15 @@
 import type { AskAction } from '../components/AskPanel';
-import type { AiProvider } from '../hooks/useAiConnection';
-import type { Domain } from '../scenarios/types';
 
+/** Every fixed `data-demo-target`; scenario and incident menu items add `scenario-<id>` / `incident-<id>`. */
 export const DEMO_TARGETS = [
   'intro-start',
+  'menu-open',
+  'menu-close',
+  'galaxy-reset',
   'domain-shopping',
   'domain-fulfillment',
   'domain-engagement',
+  'incidents-open',
   'ask-input',
   'ask-search',
   'connect-open',
@@ -21,44 +24,12 @@ export const DEMO_TARGETS = [
   'legend-ownership',
 ] as const;
 
-/** Value of a `data-demo-target` attribute the fake pointer can glide to. */
-export type DemoTarget = (typeof DEMO_TARGETS)[number];
+/** Value of a `data-demo-target` attribute the pointer can move to and press. */
+export type DemoTarget = (typeof DEMO_TARGETS)[number] | `scenario-${string}` | `incident-${string}`;
 
-export const DEMO_STEP_KINDS = [
-  'pressIntro',
-  'pickDomain',
-  'type',
-  'openConnect',
-  'pickProvider',
-  'paste',
-  'connect',
-  'closeConnect',
-  'ask',
-  'answer',
-  'playScenario',
-  'stepBack',
-  'stepForward',
-  'openIncident',
-  'toggleLegend',
-  'wait',
-  'endCard',
-] as const;
+export const DEMO_STEP_KINDS = ['click', 'type', 'paste', 'wait'] as const;
 
 export type DemoStepKind = (typeof DEMO_STEP_KINDS)[number];
-
-export type DemoConnectField = 'providerKey' | 'jevKey';
-
-/** The fake connection's lifecycle; `connecting` is what renders the Connect window as busy. */
-export type DemoAiStatus = 'disconnected' | 'connecting' | 'connected';
-
-/** Drives the Connect window during a demo; the JEV key is the site owner's AI Gateway key, never a visitor field. */
-export interface DemoConnectState {
-  provider: AiProvider;
-  providerKey: string;
-  jevKey: string;
-  showJevField: boolean;
-  isBusy: boolean;
-}
 
 export interface DemoScriptedAnswer {
   text: string;
@@ -68,77 +39,23 @@ export interface DemoScriptedAnswer {
 }
 
 interface DemoStepBase {
+  /** The whole step at speed 1, pointer glide and typing included; the rest of it is a pause. */
   durationMs: number;
   caption?: string;
-  target?: DemoTarget;
 }
 
+/**
+ * A viewer gesture on the real UI: `click` presses the target, `type` presses it then types
+ * `text` key by key, `paste` presses it then inserts `text` in one paste.
+ */
 export type DemoStep = DemoStepBase & (
-  | { kind: 'pressIntro' }
-  | { kind: 'pickDomain'; domainId: Domain['id'] }
-  | { kind: 'type'; text: string }
-  | { kind: 'openConnect' }
-  | { kind: 'pickProvider'; provider: AiProvider }
-  | { kind: 'paste'; field: DemoConnectField; value: string }
-  | { kind: 'connect' }
-  | { kind: 'closeConnect' }
-  | { kind: 'ask'; question: string }
-  | { kind: 'answer'; answer: DemoScriptedAnswer }
-  | { kind: 'playScenario'; scenarioId: string }
-  | { kind: 'stepBack' }
-  | { kind: 'stepForward' }
-  | { kind: 'openIncident'; incidentId: string }
-  | { kind: 'toggleLegend'; isVisible: boolean }
+  | { kind: 'click'; target: DemoTarget }
+  | { kind: 'type'; target: DemoTarget; text: string }
+  | { kind: 'paste'; target: DemoTarget; text: string }
   | { kind: 'wait' }
-  | { kind: 'endCard' }
 );
 
 export type DemoScript = readonly DemoStep[];
-
-/**
- * Callbacks App supplies to the runner. The runner changes the app only through these —
- * never by dispatching DOM events, which the mouse-down buttons and map pan handler ignore.
- */
-export interface DemoActions {
-  pressIntro: () => void;
-  pickDomain: (domainId: Domain['id']) => void;
-  setQuestion: (question: string) => void;
-  openConnect: () => void;
-  pickProvider: (provider: AiProvider) => void;
-  setConnectField: (field: DemoConnectField, value: string) => void;
-  setAiStatus: (status: DemoAiStatus) => void;
-  closeConnect: () => void;
-  setSearchPressed: (isPressed: boolean) => void;
-  ask: (question: string) => void;
-  playAnswer: (answer: DemoScriptedAnswer) => void;
-  playScenario: (scenarioId: string) => void;
-  stepBack: () => void;
-  stepForward: () => void;
-  openIncident: (incidentId: string) => void;
-  toggleLegend: (isVisible: boolean) => void;
-  showEndCard: () => void;
-}
-
-/** Which callbacks each step kind drives; `wait` only sleeps. Lets tests prove every kind is handled. */
-export const DEMO_STEP_ACTIONS: Record<DemoStepKind, readonly (keyof DemoActions)[]> = {
-  pressIntro: ['pressIntro'],
-  pickDomain: ['pickDomain'],
-  type: ['setQuestion'],
-  openConnect: ['openConnect'],
-  pickProvider: ['pickProvider'],
-  paste: ['setConnectField'],
-  connect: ['setAiStatus'],
-  closeConnect: ['closeConnect'],
-  ask: ['setSearchPressed', 'ask'],
-  answer: ['playAnswer'],
-  playScenario: ['playScenario'],
-  stepBack: ['stepBack'],
-  stepForward: ['stepForward'],
-  openIncident: ['openIncident'],
-  toggleLegend: ['toggleLegend'],
-  wait: [],
-  endCard: ['showEndCard'],
-};
 
 export type DemoModeName = 'ai' | 'all';
 

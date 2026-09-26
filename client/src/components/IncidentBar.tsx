@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { DemoTarget } from '../demo/types';
 import { INCIDENTS, stepsForScenario } from '../scenarios/data';
 
 interface IncidentBarProps {
@@ -49,6 +50,7 @@ export function IncidentBar({ activeScenarioId, onPickIncident, resetNonce = 0 }
       <button
         type="button"
         className="lc-present-btn lc-incident-trigger"
+        data-demo-target="incidents-open"
         aria-haspopup="menu"
         aria-expanded={open}
         data-active={activeIsIncident ? 'true' : 'false'}
@@ -77,6 +79,7 @@ export function IncidentBar({ activeScenarioId, onPickIncident, resetNonce = 0 }
                 key={incident.id}
                 type="button"
                 className="lc-picker-item"
+                data-demo-target={`incident-${incident.id}` satisfies DemoTarget}
                 data-ready="true"
                 data-active={isActive ? 'true' : 'false'}
                 style={{ ['--c' as string]: incident.color } as React.CSSProperties}

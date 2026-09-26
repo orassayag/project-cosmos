@@ -49,6 +49,7 @@ export function MobileMenu({ open, onClose, children }: MobileMenuProps) {
               <button
                 type="button"
                 className="lc-mobile-menu-close"
+                data-demo-target="menu-close"
                 onClick={onClose}
                 aria-label="Close menu"
               >

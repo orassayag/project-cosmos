@@ -5,6 +5,7 @@ import {
   scenariosForDomain,
   stepsForScenario,
 } from '../scenarios/data';
+import type { DemoTarget } from '../demo/types';
 
 interface DomainBarProps {
   active: string;
@@ -104,6 +105,7 @@ export function DomainBar({
             key={s.id}
             type="button"
             className="lc-picker-item"
+            data-demo-target={`scenario-${s.id}` satisfies DemoTarget}
             data-ready={isReady ? 'true' : 'false'}
             data-active={isActiveScenario ? 'true' : 'false'}
             disabled={!isReady}

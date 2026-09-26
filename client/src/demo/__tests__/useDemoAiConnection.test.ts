@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { AiConnection } from '../../hooks/useAiConnection';
-import { runDemo } from '../runDemo';
-import type { DemoActions, DemoAiStatus } from '../types';
-import { DEMO_AI_PROVIDER, useDemoAiConnection } from '../useDemoAiConnection';
+import type { ConnectResult } from '../../hooks/useAiConnection';
+import { DEMO_AI_PROVIDER, DEMO_CONNECT_MS, useDemoAiConnection } from '../useDemoAiConnection';
 
-function renderDemoConnection() {
+function renderDemoConnection(speed = 1) {
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
-  const rendered = renderHook(() => useDemoAiConnection());
+  const rendered = renderHook(() => useDemoAiConnection(speed));
   return { ...rendered, fetchMock };
 }
 
@@ -23,33 +21,39 @@ describe('useDemoAiConnection', () => {
 
     expect(result.current.status).toBe('disconnected');
     expect(result.current.provider).toBeNull();
-    expect(result.current.isConnecting).toBe(false);
   });
 
-  it.each<[DemoAiStatus, AiConnection['status'], AiConnection['provider'], boolean]>([
-    ['disconnected', 'disconnected', null, false],
-    ['connecting', 'disconnected', null, true],
-    ['connected', 'connected', DEMO_AI_PROVIDER, false],
-  ])('maps demo status %s onto the AiConnection shape', (demoStatus, status, provider, isConnecting) => {
-    const { result } = renderDemoConnection();
+  it('accepts any key after the connect pause, scaled by speed, without touching the network', async () => {
+    vi.useFakeTimers();
+    const { result, fetchMock } = renderDemoConnection(2);
 
-    act(() => result.current.setDemoStatus(demoStatus));
-
-    expect(result.current.status).toBe(status);
-    expect(result.current.provider).toBe(provider);
-    expect(result.current.isConnecting).toBe(isConnecting);
-  });
-
-  it('connects and disconnects without touching the network', async () => {
-    const { result, fetchMock } = renderDemoConnection();
-
-    let connectResult: Awaited<ReturnType<AiConnection['connect']>> | undefined;
-    await act(async () => {
-      connectResult = await result.current.connect('openai', 'demo-key');
+    let connectResult: ConnectResult | undefined;
+    act(() => {
+      void result.current.connect('openai', 'sk-fake').then((value) => { connectResult = value; });
     });
-    expect(connectResult).toEqual({ ok: true, provider: 'anthropic' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEMO_CONNECT_MS / 2 - 1);
+    });
+    expect(result.current.status).toBe('disconnected');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(connectResult).toEqual({ ok: true, provider: DEMO_AI_PROVIDER });
     expect(result.current.status).toBe('connected');
-    expect(result.current.provider).toBe('anthropic');
+    expect(result.current.provider).toBe(DEMO_AI_PROVIDER);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('disconnects without touching the network', async () => {
+    vi.useFakeTimers();
+    const { result, fetchMock } = renderDemoConnection();
+    act(() => {
+      void result.current.connect('anthropic', 'sk-fake');
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
 
     let isDisconnected = false;
     await act(async () => {
@@ -57,31 +61,6 @@ describe('useDemoAiConnection', () => {
     });
     expect(isDisconnected).toBe(true);
     expect(result.current.status).toBe('disconnected');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('is driven through connecting to connected by the runner', async () => {
-    vi.useFakeTimers();
-    const { result, fetchMock } = renderDemoConnection();
-    const actions = { setAiStatus: (status: DemoAiStatus) => result.current.setDemoStatus(status) } as DemoActions;
-
-    let run: Promise<unknown> = Promise.resolve();
-    act(() => {
-      run = runDemo([{ kind: 'connect', durationMs: 1000 }], actions, {
-        signal: new AbortController().signal,
-        speed: 1,
-      });
-    });
-    expect(result.current.isConnecting).toBe(true);
-    expect(result.current.status).toBe('disconnected');
-
-    await act(async () => {
-      await vi.runAllTimersAsync();
-      await run;
-    });
-    expect(result.current.status).toBe('connected');
-    expect(result.current.provider).toBe('anthropic');
-    expect(result.current.isConnecting).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

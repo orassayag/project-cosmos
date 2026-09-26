@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useViewport } from '../hooks/useViewport';
-import { scaledDuration } from '../demo/runDemo';
+import { findDemoTarget, POINTER_MOVE_MS, scaledDuration } from '../demo/runDemo';
 import type { DemoTarget } from '../demo/types';
+import type { DemoPointerMove } from '../demo/useDemoRunner';
 
-export const POINTER_MOVE_MS = 500;
 export const POINTER_RIPPLE_MS = 300;
 
 interface PointerPosition {
@@ -13,16 +13,15 @@ interface PointerPosition {
 }
 
 interface DemoPointerProps {
-  target: DemoTarget | null;
+  pointer: DemoPointerMove | null;
   isVisible: boolean;
   speed: number;
 }
 
 export function findDemoTargetCenter(target: DemoTarget): PointerPosition | null {
-  const element = document.querySelector(`[data-demo-target="${target}"]`);
+  const element = findDemoTarget(target);
   if (!element) return null;
   const rect = element.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) return null;
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
@@ -30,12 +29,17 @@ function startPosition(): PointerPosition {
   return { x: window.innerWidth / 2, y: window.innerHeight * 0.66 };
 }
 
-/** The demo's fake cursor: glides to each step's `data-demo-target` element, then ripples as if clicking it. */
-export function DemoPointer({ target, isVisible, speed }: DemoPointerProps) {
+/**
+ * The demo's on-screen cursor: glides to each target the runner is about to press and ripples as
+ * the press lands. The press itself is the runner's; this only shows where it happens.
+ */
+export function DemoPointer({ pointer, isVisible, speed }: DemoPointerProps) {
   const { isMobile, isTouch } = useViewport();
   const [position, setPosition] = useState<PointerPosition | null>(null);
   const [arrivalCount, setArrivalCount] = useState(0);
   const isShown = isVisible && !isMobile && !isTouch;
+  const target = pointer?.target ?? null;
+  const moveId = pointer?.moveId ?? 0;
 
   useEffect(() => {
     if (!isShown || target === null) return;
@@ -50,7 +54,7 @@ export function DemoPointer({ target, isVisible, speed }: DemoPointerProps) {
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [isShown, target]);
+  }, [isShown, target, moveId]);
 
   useEffect(() => {
     if (!isShown || target === null) return;

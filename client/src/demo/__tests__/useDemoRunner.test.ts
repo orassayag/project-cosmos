@@ -1,22 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import type { DemoActions, DemoScript } from '../types';
-import { DEMO_STATE_ATTRIBUTE, useDemoRunner } from '../useDemoRunner';
-import { useDemoAiConnection } from '../useDemoAiConnection';
-
-const ACTION_NAMES = [
-  'pressIntro', 'pickDomain', 'setQuestion', 'openConnect', 'pickProvider', 'setConnectField',
-  'setAiStatus', 'closeConnect', 'setSearchPressed', 'ask', 'playAnswer', 'playScenario',
-  'stepBack', 'stepForward', 'openIncident', 'toggleLegend', 'showEndCard',
-] as const satisfies readonly (keyof DemoActions)[];
-
-function recordingActions() {
-  const calls: (keyof DemoActions)[] = [];
-  const actions = Object.fromEntries(
-    ACTION_NAMES.map((name) => [name, vi.fn(() => calls.push(name))]),
-  ) as unknown as DemoActions;
-  return { actions, calls };
-}
+import { POINTER_MOVE_MS, TARGET_TIMEOUT_MS } from '../runDemo';
+import type { DemoScript } from '../types';
+import { DEMO_ERROR_ATTRIBUTE, DEMO_STATE_ATTRIBUTE, useDemoRunner } from '../useDemoRunner';
 
 function fakeInputTarget() {
   const listeners = new Map<string, EventListener>();
@@ -29,11 +15,20 @@ function fakeInputTarget() {
 }
 
 const SCRIPT: DemoScript = [
-  { kind: 'pickDomain', domainId: 'shopping', durationMs: 1000, target: 'domain-shopping', caption: 'Shopping' },
-  { kind: 'openConnect', durationMs: 1000, target: 'connect-open' },
-  { kind: 'connect', durationMs: 1000, caption: 'Connecting' },
-  { kind: 'endCard', durationMs: 1000 },
+  { kind: 'click', target: 'domain-shopping', durationMs: 1000, caption: 'Shopping' },
+  { kind: 'click', target: 'connect-open', durationMs: 1000 },
+  { kind: 'click', target: 'connect-open', durationMs: 1000, caption: 'Again' },
+  { kind: 'wait', durationMs: 1000 },
 ];
+
+let clicks: string[] = [];
+
+function addButton(target: string) {
+  const button = document.createElement('button');
+  button.setAttribute('data-demo-target', target);
+  button.addEventListener('click', () => clicks.push(target));
+  document.body.appendChild(button);
+}
 
 function demoState() {
   return document.documentElement.getAttribute(DEMO_STATE_ATTRIBUTE);
@@ -46,32 +41,36 @@ async function advance(ms: number) {
 }
 
 function renderRunner(script: DemoScript | undefined, speed = 1) {
-  const { actions, calls } = recordingActions();
   const inputTarget = fakeInputTarget();
   const onEnd = vi.fn();
-  const rendered = renderHook(() => useDemoRunner({ script, speed, actions, onEnd, inputTarget }));
-  return { ...rendered, calls, onEnd, inputTarget };
+  const rendered = renderHook(() => useDemoRunner({ script, speed, onEnd, inputTarget }));
+  return { ...rendered, onEnd, inputTarget };
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
+  clicks = [];
+  addButton('domain-shopping');
+  addButton('connect-open');
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  document.body.innerHTML = '';
   document.documentElement.removeAttribute(DEMO_STATE_ATTRIBUTE);
+  document.documentElement.removeAttribute(DEMO_ERROR_ATTRIBUTE);
 });
 
 describe('useDemoRunner', () => {
-  it('runs the script to the end and marks the document done', async () => {
-    const { result, calls, onEnd, inputTarget } = renderRunner(SCRIPT);
+  it('clicks through the script and marks the document done', async () => {
+    const { result, onEnd, inputTarget } = renderRunner(SCRIPT);
 
     expect(result.current.isActive).toBe(true);
     expect(demoState()).toBe('running');
 
     await advance(4000);
 
-    expect(calls).toEqual(['pickDomain', 'openConnect', 'setAiStatus', 'setAiStatus', 'showEndCard']);
+    expect(clicks).toEqual(['domain-shopping', 'connect-open', 'connect-open']);
     expect(demoState()).toBe('done');
     expect(result.current.status).toBe('done');
     expect(result.current.isOverlayVisible).toBe(false);
@@ -79,17 +78,17 @@ describe('useDemoRunner', () => {
     expect(inputTarget.listenerCount()).toBe(0);
   });
 
-  it('keeps the caption and target until a later step replaces them', async () => {
+  it('moves the pointer on every press, even to the same target twice', async () => {
     const { result } = renderRunner(SCRIPT);
 
     await advance(0);
-    expect(result.current).toMatchObject({ caption: 'Shopping', target: 'domain-shopping', isOverlayVisible: true });
+    expect(result.current).toMatchObject({ caption: 'Shopping', pointer: { target: 'domain-shopping', moveId: 1 } });
 
     await advance(1000);
-    expect(result.current).toMatchObject({ caption: 'Shopping', target: 'connect-open' });
+    expect(result.current).toMatchObject({ caption: 'Shopping', pointer: { target: 'connect-open', moveId: 2 } });
 
     await advance(1000);
-    expect(result.current).toMatchObject({ caption: 'Connecting', target: 'connect-open' });
+    expect(result.current).toMatchObject({ caption: 'Again', pointer: { target: 'connect-open', moveId: 3 } });
   });
 
   it('divides every duration by the speed', async () => {
@@ -102,16 +101,16 @@ describe('useDemoRunner', () => {
     expect(onEnd).toHaveBeenCalledWith('done');
   });
 
-  it.each(['pointerdown', 'keydown'])('aborts on a trusted %s and calls no later action', async (eventType) => {
-    const { result, calls, onEnd, inputTarget } = renderRunner(SCRIPT);
-    await advance(1500);
+  it.each(['pointerdown', 'keydown'])('aborts on a trusted %s and presses nothing more', async (eventType) => {
+    const { result, onEnd, inputTarget } = renderRunner(SCRIPT);
+    await advance(1000 + POINTER_MOVE_MS / 2);
 
     await act(async () => {
       inputTarget.fire(eventType, true);
     });
     await advance(10_000);
 
-    expect(calls).toEqual(['pickDomain', 'openConnect']);
+    expect(clicks).toEqual(['domain-shopping']);
     expect(demoState()).toBe('aborted');
     expect(result.current.status).toBe('aborted');
     expect(result.current.isOverlayVisible).toBe(false);
@@ -120,81 +119,36 @@ describe('useDemoRunner', () => {
     expect(inputTarget.listenerCount()).toBe(0);
   });
 
-  it('ignores untrusted input', async () => {
-    const { calls, onEnd, inputTarget } = renderRunner(SCRIPT);
-    await advance(500);
+  it('fails with the reason on the document when a target never shows', async () => {
+    const { result, onEnd } = renderRunner([{ kind: 'click', target: 'menu-open', durationMs: 500 }]);
 
-    inputTarget.fire('pointerdown', false);
-    inputTarget.fire('keydown', false);
-    await advance(3500);
+    await advance(TARGET_TIMEOUT_MS + 100);
 
-    expect(calls).toHaveLength(5);
-    expect(onEnd).toHaveBeenCalledWith('done');
-  });
-
-  it('drops the fake AI connection when aborted mid-connect', async () => {
-    const inputTarget = fakeInputTarget();
-    const { result } = renderHook(() => {
-      const demoAi = useDemoAiConnection();
-      const { actions } = recordingActions();
-      const runner = useDemoRunner({
-        script: SCRIPT,
-        speed: 1,
-        actions: { ...actions, setAiStatus: demoAi.setDemoStatus },
-        onEnd: () => demoAi.setDemoStatus('disconnected'),
-        inputTarget,
-      });
-      return { demoAi, runner };
-    });
-
-    await advance(2500);
-    expect(result.current.demoAi.isConnecting).toBe(true);
-
-    await act(async () => {
-      inputTarget.fire('pointerdown', true);
-    });
-
-    expect(result.current.runner.status).toBe('aborted');
-    expect(result.current.demoAi.status).toBe('disconnected');
-    expect(result.current.demoAi.isConnecting).toBe(false);
-  });
-
-  it('calls the latest actions after a re-render', async () => {
-    const firstActions = recordingActions();
-    const latestActions = recordingActions();
-    const inputTarget = fakeInputTarget();
-    const { rerender } = renderHook(
-      ({ actions }) => useDemoRunner({ script: SCRIPT, speed: 1, actions, onEnd: vi.fn(), inputTarget }),
-      { initialProps: { actions: firstActions.actions } },
-    );
-    await advance(0);
-
-    rerender({ actions: latestActions.actions });
-    await advance(1000);
-
-    expect(firstActions.calls).toEqual(['pickDomain']);
-    expect(latestActions.calls).toEqual(['openConnect']);
+    expect(result.current.status).toBe('failed');
+    expect(demoState()).toBe('failed');
+    expect(document.documentElement.getAttribute(DEMO_ERROR_ATTRIBUTE)).toContain('menu-open');
+    expect(onEnd).toHaveBeenCalledExactlyOnceWith('failed');
   });
 
   it('does nothing without a script', async () => {
-    const { result, calls, inputTarget } = renderRunner(undefined);
+    const { result, inputTarget } = renderRunner(undefined);
     await advance(5000);
 
     expect(result.current.status).toBe('idle');
     expect(result.current.isActive).toBe(false);
-    expect(calls).toEqual([]);
+    expect(clicks).toEqual([]);
     expect(demoState()).toBeNull();
     expect(inputTarget.addEventListener).not.toHaveBeenCalled();
   });
 
   it('clears its timers, listeners and document state on unmount', async () => {
-    const { unmount, calls, onEnd, inputTarget } = renderRunner(SCRIPT);
-    await advance(500);
+    const { unmount, onEnd, inputTarget } = renderRunner(SCRIPT);
+    await advance(POINTER_MOVE_MS + 100);
 
     unmount();
     await advance(10_000);
 
-    expect(calls).toEqual(['pickDomain']);
+    expect(clicks).toEqual(['domain-shopping']);
     expect(onEnd).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
     expect(inputTarget.listenerCount()).toBe(0);

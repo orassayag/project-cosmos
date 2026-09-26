@@ -1,98 +1,108 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { INCIDENTS } from '../../incidents/data';
 import { shotTimelineMs } from '../../map/CometPackets';
 import { PLAYABLE_BY_ID, stepsForScenario } from '../../scenarios/data';
-import { runDemo } from '../runDemo';
-import { DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
+import { POINTER_MOVE_MS, TYPING_CHARACTER_MS } from '../runDemo';
+import { DEMO_QUESTION, DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
 import {
-  AI_DEMO_SCRIPT,
   ALL_DEMO_SCENARIO_ID,
-  ALL_DEMO_SCRIPT,
-  DEMO_SCRIPTS,
+  buildDemoScript,
   DEMO_TIME_LIMITS_MS,
   playbackDurationMs,
   scriptDurationMs,
   scriptedAnswerDurationMs,
 } from '../scripts';
-import { DEMO_STEP_ACTIONS, DEMO_STEP_KINDS, DEMO_TARGETS, type DemoActions, type DemoModeName } from '../types';
+import { DEMO_TARGETS, type DemoModeName, type DemoScript, type DemoTarget } from '../types';
 
-const ACTION_NAMES = [
-  'pressIntro', 'pickDomain', 'setQuestion', 'openConnect', 'pickProvider', 'setConnectField',
-  'setAiStatus', 'closeConnect', 'setSearchPressed', 'ask', 'playAnswer', 'playScenario',
-  'stepBack', 'stepForward', 'openIncident', 'toggleLegend', 'showEndCard',
-] as const satisfies readonly (keyof DemoActions)[];
+const MODES: DemoModeName[] = ['ai', 'all'];
+const LAYOUTS = [{ isPhone: false }, { isPhone: true }];
+const VARIANTS = MODES.flatMap((mode) => LAYOUTS.map((layout) => [mode, layout.isPhone ? 'phone' : 'desktop', buildDemoScript(mode, layout)] as const));
 
-const scriptEntries = Object.entries(DEMO_SCRIPTS).map(
-  ([mode, script]) => [mode as DemoModeName, script] as const,
-);
-
-function createActionSpies(): DemoActions {
-  return Object.fromEntries(ACTION_NAMES.map((name) => [name, vi.fn()])) as unknown as DemoActions;
+function targetsOf(script: DemoScript): DemoTarget[] {
+  return script.flatMap((step) => (step.kind === 'wait' ? [] : [step.target]));
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
-});
+function isKnownTarget(target: DemoTarget): boolean {
+  if ((DEMO_TARGETS as readonly string[]).includes(target)) return true;
+  const scenarioId = target.match(/^scenario-(.+)$/)?.[1];
+  if (scenarioId) return PLAYABLE_BY_ID[scenarioId] !== undefined;
+  const incidentId = target.match(/^incident-(.+)$/)?.[1];
+  return incidentId !== undefined && INCIDENTS.some((incident) => incident.id === incidentId);
+}
 
 describe('demo scripts', () => {
-  it('keeps the ai demo within 60 seconds', () => {
-    expect(DEMO_TIME_LIMITS_MS.ai).toBe(60_000);
-    expect(scriptDurationMs(AI_DEMO_SCRIPT)).toBeLessThanOrEqual(60_000);
-  });
-
-  it('keeps the all demo within 120 seconds', () => {
-    expect(DEMO_TIME_LIMITS_MS.all).toBe(120_000);
-    expect(scriptDurationMs(ALL_DEMO_SCRIPT)).toBeLessThanOrEqual(120_000);
-  });
-
-  it.each(scriptEntries)('keeps the %s demo within its time limit', (mode, script) => {
+  it.each(VARIANTS)('keeps the %s demo (%s) within its time limit', (mode, _layout, script) => {
+    expect(DEMO_TIME_LIMITS_MS).toEqual({ ai: 60_000, all: 120_000 });
     expect(scriptDurationMs(script)).toBeLessThanOrEqual(DEMO_TIME_LIMITS_MS[mode]);
   });
 
-  it('maps every step kind to real DemoActions callbacks', () => {
-    for (const kind of DEMO_STEP_KINDS) {
-      for (const actionName of DEMO_STEP_ACTIONS[kind]) expect(ACTION_NAMES).toContain(actionName);
-    }
-    for (const [, script] of scriptEntries) {
-      for (const step of script) expect(DEMO_STEP_ACTIONS[step.kind], step.kind).toBeDefined();
-    }
+  it.each(VARIANTS)('points the %s demo (%s) only at known targets', (_mode, _layout, script) => {
+    for (const target of targetsOf(script)) expect(isKnownTarget(target), target).toBe(true);
   });
 
-  it.each(scriptEntries)('points the %s demo only at known targets', (_mode, script) => {
+  it.each(VARIANTS)('gives every gesture in the %s demo (%s) time for the pointer glide and its typing', (_mode, _layout, script) => {
     for (const step of script) {
-      if (step.target !== undefined) expect(DEMO_TARGETS).toContain(step.target);
+      if (step.kind === 'wait') continue;
+      const typingMs = step.kind === 'type' ? step.text.length * TYPING_CHARACTER_MS : 0;
+      expect(step.durationMs, step.target).toBeGreaterThanOrEqual(POINTER_MOVE_MS + typingMs);
     }
   });
 
-  it('plays the whole ai demo without a network request', async () => {
-    vi.useFakeTimers();
-    const fetchSpy = vi.fn();
-    vi.stubGlobal('fetch', fetchSpy);
-    const actions = createActionSpies();
+  it.each(VARIANTS)('connects with fake keys, types the question and searches in the %s demo (%s)', (_mode, _layout, script) => {
+    const connectAt = targetsOf(script).indexOf('connect-submit');
+    const typeStep = script.find((step) => step.kind === 'type');
+    const searchIndex = script.findIndex((step) => step.kind === 'click' && step.target === 'ask-search');
 
-    const run = runDemo(AI_DEMO_SCRIPT, actions, { signal: new AbortController().signal, speed: 1 });
-    await vi.advanceTimersByTimeAsync(scriptDurationMs(AI_DEMO_SCRIPT));
+    expect(connectAt).toBeGreaterThan(-1);
+    for (const step of script) {
+      if (step.kind === 'paste') expect(step.text).toContain('demo');
+    }
+    expect(typeStep).toMatchObject({ target: 'ask-input', text: DEMO_QUESTION });
+    expect(script[searchIndex + 1]).toMatchObject({ kind: 'wait' });
+    expect(script[searchIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(DEMO_SCRIPTED_ANSWER));
+  });
 
-    await expect(run).resolves.toBe('done');
-    expect(actions.playAnswer).toHaveBeenCalledOnce();
-    expect(actions.showEndCard).toHaveBeenCalledOnce();
-    expect(fetchSpy).not.toHaveBeenCalled();
+  it.each(MODES)('opens the phone drawer before the %s demo reaches for a domain', (mode) => {
+    const phoneTargets = targetsOf(buildDemoScript(mode, { isPhone: true }));
+    const desktopTargets = targetsOf(buildDemoScript(mode, { isPhone: false }));
+
+    expect(desktopTargets).not.toContain('menu-open');
+    expect(phoneTargets.indexOf('menu-open')).toBeLessThan(phoneTargets.findIndex((target) => target.startsWith('domain-')));
+  });
+
+  it.each(MODES)('ends the %s demo without an end card', (mode) => {
+    const script = buildDemoScript(mode, { isPhone: false });
+    expect(script[script.length - 1].kind).toBe('wait');
   });
 });
 
 describe('demo=all script', () => {
-  it('opens with the intro button and ends on the end card', () => {
-    expect(ALL_DEMO_SCRIPT[0]).toMatchObject({ kind: 'pressIntro', target: 'intro-start' });
-    expect(ALL_DEMO_SCRIPT[ALL_DEMO_SCRIPT.length - 1].kind).toBe('endCard');
+  const script = buildDemoScript('all', { isPhone: false });
+  const targets = targetsOf(script);
+
+  it('opens with the intro button', () => {
+    expect(script[0]).toMatchObject({ kind: 'click', target: 'intro-start' });
   });
 
-  it('gives the scenario and the incident their playback length from the step data', () => {
-    const scenarioStep = ALL_DEMO_SCRIPT.find((step) => step.kind === 'playScenario');
-    const incidentStep = ALL_DEMO_SCRIPT.find((step) => step.kind === 'openIncident');
+  it('picks the scenario and the newest incident from their menus, then presses Play for their full length', () => {
+    const incidentId = INCIDENTS[0].id;
+    for (const [pickTarget, playableId] of [[`scenario-${ALL_DEMO_SCENARIO_ID}`, ALL_DEMO_SCENARIO_ID], [`incident-${incidentId}`, incidentId]]) {
+      const pickIndex = targets.indexOf(pickTarget as DemoTarget);
+      expect(pickIndex, pickTarget).toBeGreaterThan(-1);
+      const playStep = script.filter((step) => step.kind !== 'wait')[pickIndex + 1];
+      expect(playStep).toMatchObject({ target: 'playback-play' });
+      expect(playStep.durationMs).toBeGreaterThanOrEqual(playbackDurationMs(playableId) + POINTER_MOVE_MS);
+    }
+    expect(targets.indexOf('incidents-open')).toBe(targets.indexOf(`incident-${incidentId}`) - 1);
+  });
 
-    expect(scenarioStep).toMatchObject({ scenarioId: ALL_DEMO_SCENARIO_ID, durationMs: playbackDurationMs(ALL_DEMO_SCENARIO_ID) });
-    expect(incidentStep).toMatchObject({ incidentId: INCIDENTS[0].id, durationMs: playbackDurationMs(INCIDENTS[0].id) });
+  it('steps back twice and forward twice', () => {
+    expect(targets.filter((target) => target === 'playback-step-back')).toHaveLength(2);
+    expect(targets.filter((target) => target === 'playback-step-forward')).toHaveLength(2);
+  });
+
+  it('turns the ownership legend on and back off', () => {
+    expect(targets.filter((target) => target === 'legend-ownership')).toHaveLength(2);
   });
 
   it('sums every shot of the scenario into its playback length', () => {
@@ -104,35 +114,5 @@ describe('demo=all script', () => {
     const leadStepsTotalMs = shotLengthsMs.reduce((totalMs, shotMs) => totalMs + shotMs, 0);
     expect(playbackDurationMs(ALL_DEMO_SCENARIO_ID)).toBeGreaterThanOrEqual(leadStepsTotalMs);
     expect(() => playbackDurationMs('no-such-scenario')).toThrow('no-such-scenario');
-  });
-
-  it('turns the ownership legend on and back off', () => {
-    const legendVisibility = ALL_DEMO_SCRIPT.flatMap((step) => (step.kind === 'toggleLegend' ? [step.isVisible] : []));
-    expect(legendVisibility).toEqual([true, false]);
-  });
-
-  it('gives the shortened ai answer its full reveal time', () => {
-    const answerStep = ALL_DEMO_SCRIPT.find((step) => step.kind === 'answer');
-    expect(answerStep?.durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(DEMO_SCRIPTED_ANSWER));
-  });
-
-  it('plays the whole all demo through each tour action without a network request', async () => {
-    vi.useFakeTimers();
-    const fetchSpy = vi.fn();
-    vi.stubGlobal('fetch', fetchSpy);
-    const actions = createActionSpies();
-
-    const run = runDemo(ALL_DEMO_SCRIPT, actions, { signal: new AbortController().signal, speed: 1 });
-    await vi.advanceTimersByTimeAsync(scriptDurationMs(ALL_DEMO_SCRIPT));
-
-    await expect(run).resolves.toBe('done');
-    expect(actions.pressIntro).toHaveBeenCalledOnce();
-    expect(actions.playScenario).toHaveBeenCalledWith(ALL_DEMO_SCENARIO_ID);
-    expect(actions.stepBack).toHaveBeenCalledTimes(2);
-    expect(actions.stepForward).toHaveBeenCalledTimes(2);
-    expect(actions.openIncident).toHaveBeenCalledWith(INCIDENTS[0].id);
-    expect(vi.mocked(actions.toggleLegend).mock.calls).toEqual([[true], [false]]);
-    expect(actions.showEndCard).toHaveBeenCalledOnce();
-    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -398,10 +398,10 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
      side; on a phone that pair would collide, so a detail card takes over and
      the context panels behind it are hidden. Close the card (its corner ×) to
      bring the previous one back. Priority, high → low:
-       demo end card / connect-agent modal  >  inspector / ask / health card  >
-       step + incident narration  >  legends. Both modals are portaled to <body>,
+       connect-agent modal  >  inspector / ask / health card  >
+       step + incident narration  >  legends. The modal is portaled to <body>,
        hence `body:has`. */
-  body:has(.lc-connect-overlay, .lc-demo-end-overlay) .lc-stage :is(
+  body:has(.lc-connect-overlay) .lc-stage :is(
     .lc-map-panel, .lc-ask-panel, .lc-health-card,
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
   ),
@@ -420,7 +420,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   /* The demo caption strip (portaled to <body>) is lowest of all: any detail card
      or narration panel owns the bottom, so the caption waits behind it. */
   body:has(
-    .lc-connect-overlay, .lc-demo-end-overlay, .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card,
+    .lc-connect-overlay, .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card,
     .lc-step-panel, .lc-incident-panel
   ) .lc-demo-caption {
     display: none !important;
@@ -457,7 +457,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-pb-share { margin-left: auto; }
 
   /* ── Demo overlays ──────────────────────────────────────────
-     No cursor on touch, so the fake pointer never shows on phones. DemoCaption
+     No cursor on touch, so the demo pointer never shows on phones. DemoCaption
      lifts itself above the transport bar when one is showing. */
   .lc-demo-pointer { display: none; }
   .lc-demo-caption { bottom: calc(10px + var(--safe-bottom)); }
@@ -467,8 +467,6 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-help-modal { padding: 24px 20px 20px; max-height: 88dvh; overflow-y: auto; }
   .lc-help-title { font-size: 22px; }
   .lc-connect-modal { padding: 20px 18px 18px; }
-  .lc-demo-end-card { padding: 20px 56px 18px 18px; }
-  .lc-demo-end-title { font-size: 20px; }
   .lc-changelog { width: 100vw; }
   .lc-spotlight-backdrop { padding-top: 72px; }
 

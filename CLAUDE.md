@@ -57,12 +57,18 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 The scripted tours live in `client/src/demo/scripts.ts` (steps), `client/src/demo/scriptedAnswer.ts`
 (the AI question + answer), and are recorded with `npm run record:demo -- ai|all`.
 
+- **The tours drive the real UI (invariant).** Every step is a viewer gesture (`click` / `type` / `paste`
+  on a `data-demo-target`): `runDemo.ts` glides the pointer there and dispatches the same pointer, mouse,
+  keyboard and input events a person would, so all changes go through the app's own handlers. Never add a
+  step that sets app state directly. Only two things are faked: the AI connection (`useDemoAiConnection`
+  accepts the fake keys, no network) and the answer (`DEMO_SCRIPTED_ANSWER`, via `handleAsk`). Scripts are
+  built per layout (`buildDemoScript(mode, { isPhone })`) — on phones the pickers sit in the drawer.
 - **Every important new feature joins `demo=all` in the same change (invariant).** Add a segment to
-  `buildAllDemoScript()` (plus any new `DemoActions` handler and `data-demo-target` attribute it needs).
+  `buildAllDemoScript()` (plus any `data-demo-target` attribute it needs).
   The tour must stay ≤120s (`scripts.test.ts` guards it) — trim other segments to make room rather than
   skipping the feature.
 - **Every AI change is reflected in `demo=ai` in the same change (invariant).** Any change to the Ask /
-  Connect-agent flow, providers, or answer behaviour updates `AI_DEMO_SCRIPT` and/or
+  Connect-agent flow, providers, or answer behaviour updates `buildAiDemoScript()` and/or
   `DEMO_SCRIPTED_ANSWER` so the tour shows the current behaviour; it must stay ≤60s.
 - After a demo change, run `npm test` and re-record both modes to confirm they finish under their limits.
 

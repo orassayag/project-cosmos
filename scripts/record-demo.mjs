@@ -6,8 +6,9 @@
  *   npm run record:demo -- ai|all    # writes recordings/demo-<mode>.webm
  *
  * BASE_URL overrides the app origin (default http://localhost:5173).
- * Exits non-zero if the demo aborts, never finishes, or takes longer than its
- * real-time limit — the wall-clock backstop for the unit-level duration check.
+ * Exits non-zero if the demo aborts, fails (a step's target never showed), never
+ * finishes, or takes longer than its real-time limit — the wall-clock backstop
+ * for the unit-level duration check.
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -65,10 +66,12 @@ try {
   let finalState;
   try {
     const finishedHtml = await page.waitForSelector(
-      'html[data-demo-state="done"], html[data-demo-state="aborted"]',
+      'html[data-demo-state="done"], html[data-demo-state="aborted"], html[data-demo-state="failed"]',
       { state: 'attached', timeout: limitMs + WAIT_HEADROOM_MS },
     );
     finalState = await finishedHtml.getAttribute('data-demo-state');
+    const failureReason = await finishedHtml.getAttribute('data-demo-error');
+    if (failureReason) finalState = `${finalState}: ${failureReason}`;
   } catch (error) {
     finalState = `timeout (${error.message.split('\n')[0]})`;
   }

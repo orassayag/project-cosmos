@@ -89,65 +89,14 @@ describe('AskAgent', () => {
     expect(screen.getByPlaceholderText('Explore Project Cosmos')).toHaveProperty('value', 'Which team owns checkout?');
   });
 
-  describe('demo props', () => {
-    const DEMO_QUESTION = 'What changed in the Fulfillment Galaxy over the past 24 hours?';
+  it('clears the previous question when the field is focused again', () => {
+    renderAskAgent('connected', 'anthropic');
+    const field = screen.getByPlaceholderText('Explore Project Cosmos');
+    fireEvent.change(field, { target: { value: 'Who owns' } });
+    fireEvent.blur(field);
 
-    function renderDemo(props: { demoQuestion?: string; demoExpanded?: boolean; demoSearchPressed?: boolean }) {
-      const onAsk = vi.fn();
-      render(
-        <AskAgent
-          onAsk={onAsk}
-          aiStatus="connected"
-          aiProvider="anthropic"
-          onConnectRequest={vi.fn()}
-          onDisconnect={vi.fn()}
-          {...props}
-        />,
-      );
-      return { onAsk, field: screen.getByPlaceholderText('Explore Project Cosmos') };
-    }
+    fireEvent.focus(field);
 
-    it('renders demoQuestion as the field text, read-only', () => {
-      const { field } = renderDemo({ demoQuestion: 'Which services' });
-
-      expect(field).toHaveProperty('value', 'Which services');
-      expect(field).toHaveProperty('readOnly', true);
-    });
-
-    it('keeps demoQuestion when the field is focused', () => {
-      const { field } = renderDemo({ demoQuestion: DEMO_QUESTION });
-
-      fireEvent.focus(field);
-
-      expect(field).toHaveProperty('value', DEMO_QUESTION);
-      expect(screen.queryByRole('group', { name: 'Example questions' })).toBeNull();
-    });
-
-    it('expands from demoExpanded without focus and shows Search pressed', () => {
-      renderDemo({ demoQuestion: DEMO_QUESTION, demoExpanded: true, demoSearchPressed: true });
-
-      expect(screen.getByRole('button', { name: 'Search' }).className).toBe('lc-ask-go lc-ask-go--pressed');
-    });
-
-    it('stays collapsed while demoExpanded is false, even when focused', () => {
-      const { field } = renderDemo({ demoQuestion: '', demoExpanded: false });
-
-      fireEvent.focus(field);
-
-      expect(screen.queryByRole('button', { name: 'Search' })).toBeNull();
-    });
-
-    it('renders Search unpressed and clears on focus without demo props', () => {
-      const { field } = renderDemo({});
-      fireEvent.focus(field);
-      fireEvent.change(field, { target: { value: 'Who owns' } });
-      fireEvent.blur(field);
-
-      fireEvent.focus(field);
-
-      expect(field).toHaveProperty('value', '');
-      expect(field).toHaveProperty('readOnly', false);
-      expect(screen.getByRole('button', { name: 'Search' }).className).toBe('lc-ask-go');
-    });
+    expect(field).toHaveProperty('value', '');
   });
 });

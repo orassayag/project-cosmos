@@ -1,46 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { abortOnTrustedInput, runDemo, scaledDuration, SEARCH_PRESS_MS, sleep } from '../runDemo';
-import { DEMO_STEP_ACTIONS, DEMO_STEP_KINDS, type DemoActions, type DemoStep, type DemoStepKind } from '../types';
-
-const ACTION_NAMES = [
-  'pressIntro', 'pickDomain', 'setQuestion', 'openConnect', 'pickProvider', 'setConnectField',
-  'setAiStatus', 'closeConnect', 'setSearchPressed', 'ask', 'playAnswer', 'playScenario',
-  'stepBack', 'stepForward', 'openIncident', 'toggleLegend', 'showEndCard',
-] as const satisfies readonly (keyof DemoActions)[];
-
-function recordingActions() {
-  const calls: { name: keyof DemoActions; args: unknown[] }[] = [];
-  const actions = Object.fromEntries(
-    ACTION_NAMES.map((name) => [name, vi.fn((...args: unknown[]) => calls.push({ name, args }))]),
-  ) as unknown as DemoActions;
-  return { actions, calls, names: () => calls.map((call) => call.name) };
-}
-
-const SAMPLE_STEPS: Record<DemoStepKind, DemoStep> = {
-  pressIntro: { kind: 'pressIntro', durationMs: 100 },
-  pickDomain: { kind: 'pickDomain', domainId: 'shopping', durationMs: 100 },
-  type: { kind: 'type', text: 'Where do orders go?', durationMs: 100 },
-  openConnect: { kind: 'openConnect', durationMs: 100 },
-  pickProvider: { kind: 'pickProvider', provider: 'anthropic', durationMs: 100 },
-  paste: { kind: 'paste', field: 'providerKey', value: 'demo-key', durationMs: 100 },
-  connect: { kind: 'connect', durationMs: 400 },
-  closeConnect: { kind: 'closeConnect', durationMs: 100 },
-  ask: { kind: 'ask', question: 'Where do orders go?', durationMs: 400 },
-  answer: { kind: 'answer', answer: { text: 'To checkout.', thinkingMs: 10, wordMs: 5 }, durationMs: 100 },
-  playScenario: { kind: 'playScenario', scenarioId: 'checkout', durationMs: 100 },
-  stepBack: { kind: 'stepBack', durationMs: 100 },
-  stepForward: { kind: 'stepForward', durationMs: 100 },
-  openIncident: { kind: 'openIncident', incidentId: 'incident-1', durationMs: 100 },
-  toggleLegend: { kind: 'toggleLegend', isVisible: true, durationMs: 100 },
-  wait: { kind: 'wait', durationMs: 100 },
-  endCard: { kind: 'endCard', durationMs: 100 },
-};
-
-const THREE_STEP_SCRIPT: DemoStep[] = [
-  { kind: 'pickDomain', domainId: 'shopping', durationMs: 1000 },
-  { kind: 'type', text: 'hello', durationMs: 1000 },
-  { kind: 'endCard', durationMs: 1000 },
-];
+import {
+  abortOnTrustedInput,
+  DemoTargetMissingError,
+  POINTER_MOVE_MS,
+  pressElement,
+  runDemo,
+  scaledDuration,
+  sleep,
+  TARGET_TIMEOUT_MS,
+  TYPING_CHARACTER_MS,
+} from '../runDemo';
+import type { DemoStep } from '../types';
 
 function fakeInputTarget() {
   const listeners = new Map<string, EventListener>();
@@ -52,12 +22,30 @@ function fakeInputTarget() {
   };
 }
 
+function addElement<K extends keyof HTMLElementTagNameMap>(tag: K, target: string): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  element.setAttribute('data-demo-target', target);
+  document.body.appendChild(element);
+  return element;
+}
+
+/** Records every event type a target receives, in order. */
+function recordEvents(element: HTMLElement, types: string[]): string[] {
+  const seen: string[] = [];
+  for (const type of types) element.addEventListener(type, () => seen.push(type));
+  return seen;
+}
+
+const run = (script: DemoStep[], options: Partial<Parameters<typeof runDemo>[1]> = {}) =>
+  runDemo(script, { signal: new AbortController().signal, speed: 1, ...options });
+
 beforeEach(() => {
   vi.useFakeTimers();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  document.body.innerHTML = '';
 });
 
 describe('sleep', () => {
@@ -75,15 +63,6 @@ describe('sleep', () => {
     await expect(promise).resolves.toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
-
-  it('removes its abort listener once it resolves', async () => {
-    const controller = new AbortController();
-    const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
-    const promise = sleep(10, controller.signal);
-    await vi.advanceTimersByTimeAsync(10);
-    await promise;
-    expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
-  });
 });
 
 describe('scaledDuration', () => {
@@ -93,115 +72,158 @@ describe('scaledDuration', () => {
   });
 });
 
+describe('pressElement', () => {
+  it('fires the full mouse sequence a real click makes and focuses the element', () => {
+    const button = addElement('button', 'ask-search');
+    const seen = recordEvents(button, ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']);
+
+    pressElement(button);
+
+    expect(seen).toEqual(['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']);
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('keeps focus where it was when mouse-down is prevented, like the Search button does', () => {
+    const field = addElement('textarea', 'ask-input');
+    const button = addElement('button', 'ask-search');
+    button.addEventListener('mousedown', (event) => event.preventDefault());
+    field.focus();
+
+    pressElement(button);
+
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('dispatches untrusted events, so the demo never aborts itself', () => {
+    const button = addElement('button', 'ask-search');
+    const trust: boolean[] = [];
+    button.addEventListener('pointerdown', (event) => trust.push(event.isTrusted));
+    pressElement(button);
+    expect(trust).toEqual([false]);
+  });
+});
+
 describe('runDemo', () => {
-  it('calls actions in script order, one step per duration', async () => {
-    const { actions, names } = recordingActions();
-    const run = runDemo(THREE_STEP_SCRIPT, actions, { signal: new AbortController().signal, speed: 1 });
+  it('glides to the target, then clicks it, then pauses out the step', async () => {
+    const button = addElement('button', 'domain-shopping');
+    const onClick = vi.fn();
+    button.addEventListener('click', onClick);
+    const onPointerMove = vi.fn();
 
+    const result = run([{ kind: 'click', target: 'domain-shopping', durationMs: 1000 }], { onPointerMove });
     await vi.advanceTimersByTimeAsync(0);
-    expect(names()).toEqual(['pickDomain']);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(names()).toEqual(['pickDomain', 'setQuestion']);
-    await vi.advanceTimersByTimeAsync(2000);
+    expect(onPointerMove).toHaveBeenCalledWith('domain-shopping');
+    expect(onClick).not.toHaveBeenCalled();
 
-    await expect(run).resolves.toBe('done');
-    expect(names()).toEqual(['pickDomain', 'setQuestion', 'showEndCard']);
+    await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS);
+    expect(onClick).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(1000 - POINTER_MOVE_MS);
+    await expect(result).resolves.toBe('done');
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('drives each step kind through the callbacks mapped in DEMO_STEP_ACTIONS', async () => {
-    for (const kind of DEMO_STEP_KINDS) {
-      const { actions, names } = recordingActions();
-      const run = runDemo([SAMPLE_STEPS[kind]], actions, { signal: new AbortController().signal, speed: 1 });
-      await vi.runAllTimersAsync();
-      await expect(run).resolves.toBe('done');
-      expect([...new Set(names())].sort()).toEqual([...DEMO_STEP_ACTIONS[kind]].sort());
-    }
+  it('types into the field one key at a time through input events React can see', async () => {
+    const field = addElement('textarea', 'ask-input');
+    const inputs: string[] = [];
+    field.addEventListener('input', (event) => inputs.push((event as InputEvent).data ?? ''));
+
+    const result = run([{ kind: 'type', target: 'ask-input', text: 'Hi!', durationMs: 2000 }]);
+    await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS);
+    expect(field.value).toBe('H');
+    expect(document.activeElement).toBe(field);
+    await vi.advanceTimersByTimeAsync(TYPING_CHARACTER_MS);
+    expect(field.value).toBe('Hi');
+
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(result).resolves.toBe('done');
+    expect(field.value).toBe('Hi!');
+    expect(inputs).toEqual(['H', 'i', '!']);
   });
 
-  it('moves the fake connection from connecting to connected within the step duration', async () => {
-    const { actions, calls } = recordingActions();
-    const run = runDemo([SAMPLE_STEPS.connect], actions, { signal: new AbortController().signal, speed: 1 });
+  it('pastes the whole text in one input event', async () => {
+    const field = addElement('input', 'connect-provider-key');
+    const inputTypes: string[] = [];
+    field.addEventListener('input', (event) => inputTypes.push((event as InputEvent).inputType));
 
-    await vi.advanceTimersByTimeAsync(399);
-    expect(calls.map((call) => call.args)).toEqual([['connecting']]);
-    await vi.advanceTimersByTimeAsync(1);
-    await expect(run).resolves.toBe('done');
-    expect(calls.map((call) => call.args)).toEqual([['connecting'], ['connected']]);
+    const result = run([{ kind: 'paste', target: 'connect-provider-key', text: 'sk-demo', durationMs: 1000 }]);
+    await vi.runAllTimersAsync();
+
+    await expect(result).resolves.toBe('done');
+    expect(field.value).toBe('sk-demo');
+    expect(inputTypes).toEqual(['insertFromPaste']);
   });
 
-  it('presses and releases search before asking, keeping the total step duration', async () => {
-    const { actions, calls } = recordingActions();
-    const run = runDemo([SAMPLE_STEPS.ask], actions, { signal: new AbortController().signal, speed: 1 });
+  it('waits for a target that renders later, such as a menu item', async () => {
+    const onClick = vi.fn();
+    const result = run([{ kind: 'click', target: 'scenario-shopping.place-order', durationMs: 1000 }]);
 
-    await vi.advanceTimersByTimeAsync(SEARCH_PRESS_MS);
-    expect(calls).toEqual([
-      { name: 'setSearchPressed', args: [true] },
-      { name: 'setSearchPressed', args: [false] },
-      { name: 'ask', args: ['Where do orders go?'] },
-    ]);
-    expect(vi.getTimerCount()).toBe(1);
-    await vi.advanceTimersByTimeAsync(400 - SEARCH_PRESS_MS);
-    await expect(run).resolves.toBe('done');
+    await vi.advanceTimersByTimeAsync(300);
+    addElement('button', 'scenario-shopping.place-order').addEventListener('click', onClick);
+    await vi.runAllTimersAsync();
+
+    await expect(result).resolves.toBe('done');
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('fails with the missing target when it never renders', async () => {
+    const result = run([{ kind: 'click', target: 'connect-open', durationMs: 1000 }]);
+    const assertion = expect(result).rejects.toThrow(DemoTargetMissingError);
+
+    await vi.advanceTimersByTimeAsync(TARGET_TIMEOUT_MS + 100);
+    await assertion;
+    await expect(result).rejects.toThrow('connect-open');
   });
 
   it('finishes in a quarter of the time at speed 4', async () => {
-    const { actions } = recordingActions();
-    let result: string | undefined;
-    void runDemo(THREE_STEP_SCRIPT, actions, { signal: new AbortController().signal, speed: 4 }).then((value) => {
-      result = value;
-    });
+    addElement('button', 'ask-search');
+    let outcome: string | undefined;
+    void run(
+      [{ kind: 'click', target: 'ask-search', durationMs: 1000 }, { kind: 'wait', durationMs: 2000 }],
+      { speed: 4 },
+    ).then((value) => { outcome = value; });
 
     await vi.advanceTimersByTimeAsync(749);
-    expect(result).toBeUndefined();
+    expect(outcome).toBeUndefined();
     await vi.advanceTimersByTimeAsync(1);
-    expect(result).toBe('done');
+    expect(outcome).toBe('done');
   });
 
-  it('reports each step before its actions run', async () => {
-    const { actions, names } = recordingActions();
-    const seen: string[] = [];
-    const onStepStart = vi.fn((step: DemoStep, stepIndex: number) => {
-      seen.push(`${stepIndex}:${step.kind}:${names().length}`);
-    });
-    const run = runDemo(THREE_STEP_SCRIPT, actions, { signal: new AbortController().signal, speed: 1, onStepStart });
+  it('reports each step before it runs', async () => {
+    const onStepStart = vi.fn();
+    const script: DemoStep[] = [{ kind: 'wait', durationMs: 10 }, { kind: 'wait', durationMs: 10, caption: 'Two' }];
+    const result = run(script, { onStepStart });
     await vi.runAllTimersAsync();
-    await run;
-    expect(seen).toEqual(['0:pickDomain:0', '1:type:1', '2:endCard:2']);
+    await result;
+    expect(onStepStart.mock.calls).toEqual([[script[0], 0], [script[1], 1]]);
   });
 
-  it('stops on abort mid-run: no later action and no pending timer', async () => {
-    const { actions, names } = recordingActions();
+  it('stops on abort mid-type: no later key and no pending timer', async () => {
+    const field = addElement('textarea', 'ask-input');
     const controller = new AbortController();
-    const run = runDemo(THREE_STEP_SCRIPT, actions, { signal: controller.signal, speed: 1 });
+    const result = run([{ kind: 'type', target: 'ask-input', text: 'hello', durationMs: 2000 }], { signal: controller.signal });
 
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS + TYPING_CHARACTER_MS);
     controller.abort();
 
-    await expect(run).resolves.toBe('aborted');
+    await expect(result).resolves.toBe('aborted');
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(5000);
-    expect(names()).toEqual(['pickDomain', 'setQuestion']);
+    expect(field.value).toBe('he');
   });
 
-  it('calls no action when the signal is already aborted', async () => {
-    const { actions, names } = recordingActions();
+  it('presses nothing when the signal is already aborted', async () => {
+    const onClick = vi.fn();
+    addElement('button', 'ask-search').addEventListener('click', onClick);
     const controller = new AbortController();
     controller.abort();
-    const onStepStart = vi.fn();
 
-    await expect(runDemo(THREE_STEP_SCRIPT, actions, { signal: controller.signal, speed: 1, onStepStart })).resolves.toBe(
-      'aborted',
-    );
-    expect(names()).toEqual([]);
-    expect(onStepStart).not.toHaveBeenCalled();
+    await expect(run([{ kind: 'click', target: 'ask-search', durationMs: 100 }], { signal: controller.signal })).resolves.toBe('aborted');
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it('rejects a non-positive speed', async () => {
-    const { actions } = recordingActions();
-    await expect(runDemo(THREE_STEP_SCRIPT, actions, { signal: new AbortController().signal, speed: 0 })).rejects.toThrow(
-      RangeError,
-    );
+    await expect(run([{ kind: 'wait', durationMs: 10 }], { speed: 0 })).rejects.toThrow(RangeError);
   });
 });
 
@@ -216,19 +238,10 @@ describe('abortOnTrustedInput', () => {
     }
   });
 
-  it('ignores untrusted events', () => {
-    const controller = new AbortController();
-    const target = fakeInputTarget();
-    abortOnTrustedInput(controller, target);
-    target.fire('pointerdown', false);
-    target.fire('keydown', false);
-    expect(controller.signal.aborted).toBe(false);
-  });
-
-  it('ignores a synthetic event dispatched on window', () => {
+  it('ignores the runner’s own untrusted presses', () => {
     const controller = new AbortController();
     const cleanup = abortOnTrustedInput(controller);
-    window.dispatchEvent(new Event('pointerdown'));
+    pressElement(addElement('button', 'ask-search'));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(controller.signal.aborted).toBe(false);
     cleanup();
@@ -242,21 +255,5 @@ describe('abortOnTrustedInput', () => {
     expect(target.listenerCount()).toBe(0);
     target.fire('pointerdown', true);
     expect(controller.signal.aborted).toBe(false);
-  });
-
-  it('a trusted pointerdown aborts a running demo', async () => {
-    const { actions, names } = recordingActions();
-    const controller = new AbortController();
-    const target = fakeInputTarget();
-    const cleanup = abortOnTrustedInput(controller, target);
-    const run = runDemo(THREE_STEP_SCRIPT, actions, { signal: controller.signal, speed: 1 });
-
-    await vi.advanceTimersByTimeAsync(500);
-    target.fire('pointerdown', true);
-
-    await expect(run).resolves.toBe('aborted');
-    expect(names()).toEqual(['pickDomain']);
-    expect(vi.getTimerCount()).toBe(0);
-    cleanup();
   });
 });

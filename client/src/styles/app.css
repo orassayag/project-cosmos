@@ -933,12 +933,6 @@ body:has(.lc-map-stage[data-panning='true']) * {
   color: var(--text-1);
   border-color: var(--border-strong);
 }
-.lc-ask-go--pressed {
-  color: var(--text-1);
-  border-color: var(--border-strong);
-  background: color-mix(in srgb, var(--text-1) 14%, var(--bg-surface));
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
-}
 
 /* Example questions shown while the expanded field is empty. The card grows to
    make room and shrinks back as soon as the visitor starts typing. */
@@ -3742,7 +3736,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   color: var(--text-1);
 }
 
-/* ── Demo overlays: fake pointer + caption strip ──────────────
+/* ── Demo overlays: pointer + caption strip ──────────────────
    Both sit above the Connect window (z 200) so the recording shows them
    over it; neither ever takes input. */
 .lc-demo-pointer {
@@ -3813,23 +3807,3 @@ body:has(.lc-map-stage[data-panning='true']) * {
   .lc-demo-pointer { transition: none; }
   .lc-demo-caption-text { animation: none; }
 }
-
-/* ── Demo end card ── above the demo pointer (230) and caption (220), which are
-   still on screen during the `endCard` step. */
-.lc-demo-end-overlay { z-index: 240; }
-.lc-demo-end-card { width: min(520px, calc(100vw - 32px)); padding-right: 64px; }
-.lc-demo-end-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  margin: 0;
-}
-.lc-demo-end-sep { color: var(--text-3); }
-.lc-demo-end-link {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-}
-.lc-demo-end-link:hover,
-.lc-demo-end-link:focus-visible { border-bottom-color: var(--accent); }

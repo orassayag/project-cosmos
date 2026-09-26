@@ -1,42 +1,34 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AiConnection, AiProvider, ConnectResult } from '../hooks/useAiConnection';
-import type { DemoAiStatus } from './types';
+import { scaledDuration } from './runDemo';
 
 export const DEMO_AI_PROVIDER: AiProvider = 'anthropic';
 
-export interface DemoAiConnection extends AiConnection {
-  /** True while the scripted `connect` step is in flight; App feeds it to the Connect window's busy state. */
-  isConnecting: boolean;
-  /** The runner's `DemoActions.setAiStatus`. */
-  setDemoStatus: (status: DemoAiStatus) => void;
-}
+/** How long the fake connect keeps the Connect window busy, at speed 1. */
+export const DEMO_CONNECT_MS = 1800;
 
 /**
- * A stand-in for `useAiConnection` while the demo plays. `connecting` still reads as
- * `disconnected` to consumers, because `AiConnectionStatus` has no in-between state.
+ * A stand-in for `useAiConnection` while the demo plays: the Connect window's real submit
+ * lands here, which accepts the fake keys after a pause and never touches the network.
  */
-export function useDemoAiConnection(): DemoAiConnection {
-  const [demoStatus, setDemoStatus] = useState<DemoAiStatus>('disconnected');
+export function useDemoAiConnection(speed: number): AiConnection {
+  const [isConnected, setIsConnected] = useState(false);
 
   const connect = useCallback(async (): Promise<ConnectResult> => {
-    setDemoStatus('connected');
+    await new Promise((resolve) => setTimeout(resolve, scaledDuration(DEMO_CONNECT_MS, speed)));
+    setIsConnected(true);
     return { ok: true, provider: DEMO_AI_PROVIDER };
-  }, []);
+  }, [speed]);
 
   const disconnect = useCallback(async (): Promise<boolean> => {
-    setDemoStatus('disconnected');
+    setIsConnected(false);
     return true;
   }, []);
 
-  return useMemo(() => {
-    const isConnected = demoStatus === 'connected';
-    return {
-      status: isConnected ? 'connected' : 'disconnected',
-      provider: isConnected ? DEMO_AI_PROVIDER : null,
-      isConnecting: demoStatus === 'connecting',
-      connect,
-      disconnect,
-      setDemoStatus,
-    };
-  }, [demoStatus, connect, disconnect]);
+  return useMemo(() => ({
+    status: isConnected ? 'connected' : 'disconnected',
+    provider: isConnected ? DEMO_AI_PROVIDER : null,
+    connect,
+    disconnect,
+  }), [isConnected, connect, disconnect]);
 }

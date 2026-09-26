@@ -104,5 +104,4 @@ export const OVERLAY = {
   /** The star/topic inspector. Registered only on phones, where it joins the
    *  stack; on desktop it coexists with the map overlays as local state. */
   inspector: 'inspector',
-  demoEndCard: 'demo-end-card',
 } as const;

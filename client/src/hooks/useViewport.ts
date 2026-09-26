@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 // phones held in landscape, where the width alone is wide enough to look like
 // a desktop but there is nowhere near the vertical room the full-height panels
 // assume — so they'd otherwise take over the whole screen.
-const MOBILE_QUERY = '(max-width: 768px), (max-height: 480px)';
+export const MOBILE_QUERY ='(max-width: 768px), (max-height: 480px)';
 const TABLET_QUERY = '(max-width: 1024px)';
 const COARSE_QUERY = '(pointer: coarse)';
 

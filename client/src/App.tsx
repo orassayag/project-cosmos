@@ -17,7 +17,6 @@ import type { AskAction } from './components/AskPanel';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { DemoCaption } from './components/DemoCaption';
 import { DemoPointer } from './components/DemoPointer';
-import { DemoEndCard } from './components/DemoEndCard';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
@@ -27,15 +26,15 @@ import type { SpotlightTarget } from './components/Spotlight';
 import { BrandStarfield } from './map/BrandStarfield';
 import { MobileMenu } from './components/MobileMenu';
 import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overlays/OverlayManager';
-import { useViewport } from './hooks/useViewport';
+import { MOBILE_QUERY, useViewport } from './hooks/useViewport';
 import { useAiConnection } from './hooks/useAiConnection';
 import type { AiConnection } from './hooks/useAiConnection';
 import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from './demo/demoMode';
-import { DEMO_SCRIPTS } from './demo/scripts';
-import type { DemoActions, DemoConnectState, DemoScriptedAnswer } from './demo/types';
+import { buildDemoScript } from './demo/scripts';
+import { DEMO_SCRIPTED_ANSWER } from './demo/scriptedAnswer';
+import type { DemoScriptedAnswer } from './demo/types';
 import { useDemoAiConnection } from './demo/useDemoAiConnection';
 import { useDemoRunner } from './demo/useDemoRunner';
-import { useDemoView } from './demo/useDemoView';
 
 import { DOMAINS, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
 import type { Incident, DriftEntry } from './scenarios/data';
@@ -46,18 +45,13 @@ import { readInitialDeepLink, resolvePlayableId, useDeepLink } from './hooks/use
 
 interface ActivityEntry { idx: number; step: Step }
 
-/**
- * Holds the answer panel on its thinking dots from the demo's Search press until the scripted
- * answer arrives; without it the panel would ask the server or play the joke answer.
- */
-const DEMO_AWAITING_ANSWER: DemoScriptedAnswer = { text: '', thinkingMs: 60_000, wordMs: 0 };
-
-interface DemoAskState { question: string; isSearchPressed: boolean }
-
 export function App() {
   const initial = useMemo(readInitialDeepLink, []);
   const demoMode = useMemo(() => readDemoMode(window.location.href), []);
-  const demoScript = demoMode ? DEMO_SCRIPTS[demoMode.mode] : undefined;
+  // Built once for the layout at load: a script that changed mid-run would restart it.
+  const [demoScript] = useState(() => demoMode
+    ? buildDemoScript(demoMode.mode, { isPhone: window.matchMedia(MOBILE_QUERY).matches })
+    : undefined);
   const demoSpeed = demoMode?.speed ?? 1;
   const [showIntro, setShowIntro] = useState(() => shouldShowIntro(
     demoMode,
@@ -310,46 +304,17 @@ export function App() {
     setWarping(true);
   }, [demoMode]);
 
-  const demoAi = useDemoAiConnection();
-  const demoView = useDemoView(demoSpeed);
-  const demoActions: DemoActions = {
-    // The intro's own handler also fades the intro out and unmounts it; its button is a plain
-    // click handler, so a programmatic click runs exactly that path (and is a no-op once disabled).
-    pressIntro: () => document.querySelector<HTMLButtonElement>('[data-demo-target="intro-start"]')?.click(),
-    pickDomain: handlePickDomain,
-    setQuestion: demoView.typeQuestion,
-    openConnect: () => overlay.open(OVERLAY.connect),
-    pickProvider: demoView.pickProvider,
-    setConnectField: demoView.setConnectField,
-    setAiStatus: demoAi.setDemoStatus,
-    closeConnect: () => overlay.close(OVERLAY.connect),
-    setSearchPressed: demoView.setSearchPressed,
-    ask: (question) => openAskPanel(question, [], DEMO_AWAITING_ANSWER),
-    playAnswer: (answer) => setAskScriptedAnswer(answer),
-    playScenario: handlePlayScenario,
-    stepBack: navPrev,
-    stepForward: navNext,
-    openIncident: handlePlayScenario,
-    toggleLegend: (isVisible) => {
-      if (isVisible) overlay.open(OVERLAY.mapOwnership);
-      else overlay.close(OVERLAY.mapOwnership);
-    },
-    showEndCard: () => {
-      demoView.requestEndCard();
-      overlay.open(OVERLAY.demoEndCard);
-    },
-  };
-  const handleDemoEnd = () => {
-    demoAi.setDemoStatus('disconnected');
-    demoView.reset();
-    overlay.close(OVERLAY.connect);
-    if (askScriptedAnswer === DEMO_AWAITING_ANSWER) overlay.close(OVERLAY.ask);
-  };
-  const demoRunner = useDemoRunner({ script: demoScript, speed: demoSpeed, actions: demoActions, onEnd: handleDemoEnd });
+  const demoAi = useDemoAiConnection(demoSpeed);
+  const demoRunner = useDemoRunner({
+    script: demoScript,
+    speed: demoSpeed,
+    // A run cut short can leave the Connect window open with the fake keys in it.
+    onEnd: () => overlay.close(OVERLAY.connect),
+  });
   const isDemoActive = demoRunner.isActive;
   const demoOverlays = demoScript && (
     <>
-      <DemoPointer target={demoRunner.target} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
+      <DemoPointer pointer={demoRunner.pointer} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
       <DemoCaption caption={demoRunner.caption} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
     </>
   );
@@ -359,21 +324,10 @@ export function App() {
   const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
   const isAiConnected = aiConnection.status === 'connected';
   const handleAsk = useCallback((question: string) => {
-    openAskPanel(question, isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
-  }, [openAskPanel, isAiConnected]);
-
-  const demoAsk: DemoAskState | undefined = isDemoActive && demoView.view.question !== undefined
-    ? { question: demoView.view.question, isSearchPressed: demoView.view.isSearchPressed }
-    : undefined;
-  const demoConnect: DemoConnectState | undefined = isDemoActive
-    ? {
-      provider: demoView.view.provider,
-      providerKey: demoView.view.providerKey,
-      jevKey: demoView.view.jevKey,
-      showJevField: true,
-      isBusy: demoAi.isConnecting,
-    }
-    : undefined;
+    // The demo's question goes through the real Search; only the answer is scripted.
+    if (isDemoActive) openAskPanel(question, [], DEMO_SCRIPTED_ANSWER);
+    else openAskPanel(question, isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
+  }, [openAskPanel, isAiConnected, isDemoActive]);
 
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow
@@ -440,11 +394,9 @@ export function App() {
         onAsk={handleAsk}
         onAnswerStart={handleAnswerStart}
         onAskAction={handleAskAction}
-        demoAsk={demoAsk}
-        demoConnect={demoConnect}
+        showDemoJevField={isDemoActive}
       />
       {demoOverlays}
-      {demoScript && <DemoEndCard />}
     </OverlayProvider>
   );
 }
@@ -488,8 +440,7 @@ interface ProjectCosmosShellProps {
   onAsk: (question: string) => void;
   onAnswerStart: () => void;
   onAskAction: (action: AskAction) => void;
-  demoAsk: DemoAskState | undefined;
-  demoConnect: DemoConnectState | undefined;
+  showDemoJevField: boolean;
 }
 
 function ProjectCosmosShell(p: ProjectCosmosShellProps) {
@@ -509,7 +460,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     driftDate, onSelectDrift,
     activeIncident,
     aiConnection, askQuestion, askNonce, askFocusIds, askScriptedAnswer,
-    onAsk, onAnswerStart, onAskAction, demoAsk, demoConnect,
+    onAsk, onAnswerStart, onAskAction, showDemoJevField,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
@@ -613,6 +564,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             <button
               type="button"
               className="lc-topbar-brand lc-topbar-brand--reset"
+              data-demo-target="galaxy-reset"
               onClick={onResetGalaxy}
               title="Reset the galaxy — clear the current scenario, filters and URL"
             >
@@ -698,9 +650,6 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             aiProvider={aiConnection.provider}
             onConnectRequest={handleConnectRequest}
             onDisconnect={handleDisconnect}
-            demoQuestion={demoAsk?.question}
-            demoExpanded={demoAsk ? true : undefined}
-            demoSearchPressed={demoAsk?.isSearchPressed}
           />
         );
 
@@ -738,6 +687,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
                   <button
                     type="button"
                     className="lc-menu-toggle"
+                    data-demo-target="menu-open"
                     aria-label="Open menu"
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen(true)}
@@ -878,7 +828,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
       <ConnectAgentModal
         currentProvider={aiConnection.provider}
         onConnect={aiConnection.connect}
-        demo={demoConnect}
+        showJevField={showDemoJevField}
       />
 
       <ChangelogPanel

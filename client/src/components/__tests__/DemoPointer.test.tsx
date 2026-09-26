@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { DemoPointer, POINTER_MOVE_MS, POINTER_RIPPLE_MS } from '../DemoPointer';
+import { POINTER_MOVE_MS } from '../../demo/runDemo';
+import { DemoPointer, POINTER_RIPPLE_MS } from '../DemoPointer';
 
 function addTarget(name: string, rect: { left: number; top: number; width: number; height: number }) {
   const element = document.createElement('button');
@@ -32,7 +33,7 @@ describe('DemoPointer', () => {
   it('glides to the centre of the target element and ripples, with both durations scaled by speed', async () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout'] });
     addTarget('connect-open', { left: 100, top: 40, width: 80, height: 20 });
-    render(<DemoPointer target="connect-open" isVisible speed={2} />);
+    render(<DemoPointer pointer={{ target: 'connect-open', moveId: 1 }} isVisible speed={2} />);
     await flushFrames();
 
     const pointer = screen.getByTestId('demo-pointer');
@@ -45,7 +46,7 @@ describe('DemoPointer', () => {
 
   it('renders nothing while the target element does not exist', async () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout'] });
-    render(<DemoPointer target="ask-search" isVisible speed={1} />);
+    render(<DemoPointer pointer={{ target: 'ask-search', moveId: 2 }} isVisible speed={1} />);
     await flushFrames();
 
     expect(screen.queryByTestId('demo-pointer')).toBeNull();
@@ -54,20 +55,34 @@ describe('DemoPointer', () => {
   it('stays where it was when a later target is missing', async () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout'] });
     addTarget('ask-input', { left: 0, top: 0, width: 200, height: 40 });
-    const { rerender } = render(<DemoPointer target="ask-input" isVisible speed={1} />);
+    const { rerender } = render(<DemoPointer pointer={{ target: 'ask-input', moveId: 3 }} isVisible speed={1} />);
     await flushFrames();
-    rerender(<DemoPointer target="ask-search" isVisible speed={1} />);
+    rerender(<DemoPointer pointer={{ target: 'ask-search', moveId: 4 }} isVisible speed={1} />);
     await flushFrames();
 
     expect(screen.getByTestId('demo-pointer').style.transform).toBe('translate(100px, 20px)');
   });
 
+  it('ripples again when the same target is pressed twice', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout'] });
+    addTarget('playback-step-back', { left: 0, top: 0, width: 40, height: 40 });
+    const { rerender } = render(<DemoPointer pointer={{ target: 'playback-step-back', moveId: 1 }} isVisible speed={1} />);
+    await flushFrames();
+    const firstRipple = screen.getByTestId('demo-pointer').querySelector('.lc-demo-pointer-ripple');
+    rerender(<DemoPointer pointer={{ target: 'playback-step-back', moveId: 2 }} isVisible speed={1} />);
+    await flushFrames();
+
+    const secondRipple = screen.getByTestId('demo-pointer').querySelector('.lc-demo-pointer-ripple');
+    expect(secondRipple).not.toBeNull();
+    expect(secondRipple).not.toBe(firstRipple);
+  });
+
   it('hides once the overlay is no longer visible', async () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout'] });
     addTarget('ask-input', { left: 0, top: 0, width: 200, height: 40 });
-    const { rerender } = render(<DemoPointer target="ask-input" isVisible speed={1} />);
+    const { rerender } = render(<DemoPointer pointer={{ target: 'ask-input', moveId: 5 }} isVisible speed={1} />);
     await flushFrames();
-    rerender(<DemoPointer target="ask-input" isVisible={false} speed={1} />);
+    rerender(<DemoPointer pointer={{ target: 'ask-input', moveId: 6 }} isVisible={false} speed={1} />);
 
     expect(screen.queryByTestId('demo-pointer')).toBeNull();
   });

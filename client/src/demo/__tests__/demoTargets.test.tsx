@@ -3,22 +3,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { AskAgent } from '../../components/AskAgent';
 import { ConnectAgentModal } from '../../components/ConnectAgentModal';
 import { DomainBar } from '../../components/DomainBar';
+import { IncidentBar } from '../../components/IncidentBar';
 import { IntroOverlay } from '../../components/IntroOverlay';
+import { MobileMenu } from '../../components/MobileMenu';
 import { PlaybackControls } from '../../components/PlaybackControls';
 import { ProjectCosmosMap } from '../../map/Map';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { RunnerApi } from '../../scenarios/runner';
 import type { Scenario, Step } from '../../scenarios/types';
-import { DEMO_SCRIPTS } from '../scripts';
-import { DEMO_TARGETS, type DemoConnectState } from '../types';
-
-const DEMO_CONNECT_STATE: DemoConnectState = {
-  provider: 'anthropic',
-  providerKey: 'sk-ant-demo-••••••••',
-  jevKey: 'vck-demo-••••••••',
-  showJevField: true,
-  isBusy: false,
-};
+import { buildDemoScript } from '../scripts';
+import { DEMO_TARGETS } from '../types';
 
 const STUB_STEPS = [{ label: 'First' }, { label: 'Second' }, { label: 'Third' }] as Step[];
 
@@ -36,17 +30,20 @@ function DemoSurfaces() {
     <OverlayProvider value={overlay}>
       <button type="button" onClick={() => overlay.open(OVERLAY.connect)}>Open connect</button>
       <IntroOverlay onStart={vi.fn()} onExitComplete={vi.fn()} />
+      {/* Stand-ins for App's own buttons: the brand reset and the phone menu toggle. */}
+      <button type="button" data-demo-target="galaxy-reset">Project Cosmos</button>
+      <button type="button" data-demo-target="menu-open">Open menu</button>
+      <MobileMenu open onClose={vi.fn()}>menu</MobileMenu>
       <DomainBar active="shopping" activeScenarioId={null} onPickDomain={vi.fn()} onPickScenario={vi.fn()} />
+      <IncidentBar activeScenarioId={null} onPickIncident={vi.fn()} />
       <AskAgent
         onAsk={vi.fn()}
         aiStatus="disconnected"
         aiProvider={null}
         onConnectRequest={vi.fn()}
         onDisconnect={vi.fn()}
-        demoQuestion="Which services does checkout touch?"
-        demoExpanded
       />
-      <ConnectAgentModal currentProvider={null} onConnect={vi.fn()} demo={DEMO_CONNECT_STATE} />
+      <ConnectAgentModal currentProvider={null} onConnect={vi.fn()} showJevField />
       <PlaybackControls
         runner={STUB_RUNNER}
         steps={STUB_STEPS}
@@ -65,6 +62,10 @@ function renderDemoSurfaces() {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   render(<DemoSurfaces />);
   fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
+  // The menus and the Ask footer only render once opened, as they do for the demo's own clicks.
+  fireEvent.click(findTargets('domain-shopping')[0]);
+  fireEvent.click(findTargets('incidents-open')[0]);
+  fireEvent.focus(findTargets('ask-input')[0]);
 }
 
 function findTargets(target: string) {
@@ -72,10 +73,13 @@ function findTargets(target: string) {
 }
 
 describe('data-demo-target attributes', () => {
-  it.each(Object.entries(DEMO_SCRIPTS))('resolves every target the %s demo script points at to exactly one element', (_mode, script) => {
+  it.each([
+    ['ai', false], ['ai', true], ['all', false], ['all', true],
+  ] as const)('resolves every target the %s demo script (phone: %s) points at to exactly one element', (mode, isPhone) => {
     renderDemoSurfaces();
 
-    const scriptTargets = script.flatMap((step) => (step.target ? [step.target] : []));
+    const script = buildDemoScript(mode, { isPhone });
+    const scriptTargets = script.flatMap((step) => (step.kind === 'wait' ? [] : [step.target]));
     expect(scriptTargets.length).toBeGreaterThan(0);
     for (const target of scriptTargets) {
       expect(findTargets(target), target).toHaveLength(1);
