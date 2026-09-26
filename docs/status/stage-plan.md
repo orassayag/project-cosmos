@@ -24,4 +24,4 @@ the plan: §1–§6, §8, §9 before §7.
 - Stage 11: COMMITTED — A2: DemoEndCard.tsx + OVERLAY.demoEndCard + close button + DemoEndCard.test
 - Stage 12: COMMITTED — §7: `demo=all` script (scenario-derived segment 2 time) + new DemoActions wired in App (pressIntro, playScenario, stepBack/Forward, openIncident, toggleLegend) + scripts.test (all ≤ 120s)
 - Stage 13: COMMITTED — A4: scripts/record-demo.mjs, `record:demo` npm script, playwright devDependency, recordings/ gitignored
-- Stage 14: PLANNED — Final acceptance: /test, record:demo ai + all under limits, 390×844 / 844×390 manual check, no-`?demo=` regression check
+- Stage 14: COMMITTED — Final acceptance: /test, record:demo ai + all under limits, 390×844 / 844×390 manual check, no-`?demo=` regression check
