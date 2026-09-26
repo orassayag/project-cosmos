@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ProjectCosmosMap } from './map/Map';
 import { DomainBar } from './components/DomainBar';
@@ -13,6 +13,7 @@ import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
 import { AskAgent } from './components/AskAgent';
 import { AskPanel } from './components/AskPanel';
+import type { AskAction } from './components/AskPanel';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
@@ -26,12 +27,12 @@ import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overl
 import { useViewport } from './hooks/useViewport';
 import { useAiConnection } from './hooks/useAiConnection';
 
-import { DOMAINS, SCENARIOS_BY_ID, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
+import { DOMAINS, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
 import type { Incident, DriftEntry } from './scenarios/data';
 import type { Step } from './scenarios/types';
 import { useScenarioRunner } from './scenarios/runner';
 import type { Shot } from './scenarios/runner';
-import { readInitialDeepLink, useDeepLink } from './hooks/useDeepLink';
+import { readInitialDeepLink, resolvePlayableId, useDeepLink } from './hooks/useDeepLink';
 
 interface ActivityEntry { idx: number; step: Step }
 
@@ -51,10 +52,7 @@ export function App() {
   // Hydrate from deep link on first paint. An incident id wins over a
   // scenario id — both resolve into the same runner slot.
   useEffect(() => {
-    const deepLinkId =
-      (initial.incident && INCIDENTS_BY_ID[initial.incident] && initial.incident) ||
-      (initial.scenario && SCENARIOS_BY_ID[initial.scenario] && initial.scenario) ||
-      null;
+    const deepLinkId = resolvePlayableId(initial.incident) ?? resolvePlayableId(initial.scenario);
     if (deepLinkId) {
       setScenario(deepLinkId);
       if (initial.step != null) {
@@ -152,6 +150,30 @@ export function App() {
     // is committed before play() reads it.
     queueMicrotask(() => runner.play());
   }, [runner]);
+
+  // The runner only exposes the new scenario's steps after the next render, so
+  // playback starts from an effect once the picked id is actually loaded.
+  const pendingAutoplayIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (pendingAutoplayIdRef.current === null) return;
+    if (pendingAutoplayIdRef.current !== state.scenarioId || steps.length === 0) return;
+    pendingAutoplayIdRef.current = null;
+    navPlay();
+  }, [state.scenarioId, steps, navPlay]);
+
+  const handlePlayScenario = useCallback(
+    (id: string) => {
+      const playableId = resolvePlayableId(id);
+      if (!playableId) return;
+      if (playableId === state.scenarioId) {
+        navRestart();
+        return;
+      }
+      pendingAutoplayIdRef.current = playableId;
+      handlePickScenario(playableId);
+    },
+    [state.scenarioId, navRestart, handlePickScenario],
+  );
 
   const handlePickDomain = useCallback(
     (domainId: string) => {
@@ -271,6 +293,7 @@ export function App() {
         setPanelOpen={setPanelOpen}
         handlePickDomain={handlePickDomain}
         handlePickScenario={handlePickScenario}
+        onPlayScenario={handlePlayScenario}
         handleShotComplete={handleShotComplete}
         isolate={isolate}
         setHistory={setHistory}
@@ -307,6 +330,7 @@ interface ProjectCosmosShellProps {
   setPanelOpen: (v: boolean) => void;
   handlePickDomain: (d: string) => void;
   handlePickScenario: (s: string) => void;
+  onPlayScenario: (playableId: string) => void;
   handleShotComplete: (token: number) => void;
   isolate: boolean;
   setHistory: (v: ActivityEntry[]) => void;
@@ -338,7 +362,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
   const {
     activeDomain, runner, state, steps, scenario, shot, history,
-    panelOpen, setPanelOpen, handlePickDomain, handlePickScenario,
+    panelOpen, setPanelOpen, handlePickDomain, handlePickScenario, onPlayScenario,
     handleShotComplete, isolate, setHistory, navPlay, navPrev, navNext, navJump, navRestart,
     spotlightTarget, setSpotlightTarget,
     warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, projectCosmosState, resetNonce,
@@ -367,20 +391,29 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   // inspector or any other surface — opening one closes the rest.
   const [askQuestion, setAskQuestion] = useState<string | null>(null);
   const [askNonce, setAskNonce] = useState(0);
-  // A random node the map "focuses" on while the answer shows — picked fresh
-  // per question so the demo lands on a different cluster each time. The focus
-  // only engages once the answer starts typing (not during "thinking").
-  const [askFocusId, setAskFocusId] = useState<string | null>(null);
+  // The nodes the map "focuses" on while the answer shows. Disconnected, the
+  // canned demo picks one random node per question; connected, the list starts
+  // empty and the agent's highlight actions fill it. The focus only engages
+  // once the answer starts (not during "thinking").
+  const [askFocusIds, setAskFocusIds] = useState<string[]>([]);
   const [askAnswering, setAskAnswering] = useState(false);
+  const aiConnection = useAiConnection();
+  const isAiConnected = aiConnection.status === 'connected';
   const handleAsk = useCallback((question: string) => {
     setAskQuestion(question);
     setAskNonce((n) => n + 1);
-    setAskFocusId(SERVICES[Math.floor(Math.random() * SERVICES.length)].id);
+    setAskFocusIds(isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
     setAskAnswering(false);
     overlay.open(OVERLAY.ask);
-  }, [overlay]);
+  }, [overlay, isAiConnected]);
   const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
-  const aiConnection = useAiConnection();
+  const handleAskAction = useCallback((action: AskAction) => {
+    if (action.kind === 'highlight') {
+      setAskFocusIds(action.serviceIds.filter((id) => SERVICES_BY_ID[id] || TOPICS_BY_ID[id]));
+    } else {
+      onPlayScenario(action.scenarioId);
+    }
+  }, [onPlayScenario]);
   const { disconnect: disconnectAi } = aiConnection;
   const handleConnectRequest = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
   const handleDisconnect = useCallback(() => {
@@ -639,7 +672,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           spotlightTarget={spotlightTarget}
           onSpotlightConsumed={() => setSpotlightTarget(null)}
           resetNonce={resetNonce}
-          askFocusId={askAnswering ? askFocusId : null}
+          askFocusIds={askAnswering ? askFocusIds : []}
           incidentActive={!!activeIncident}
           explodeNodeId={explodedStarId}
           explodeTargetId={explodeTargetId}
@@ -682,6 +715,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
             onAnswerStart={handleAnswerStart}
             showConnectPrompt={aiConnection.status === 'disconnected'}
             onConnectRequest={handleConnectRequest}
+            onAction={handleAskAction}
           />
         )}
 

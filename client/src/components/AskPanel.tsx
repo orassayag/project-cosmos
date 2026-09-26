@@ -10,7 +10,13 @@ interface AskPanelProps {
   /** True while no AI agent is connected — the canned joke then ends with a Connect prompt. */
   showConnectPrompt?: boolean;
   onConnectRequest?: () => void;
+  /** Map actions the live agent streams alongside its answer (wired by the stream reader). */
+  onAction?: (action: AskAction) => void;
 }
+
+export type AskAction =
+  | { type: 'action'; kind: 'highlight'; serviceIds: string[] }
+  | { type: 'action'; kind: 'playScenario'; scenarioId: string };
 
 // Same running joke, ten ways: this is a portfolio demo with no live model
 // wired up, so every "answer" is a self-aware placeholder.

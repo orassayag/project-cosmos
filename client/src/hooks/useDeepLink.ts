@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { DOMAINS } from '../scenarios/data';
+import { DOMAINS, INCIDENTS_BY_ID, SCENARIOS_BY_ID } from '../scenarios/data';
 
 interface DeepLinkState {
   domain: string | null;
@@ -62,4 +62,10 @@ export function readInitialDeepLink(): InitialDeepLink {
     incident: params.get('incident'),
     step: Number.isFinite(stepNum) && stepNum >= 0 ? stepNum : null,
   };
+}
+
+export function resolvePlayableId(id: string | null | undefined): string | null {
+  if (!id) return null;
+  if (INCIDENTS_BY_ID[id] || SCENARIOS_BY_ID[id]) return id;
+  return null;
 }

@@ -35,6 +35,7 @@ import { LATEST_DRIFT_BY_NODE, LATEST_DRIFT_DATE, LATEST_DRIFT_ENTRIES, driftEnt
 import type { DriftEntry } from '../scenarios/drift';
 import type { DriftKind } from '../scenarios/drift';
 import { BlastLegend } from './BlastLegend';
+import { computeAskTouches } from './askTouches';
 import { computeBlastRadius, BLAST_LEVEL_META } from './blast-radius';
 import { HealthLegend } from './HealthLegend';
 import { HealthCard } from './HealthCard';
@@ -121,9 +122,9 @@ interface MapProps {
   onSpotlightConsumed?: () => void;
   /** Incremented by the "Project Cosmos" reset — clears selection and reframes home. */
   resetNonce?: number;
-  /** A random node the Ask panel "focuses" on — dims the map to its cluster
-   *  while the panel is open, so the answer reads as being about it. */
-  askFocusId?: string | null;
+  /** Nodes the Ask panel answer is about — while the panel is open the map
+   *  dims down to every one of them plus their immediate neighbours. */
+  askFocusIds?: readonly string[];
   /** True when the active playable is a recorded incident — tints the comet
    *  the incident colour so a historical replay never reads as live traffic. */
   incidentActive?: boolean;
@@ -146,6 +147,8 @@ interface MapProps {
 }
 
 
+const NO_ASK_FOCUS_IDS: readonly string[] = [];
+
 export function ProjectCosmosMap({
   activeScenarioId = null,
   shot = null,
@@ -157,7 +160,7 @@ export function ProjectCosmosMap({
   spotlightTarget = null,
   onSpotlightConsumed,
   resetNonce = 0,
-  askFocusId = null,
+  askFocusIds = NO_ASK_FOCUS_IDS,
   incidentActive = false,
   explodeNodeId = null,
   explodeTargetId = null,
@@ -696,19 +699,10 @@ export function ProjectCosmosMap({
     return ids;
   }, [selection, edges]);
 
-  // While the Ask panel is open, dim the map down to a random node and its
-  // immediate neighbours — the "cluster" the answer pretends to be about.
-  const askTouches = useMemo<Set<string> | null>(() => {
-    if (!overlay.isOpen(OVERLAY.ask) || !askFocusId) return null;
-    const ids = new Set<string>([askFocusId]);
-    for (const e of edges) {
-      if (e.from === askFocusId || e.to === askFocusId) {
-        ids.add(e.from);
-        ids.add(e.to);
-      }
-    }
-    return ids;
-  }, [overlay, askFocusId, edges]);
+  const askTouches = useMemo<Set<string> | null>(
+    () => (overlay.isOpen(OVERLAY.ask) ? computeAskTouches(askFocusIds, edges) : null),
+    [overlay, askFocusIds, edges],
+  );
 
   // Priority: ask focus > scenario > blast radius > selection > drift > ownership.
   // Health is a heat map — it tints every node and never dims.
