@@ -33,6 +33,10 @@ If the diff touched code, run `npm run build` (and `npm run snapshot` then `npm 
 `client/src/scenarios/` or `client/src/incidents/` changed; include the regenerated
 `server/src/generated/cosmos-map.json`). A failure is a stop condition — report the output, don't commit.
 
+Check whether the change makes `README.md` stale — a new or removed feature, command, script,
+env var, API route, keyboard shortcut, folder, or deploy step. If so, update `README.md` and
+include it in this commit. Internal-only changes need no README edit, but never skip the check.
+
 ## 3. Write the version note
 
 Summarize the real changes as **one plain-language bullet per change**, understandable by a

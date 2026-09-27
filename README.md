@@ -9,19 +9,32 @@
 >
 > This project is an extended version of [Cosmos OS](https://github.com/ludeo-labs/cosmos-os).
 > The original project was created by [Omer Sher](https://github.com/ludeo-labs) at
-> [Ludeo](https://ludeo.com) and is licensed under the MIT License. I extended it with
-> incident replay (curated production incidents replayed on the map), blast-radius analysis,
-> a service health heat map with on-call cards, an ownership view, a "what changed last night"
-> drift overlay with a status footer pill, a browsable architecture changelog, an
-> "Ask the agent" natural-language question panel, a presentation mode for talks,
-> an on-map step stepper, and a richer visual layer (planet morphology, nebula
-> fields, parallax panning, and star explosions).
+> [Ludeo](https://ludeo.com) and is licensed under the MIT License. On top of the original map
+> it adds:
+>
+> - **A real AI agent** — a Hono server on Vercel running a LangChain + LangGraph agent that
+>   answers questions about the architecture with the visitor's own Claude or OpenAI key, streams
+>   the answer, and lights up services or plays scenarios on the map. Questions are triaged first
+>   by **JEV** (a classification model on Vercel AI Gateway) so off-topic questions never cost the
+>   visitor a token.
+> - **Architecture insight views** — incident replay, blast-radius analysis, a service health
+>   heat map with on-call cards, an ownership view, a "what changed last night" drift overlay, and
+>   a browsable architecture changelog.
+> - **A mobile-first, responsive UI** — a phone drawer, bottom-sheet panels, pinch-zoom, and a
+>   strict one-panel-at-a-time policy.
+> - **Self-playing demo tours** (`?demo=ai`, `?demo=all`) that drive the real UI with a human-like
+>   pointer, plus a Playwright recorder.
+> - **Presentation mode, an on-map step stepper, quick search, a live activity log**, and a richer
+>   visual layer (planet morphology, nebula fields, parallax panning, star explosions).
+> - **A client/server npm-workspaces layout, Vitest suites in both workspaces, and a local
+>   version ledger** with a version badge in the top bar.
 
-**A living map of your architecture.** Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. And a nightly AI agent keeps the whole map honest against your actual code.
+**A living map of your architecture.** Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.
 
 <p align="center">
   <a href="https://project-cosmos-six.vercel.app/"><b>▶ Live demo</b></a> ·
   <a href="#quickstart">Quickstart</a> ·
+  <a href="#ask-the-agent-ai">AI agent</a> ·
   <a href="#make-it-your-cosmos">Make it yours</a> ·
   <a href="#drift-sync">Drift Sync</a>
 </p>
@@ -34,29 +47,44 @@
 
 Every architecture diagram starts dying the moment it's born. The wiki page is from two reorgs ago, the Lucidchart link is stale, and the only reliable documentation is a senior engineer with a whiteboard. Project Cosmos takes a different bet:
 
-1. **The map is the source, not a mirror.** Everything you see — services, topics, flows — is one set of plain TypeScript files. No backend, no database, no sync job to a diagramming SaaS.
+1. **The map is the source, not a mirror.** Everything you see — services, topics, flows — is one set of plain TypeScript files. No database, no sync job to a diagramming SaaS. The map works with no server at all; the server only exists to power the optional AI agent.
 2. **Flows are playable, not drawn.** A scenario is a real request traced hop-by-hop: URL, headers, payload, what got produced to which topic, what got written to which database. Press play and watch it fly.
 3. **Honesty is automated.** A nightly agent diffs your repos against the map and opens one PR per team when reality moved. Forgetting to update the docs stops being an option.
+4. **Questions get answered from the map, not from guesses.** The AI agent only knows what the map knows, and can only point at services and scenarios that really exist on it.
 
 ## What's in the box
 
-- 🗺️ **The map** — an animated SVG cosmos of your services (capsules), Kafka topics (orbitals), and protocol-colored connections (HTTP amber, WebSocket cyan, Kafka orange).
-- 🎬 **Scenario player** — named end-to-end flows play as comets along real curved paths, with a step panel showing the actual request/response payloads at every hop. Deep-linkable (`?domain=…&scenario=…&step=…`).
-- 🚨 **Incident replay** — pick a past production incident from the **Incidents** list and press play. The map replays the exact path the failing request (or cascade) took, with the real (redacted) payloads captured at the time, a red comet, and a banner so it never reads as live traffic. No AI — just human-curated recordings. Deep-linkable (`?incident=…&step=…`).
+### The map
+
+- 🗺️ **The map** — an animated SVG cosmos of your services (planets), Kafka topics (orbitals), and protocol-colored connections (HTTP amber, WebSocket cyan, Kafka orange). Every service is a distinct world — terran, cratered, banded, icy, volcanic or ringed — derived deterministically from its id, over nebula fields with parallax panning.
+- 🎬 **Scenario player** — named end-to-end flows play as comets along real curved paths, with a step panel showing the actual request/response payloads at every hop, and an on-map stepper to walk through them. Deep-linkable (`?domain=…&scenario=…&step=…`).
+- 🚨 **Incident replay** — pick a past production incident from the **Incidents** list and press play. The map replays the exact path the failing request (or cascade) took, with the real (redacted) payloads captured at the time, a red comet, a banner so it never reads as live traffic, and a star explosion when the meteor hits the failing service. Deep-linkable (`?incident=…&step=…`).
 - 🔎 **Quick search** — press `/` anywhere and start typing: services, topics and scenarios rank together in one palette, and picking a result warps the map straight to it.
 - 📜 **Live activity log** — a running `LIVE · ACTIVITY` feed of every step as it fires during playback, so you can read the whole path at once instead of one step at a time.
 - 🔍 **Service passports** — click any star: owner team, repo link, stack, databases, and why it exists.
 - 🪐 **Service ecosystems** — umbrella services expand into a mini solar system of sub-services; packets re-route through the internals during playback.
+- ✏️ **Layout edit mode** — hit `Edit layout` (or press `L`), drag stars and topics where you want them, then `Copy coords` and paste the values into the data files. Try it in the [live demo](https://project-cosmos-six.vercel.app/) — your rearrangement stays in your browser only.
+
+### Insight views
+
 - 🔦 **Blast radius** — click a service or topic and the map ranks everything that would break if you changed it, HIGH → MED → LOW. It walks the real dependency graph, which reverses direction for synchronous calls versus Kafka hand-offs, so the answer is genuine impact, not just "what's connected."
 - 🌡️ **Service health heat map** — stars tint by commit age and open-PR backlog (fresh → warm → hot); click one for its on-call card: who's holding the pager, until when, and which Slack channel to escalate in.
 - 👥 **Ownership view** — an ownership legend that isolates everything a team owns with one click, so a crowded galaxy collapses to just one team's surface.
-- 📽️ **Presentation mode** — `P` strips the UI back to the bare map and fattens the comets so a scenario reads from the back of the room; the arrow keys and space still drive playback with the controls hidden.
-- ✏️ **Layout edit mode** — hit `Edit layout` (or press `L`), drag stars and topics where you want them, then `Copy coords` and paste the values into the data files. Try it in the [live demo](https://project-cosmos-six.vercel.app/) — your rearrangement stays in your browser only.
-- 🤖 **Two Claude skills** — `/add-service` and `/add-scenario` teach [Claude Code](https://claude.com/claude-code) to interrogate your repos and grow the map for you: who do you call, what do you produce, to which topic, what database are you hiding.
-- 🌙 **Drift Sync** — the nightly honesty robot. Diffs every tracked repo against a baseline SHA, filters noise with cheap regexes, asks an AI agent "does the map still tell the truth?", and opens one tidy PR per team with file:line evidence. A footer status pill links straight to the latest run on GitHub Actions.
-- ✨ **What changed last night** — after a nightly run, the affected services and topics glow on the map in their change color; the overlay lists each finding with a link to the draft PR the pipeline raised.
+- ✨ **What changed last night** — after a nightly run, the affected services and topics glow on the map in their change color; the overlay lists each finding with a link to the draft PR the pipeline raised. A footer status pill links straight to the latest run on GitHub Actions.
 - 🗞️ **Architecture changelog** — the drift history as a browsable "added / changed / risk / removed" list; click an item to warp the map into that commit's context and jump to its PR or the affected node.
-- 💬 **Ask the agent** — a natural-language question box over the whole architecture. It ships as a self-aware UI demo in the open-source build (no model wired up); point it at a model to make it answer for real.
+
+### AI
+
+- 💬 **Ask the agent** — a natural-language question box over the whole architecture, backed by a real LangChain + LangGraph agent. Connect your own Claude or OpenAI key and the answer streams in word by word, with a token count; the agent can light up every service it mentions and start playing the matching scenario. Without a key you get playful demo answers and a one-tap link to connect. See [Ask the agent (AI)](#ask-the-agent-ai).
+- 🌙 **Drift Sync** — the nightly honesty robot. Diffs every tracked repo against a baseline SHA, filters noise with cheap regexes, asks an AI agent "does the map still tell the truth?", and opens one tidy PR per team with file:line evidence.
+- 🤖 **Two Claude skills** — `/add-service` and `/add-scenario` teach [Claude Code](https://claude.com/claude-code) to interrogate your repos and grow the map for you: who do you call, what do you produce, to which topic, what database are you hiding.
+
+### Presenting and sharing
+
+- 📽️ **Presentation mode** — `P` strips the UI back to the bare map and fattens the comets so a scenario reads from the back of the room; the arrow keys and space still drive playback with the controls hidden.
+- 🎥 **Self-playing demo tours** — open the site with `?demo=ai` or `?demo=all` and it tours itself. See [Demo tours](#demo-tours).
+- 📱 **Mobile-first** — the whole app works on a phone. See [Mobile](#mobile).
+- 🏷️ **Version badge** — the top bar shows the current version from the [version ledger](#versioning).
 
 ## Quickstart
 
@@ -71,15 +99,27 @@ npm run dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
-Run the tests (client and server):
+`npm run dev` starts only the client (Vite): the whole map works, and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
 
-```bash
-npm test
-```
+### Useful commands
+
+Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Client dev server on `:5173` (no AI) |
+| `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
+| `npm run typecheck` | Type-checks every workspace, no emit |
+| `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/` |
+| `npm test` | Vitest in the client and server workspaces |
+| `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
+| `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
+| `npm run fresh` | Replaces AstroMart with a minimal 2-star starter cosmos |
+| `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
 
 ### Run with AI locally
 
-`npm run dev:client` is the zero-setup path: the map works, with no AI. To run the client and the AI server together on one origin, use the [Vercel CLI](https://vercel.com/docs/cli). Link the project and pull its environment variables:
+The client and the AI server run together on one origin through the [Vercel CLI](https://vercel.com/docs/cli). Link the project and pull its environment variables:
 
 ```bash
 vercel link
@@ -94,7 +134,12 @@ cp server/.env.example server/.env
 vercel dev -L
 ```
 
-Both keys are optional. Without `AI_COOKIE_SECRET` the AI routes report "not configured", and without `AI_GATEWAY_API_KEY` question matching falls back to a local heuristic. A visitor can also paste their own Vercel AI Gateway key in the Connect window (the optional JEV field); it is sealed in the same encrypted cookie and used for question matching instead of the site's key.
+| Variable | Required | What it does |
+|---|---|---|
+| `AI_COOKIE_SECRET` | For AI | 32 random bytes, base64 (`openssl rand -base64 32`). Seals the visitor's key cookie. Without it the AI routes answer `503 AI_NOT_CONFIGURED` and the Ask box shows "No AI agent connected". |
+| `AI_GATEWAY_API_KEY` | No | Vercel AI Gateway key used by JEV to triage questions. Without it, triage falls back to a free local keyword check. |
+
+A visitor can also paste their own Vercel AI Gateway key in the Connect window (the optional JEV field); it is sealed in the same encrypted cookie and used for question triage instead of the site's key.
 
 ### Driving it from the keyboard
 
@@ -115,7 +160,74 @@ Everything the map does is reachable without the mouse:
 | `0` | Reset the zoom |
 | `Esc` | Reset the galaxy — clears the scenario, filters, selection and URL |
 
-Mouse equivalents: drag the background to pan, scroll to zoom around the cursor, click any star or topic to open its panel.
+Mouse equivalents: drag the background to pan, scroll to zoom around the cursor, click any star or topic to open its panel. On touch screens: drag to pan, pinch to zoom, tap to open.
+
+## Ask the agent (AI)
+
+The **Ask** box (the "Explore Project Cosmos" search) answers questions about the architecture — *"What happens when a payment fails?"*, *"Which team owns checkout?"*, *"Play the order flow"*. Empty, it offers those three as one-tap starter chips.
+
+### Connecting
+
+A small robot icon with a red/green light shows whether an agent is connected. **Connect AI agent** opens a window where the visitor picks **Claude** or **OpenAI** and pastes their own API key; the server checks it with the provider on the spot and reports the result. An optional second field takes a Vercel AI Gateway key for JEV triage. **Disconnect** clears it at any time.
+
+The key never touches page scripts or storage: it is sealed with AES-256-GCM into an `HttpOnly`, `Secure`, `SameSite=Strict` cookie scoped to `/api/ai`, and the server is stateless — no accounts, no database. The key is re-checked on every page load, so the green light turns red if it stops working, and a key revoked mid-answer disconnects automatically.
+
+### How a question is answered
+
+```
+question → JEV triage (site's or visitor's AI Gateway key; free keyword fallback)
+   ├─ off-topic                        → a canned playful reply, 0 tokens on the visitor's key
+   ├─ "play X" with a confident target → plays the scenario directly, 0 tokens
+   └─ everything else                  → LangGraph agent on the visitor's Claude / OpenAI key
+                                           ├─ streams the answer (NDJSON)
+                                           ├─ highlight_services → lights up every service it names
+                                           └─ play_scenario      → starts the matching flow
+```
+
+- **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the visitor's model.
+- **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map snapshot (services, topics, scenarios, steps, teams) as its only knowledge. Its two tools accept only ids that exist in the snapshot, so it can never point at an invented service. Answers are capped at ~150 words.
+- **Errors are explained, not dumped**: out of credit, rate-limited, invalid key, or a general provider problem — never echoing any part of the key.
+
+### Server API
+
+The server (`server/`) is a [Hono](https://hono.dev) app served under `/api`:
+
+| Route | What it does |
+|---|---|
+| `POST /api/ai/connect` | Validates `{ provider, apiKey, gatewayApiKey? }`, checks the key with the provider, sets the encrypted cookie |
+| `POST /api/ai/disconnect` | Clears the cookie (works even when AI is not configured) |
+| `GET /api/ai/status` | `{ connected, provider }`; clears a revoked key |
+| `POST /api/ai/ask` | Streams `token` / `action` / `usage` / `error` / `done` events as NDJSON |
+
+The agent reads the map from `server/src/generated/cosmos-map.json`, a committed snapshot of the client's map data — run `npm run snapshot` after any data edit; `npm run validate` fails if it is stale.
+
+## Demo tours
+
+Open the site with `?demo=ai` (≤60 s) or `?demo=all` (≤120 s) and it plays a scripted tour of itself; add `&speed=2` (up to 8) to fast-forward. Any click or key press stops it.
+
+- **`demo=ai`** opens the Fulfillment domain, connects an AI agent, types a question and shows the answer lighting up the map.
+- **`demo=all`** tours the whole app: the intro, domains, playing and stepping a scenario, replaying an incident, the ownership view, and the AI agent.
+
+The tours drive the **real UI**: a human-like pointer glides along curved paths, overshoots and settles, and types with natural rhythm, dispatching the same pointer, mouse and keyboard events a person would. Only the AI connection and the answer are faked, so a tour never contacts a real AI service. On phones the pointer is hidden and the tours open the menu drawer when they need it.
+
+Record a tour to video (with the dev server running):
+
+```bash
+npm run record:demo -- ai
+npm run record:demo -- all
+```
+
+The recorder uses Playwright and fails if the tour aborts or runs over its time limit.
+
+## Mobile
+
+The app is built mobile-first and verified on a ~390px-wide phone first, then on desktop.
+
+- **Phone-class** means `max-width: 768px` **or** `max-height: 480px` (landscape phones); the `useViewport` hook mirrors this onto `<html data-viewport data-touch>` so CSS and JS agree.
+- On phones the topbar collapses into a slide-over **drawer** (domain and incident pickers, Ask, changelog, presentation, help), and every floating panel docks as a **bottom sheet** clear of notches and home indicators.
+- **One panel at a time** — panels never stack: a detail card (inspector, ask, health card) hides the context panels behind it.
+- **Every panel has a close button** in its top-right corner on phones.
+- Touch gestures: drag to pan, two-finger pinch to zoom.
 
 ## Make it your cosmos
 
@@ -123,11 +235,12 @@ The entire universe lives in `client/src/scenarios/` — plain, typed TypeScript
 
 | Concept | What it is | Where |
 |---|---|---|
-| **Service** | A deployed process → a capsule on the map | `services.ts` |
+| **Service** | A deployed process → a planet on the map | `services.ts` |
 | **Topic** | A Kafka topic used as an edge → an orbital node | `topics.ts` |
 | **Domain** | A group of related scenarios | `scenarios.ts` |
 | **Scenario** | A named, playable end-to-end flow | `scenarios.ts` |
 | **Step** | One hop: from → to, protocol, payload | `steps/*.ts` |
+| **Team** | An owner, for the ownership view and passports | `owners.ts` |
 | **Incident** | A past production incident, frozen in time and replayable | `client/src/incidents/*.ts` |
 
 **Start from the template:** click **Use this template** on GitHub (or clone), then:
@@ -158,7 +271,7 @@ You can also install the skills into any environment as a plugin, no clone neede
 
 The skills make Claude read your actual source — call sites, producers, consumers, schemas — and write verified entries. No guessing allowed; the skill files are the guardrails.
 
-**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that the committed map snapshot (`server/src/generated/cosmos-map.json`) is fresh — run `npm run snapshot` after any data edit. Both run in CI on every PR (the **Validate** badge above), alongside `npm run lint`.
+**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, `hex` matches the color token, and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that the committed map snapshot (`server/src/generated/cosmos-map.json`) is fresh — run `npm run snapshot` after any data edit and commit the snapshot with it. All of these run in CI on every PR (the **Validate** badge above), alongside `npm run lint` and `npm test`.
 
 Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the numbers back into `services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
 
@@ -172,7 +285,7 @@ An incident is just a scenario frozen in time. Recordings live in `client/src/in
 2. **Copy the relevant steps** and replace the example payloads with the real ones from the logs — redact card/customer/token fields (`"[redacted]"`).
 3. **Add the title, date, and a one- or two-sentence note** describing what went wrong.
 4. **Give it a globally-unique `phaseId`** (incidents use `101+` so they never collide with scenarios) and set every step's `phase` to that same id.
-5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it.
+5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it; `npm run snapshot` makes it known to the AI agent.
 
 Every step's `from` / `to` / `via` / `through` must match an existing `SERVICES[].id` or `TOPICS[].id` — incidents reuse the same map you already drew.
 
@@ -232,14 +345,57 @@ clone tracked repos → diff vs baseline SHA → regex prefilter (~95% exit free
    → applier edits the map, validates in-loop → one draft PR per team → Slack ping
 ```
 
-Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default on forks; enable it when you're ready.
+Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. The pipeline also refreshes the AI agent's map snapshot. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default on forks; enable it when you're ready.
+
+## Project layout
+
+```
+client/                 Vite + React app (the map)
+  src/scenarios/        the universe as typed data — most changes belong here
+  src/incidents/        recorded production incidents
+  src/map/              SVG map rendering, edges, planets, insight views
+  src/components/       UI shell: intro, playback, step panel, Ask box, Connect window
+  src/demo/             self-playing demo tours
+  src/hooks/            viewport, deep links, map view, AI connection
+  src/styles/           tokens, app, components, responsive.css (loaded last)
+server/                 Hono API for the AI agent (Vercel Function)
+  src/agent/            JEV triage, routing, LangGraph agent, map-action tools
+  src/generated/        cosmos-map.json — committed snapshot of the map data
+drift-sync/             the nightly honesty pipeline (its own README)
+scripts/                fresh-start, demo recorder, version hooks
+versions/               the version ledger, one file per year
+.claude/skills/         add-service, add-scenario, update
+```
+
+## Deployment
+
+The app is one [Vercel](https://vercel.com) project using **Vercel Services** (`vercel.json`): `client/` serves the static app and `server/` serves `/api/*` as a function, both on one origin. Git auto-deploys are off — deploy deliberately with `vercel deploy`. Set `AI_COOKIE_SECRET` (and optionally `AI_GATEWAY_API_KEY`) in the project's environment variables; without them the map still deploys and works, with AI switched off.
+
+The old GitHub Pages address now serves only a redirect page (`pages-redirect/`) that forwards visitors and their deep links to Vercel.
+
+## Testing and CI
+
+- **Vitest** in both workspaces (`npm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
+- **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, build, the drift-sync type-check, `npm test`, and `npm run validate` on every PR and push to `main`.
+
+## Versioning
+
+Every commit is auto-versioned by a local post-commit hook (`scripts/version-bump.sh`): the Conventional Commits type decides the bump (`feat` → minor, `!` / `BREAKING CHANGE` → major, anything else → patch), a plain-English row is added to `versions/<year>.md`, and the commit is tagged `vX.Y.Z`. The top bar shows the current version. Install the hook once per clone:
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+With Claude Code, `/update` writes the version note, commits, and pushes in one step, and `/revert <x.y.z>` restores any recorded version. The ledger is generated — never edit `versions/*.md` by hand.
 
 ## Tech notes
 
-- Vite 8 + React 19 + TypeScript (strict). One build, no server, no database — the whole universe is ~22 KB gzipped of scenario and incident data.
+- **Client**: Vite 8 + React 19 + TypeScript (strict), Framer Motion for panels. The map needs no server and no database — the whole universe is typed data bundled into the build.
 - Comets glide on the **real rendered SVG paths** (GSAP MotionPath + `getPointAtLength()`), not approximations.
 - The hyperspace intro is a plain `<canvas>` and one perspective formula — no 3D library.
 - OKLCH color tokens, themeable (`cosmos`, `light`, `minimal`, `dark`).
+- **Server**: Hono on Vercel Functions (Node), Zod-validated requests, structured logging that never records keys, AES-256-GCM cookie sealing.
+- **AI**: LangChain (`@langchain/anthropic`, `@langchain/openai`) + LangGraph for the agent; the AI SDK's evaluation API on Vercel AI Gateway for JEV triage; the Anthropic SDK for Drift Sync.
 
 ## Origin
 

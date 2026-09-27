@@ -41,6 +41,12 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
   `.git/version-note.md` on the commit. If a row ever lands without a note, restore it with
   `scripts/version-note.sh amend`.
 - The ledger is generated — **never edit `versions/*.md` by hand.**
+- **Every commit + push updates the versions folder and re-checks the README (invariant).**
+  Before each commit, (1) write the version note so the hook records a `versions/<year>.md`
+  row, and (2) check whether the change makes `README.md` stale — a new or removed feature,
+  command, script, env var, route, keyboard shortcut, folder, or deploy step — and update
+  `README.md` in the same commit if so. A purely internal change (refactor, test, fix with no
+  visible effect) needs no README edit, but the check is never skipped.
 - The hook is local (not tracked). On a fresh clone, install it once with
   `bash scripts/install-hooks.sh`.
 
