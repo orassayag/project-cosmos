@@ -10,4 +10,4 @@ Please **do not open a public issue** for security problems. Use GitHub's privat
 
 - Store the drift-sync PAT and API key only as GitHub Actions **secrets**; never commit them or put them in `config.json`.
 - The PAT needs only the `repo` scope. Don't grant more.
-- Drift-sync is disabled on forks by default (`DRIFT_SYNC_ENABLED` repo variable) — leave it off unless you've reviewed the workflow.
+- Drift-sync is disabled by default (`DRIFT_SYNC_ENABLED` repo variable) — leave it off unless you've reviewed the workflow.

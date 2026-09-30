@@ -9,6 +9,6 @@ Generated: 2026-09-30
 
 ## Stages
 - Stage 1: COMMITTED — Licence and authorship metadata (LICENSE, package.json, plugin manifests)
-- Stage 2: PLANNED — Fork wording removal and "Origin & credits" (README, SECURITY)
+- Stage 2: COMMITTED — Fork wording removal and "Origin & credits" (README, SECURITY)
 - Stage 3: PLANNED — README/GitHub-description reminder hook + shell test + install-hooks wiring
 - Stage 4: PLANNED — Docs-vs-code audit checklist and mismatch fixes

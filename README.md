@@ -5,29 +5,7 @@
 [![Release](https://img.shields.io/github/v/release/orassayag/project-cosmos)](https://github.com/orassayag/project-cosmos/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **About this fork**
->
-> This project is an extended version of [Cosmos OS](https://github.com/ludeo-labs/cosmos-os).
-> The original project was created by [Omer Sher](https://github.com/ludeo-labs) at
-> [Ludeo](https://ludeo.com) and is licensed under the MIT License. On top of the original map
-> it adds:
->
-> - **A real AI agent** — a Hono server on Vercel running a LangChain + LangGraph agent that
->   answers questions about the architecture with the visitor's own Claude or OpenAI key, streams
->   the answer, and lights up services or plays scenarios on the map. Questions are triaged first
->   by **JEV** (a classification model on Vercel AI Gateway) so off-topic questions never cost the
->   visitor a token.
-> - **Architecture insight views** — incident replay, blast-radius analysis, a service health
->   heat map with on-call cards, an ownership view, a "what changed last night" drift overlay, and
->   a browsable architecture changelog.
-> - **A mobile-first, responsive UI** — a phone drawer, bottom-sheet panels, pinch-zoom, and a
->   strict one-panel-at-a-time policy.
-> - **Self-playing demo tours** (`?demo=ai`, `?demo=all`) that drive the real UI with a human-like
->   pointer, plus a Playwright recorder.
-> - **Presentation mode, an on-map step stepper, quick search, a live activity log**, and a richer
->   visual layer (planet morphology, nebula fields, parallax panning, star explosions).
-> - **A client/server npm-workspaces layout, Vitest suites in both workspaces, and a local
->   version ledger** with a version badge in the top bar.
+> Originally based on [Cosmos OS](https://github.com/ludeo-labs/cosmos-os) — see [Origin & credits](#origin--credits).
 
 **A living map of your architecture.** Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.
 
@@ -345,7 +323,7 @@ clone tracked repos → diff vs baseline SHA → regex prefilter (~95% exit free
    → applier edits the map, validates in-loop → one draft PR per team → Slack ping
 ```
 
-Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. The pipeline also refreshes the AI agent's map snapshot. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default on forks; enable it when you're ready.
+Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. The pipeline also refreshes the AI agent's map snapshot. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default; enable it when you're ready.
 
 ## Project layout
 
@@ -397,10 +375,30 @@ With Claude Code, `/update` writes the version note, commits, and pushes in one 
 - **Server**: Hono on Vercel Functions (Node), Zod-validated requests, structured logging that never records keys, AES-256-GCM cookie sealing.
 - **AI**: LangChain (`@langchain/anthropic`, `@langchain/openai`) + LangGraph for the agent; the AI SDK's evaluation API on Vercel AI Gateway for JEV triage; the Anthropic SDK for Drift Sync.
 
-## Origin
+## Origin & credits
 
-This repository is a fork of [ludeo-labs/cosmos-os](https://github.com/ludeo-labs/cosmos-os).
-Cosmos OS began as an internal tool at [Ludeo](https://ludeo.com), built to answer "wait, what happens after the client sends this?" without archaeology. The open-source version is the same map with a fictional universe on it. The full story: [Your architecture diagram is already wrong — so I built a galaxy instead](https://medium.com/@omersher_79552/your-architecture-diagram-is-already-wrong-so-i-built-a-galaxy-instead-d4cf6c62ade9).
+Project Cosmos is originally based on [Cosmos OS](https://github.com/ludeo-labs/cosmos-os), created by [Omer Sher](https://github.com/ludeo-labs) at [Ludeo](https://ludeo.com) and released under the MIT License. The original copyright notice is preserved in [`LICENSE`](LICENSE).
+
+Cosmos OS began as an internal tool at Ludeo, built to answer "wait, what happens after the client sends this?" without archaeology. The full story: [Your architecture diagram is already wrong — so I built a galaxy instead](https://medium.com/@omersher_79552/your-architecture-diagram-is-already-wrong-so-i-built-a-galaxy-instead-d4cf6c62ade9).
+
+On top of the original map, this project adds:
+
+- **A real AI agent** — a Hono server on Vercel running a LangChain + LangGraph agent that
+  answers questions about the architecture with the visitor's own Claude or OpenAI key, streams
+  the answer, and lights up services or plays scenarios on the map. Questions are triaged first
+  by **JEV** (a classification model on Vercel AI Gateway) so off-topic questions never cost the
+  visitor a token.
+- **Architecture insight views** — incident replay, blast-radius analysis, a service health
+  heat map with on-call cards, an ownership view, a "what changed last night" drift overlay, and
+  a browsable architecture changelog.
+- **A mobile-first, responsive UI** — a phone drawer, bottom-sheet panels, pinch-zoom, and a
+  strict one-panel-at-a-time policy.
+- **Self-playing demo tours** (`?demo=ai`, `?demo=all`) that drive the real UI with a human-like
+  pointer, plus a Playwright recorder.
+- **Presentation mode, an on-map step stepper, quick search, a live activity log**, and a richer
+  visual layer (planet morphology, nebula fields, parallax panning, star explosions).
+- **A client/server npm-workspaces layout, Vitest suites in both workspaces, and a local
+  version ledger** with a version badge in the top bar.
 
 ## Contributing
 
@@ -408,4 +406,4 @@ PRs welcome — [CONTRIBUTING.md](CONTRIBUTING.md) has the dev setup and the thr
 
 ## License
 
-[MIT](LICENSE) © Ludeo
+[MIT](LICENSE) © Ludeo, © Or Assayag
