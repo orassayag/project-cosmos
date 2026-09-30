@@ -3,7 +3,7 @@
   "displayName": "Project Cosmos",
   "version": "0.1.0",
   "description": "Skills for growing and maintaining a Project Cosmos architecture map: add-service and add-scenario.",
-  "author": { "name": "Omer Sher" },
+  "author": { "name": "Or Assayag" },
   "repository": "https://github.com/orassayag/project-cosmos",
   "license": "MIT",
   "keywords": ["architecture", "visualization", "kafka", "microservices", "documentation"]

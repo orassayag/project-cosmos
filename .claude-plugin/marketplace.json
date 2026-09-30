@@ -1,14 +1,14 @@
 {
   "name": "project-cosmos",
   "description": "Project Cosmos — a living map of your architecture. Skills that grow and maintain it.",
-  "owner": { "name": "Omer Sher" },
+  "owner": { "name": "Or Assayag" },
   "plugins": [
     {
       "name": "cosmos",
       "source": "./",
       "description": "Grow a Project Cosmos map from real code: /cosmos:add-service researches and wires a service in, /cosmos:add-scenario traces a flow end-to-end and makes it playable.",
       "version": "0.1.0",
-      "author": { "name": "Omer Sher" }
+      "author": { "name": "Or Assayag" }
     }
   ]
 }

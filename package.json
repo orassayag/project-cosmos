@@ -1,6 +1,7 @@
 {
   "name": "project-cosmos",
   "private": true,
+  "author": "Or Assayag",
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
