@@ -1,40 +1,16 @@
-# Stage 3 work brief — §3: useAiConnection `enabled` + useDemoAiConnection
+# Stage 3 — README/GitHub-description reminder hook + shell test + install-hooks wiring
 
-Stage-plan line: `useAiConnection `enabled` option + test, demo/useDemoAiConnection.ts (runner-driven fake connection, no network)`
+Plan: docs/plans/unfork-project.md (§3). Ledger so far: docs/status/ledger.md (stages 1–2 committed).
 
-Files expected (≤6 files, ≤300 lines each):
-- `client/src/hooks/useAiConnection.ts` (edit — add `enabled` option)
-- `client/src/hooks/__tests__/useAiConnection.test.ts` (edit or create — add `enabled: false` case)
-- `client/src/demo/useDemoAiConnection.ts` (new)
-- `client/src/demo/__tests__/useDemoAiConnection.test.ts` (new)
+## Plan §3 (verbatim)
+### 3. Reminder hook (I2)
+- Add a tracked `commit-msg` (or `pre-commit`) hook script under `scripts/`. On `feat:` or breaking (`!`/`BREAKING CHANGE`) commits where `README.md` is not staged, print a warning plus the ready-to-run `gh repo edit --description "..." --add-topic ...` command. It never runs `gh` and never blocks the commit (exit 0).
+- Wire it in `scripts/install-hooks.sh` so a fresh clone gets it; leave the post-commit ledger hook untouched.
+- Verify: a shell test/fixture (e.g. `scripts/__tests__/readme-reminder.test.sh`) feeding sample commit messages and staged-file lists — asserts the warning appears for `feat:` without README, is silent for `fix:` or `feat:` with README staged, and the exit code is always 0. Narrowest layer: script-level unit. Also confirm `bash scripts/install-hooks.sh` installs both hooks.
 
-Builds on stage 1's `client/src/demo/types.ts` (`DemoAiStatus`, `DemoActions.setAiStatus`) and stage 2's `runDemo.ts`. Read both first; do not redefine their types. Read `useAiConnection.ts` to reuse its exported `AiConnection` shape exactly — `useDemoAiConnection` must be assignable to it so App (stage 8) can pass `demo ? demoAi : realAi` down.
-
-Out of scope for this stage: App.tsx wiring (stage 8), the `demo=ai` script table (stage 7). The plan's "runner test asserts `fetch` is never called during a full `ai` script" needs the stage-7 script — do not fake it here; note it under Open questions as deferred to stage 7.
-
-## Plan — §3 Fake AI connection (I5) (verbatim)
-
-- `useAiConnection({ enabled })` gets an `enabled` option, true by default. When it is false,
-  the hook skips the `/api/ai/status` fetch and reports `disconnected`.
-- `useDemoAiConnection()` in `client/src/demo/` returns the same `AiConnection` shape. Its
-  status is driven by the runner (`disconnected → connecting → connected`) and its provider is
-  `anthropic`. Its `connect`/`disconnect` never touch the network.
-- App calls both hooks unconditionally, following the rules of hooks, and passes
-  `demo ? demoAi : realAi` down. While the demo is active, `realAi` is created with
-  `enabled: false`. After an abort, App switches back to `realAi`, which then re-checks status.
-- Tests: `client/src/hooks/__tests__/useAiConnection.test.ts` adds that `enabled: false` makes
-  no `fetch` call. *Protects: the demo never calls the AI server, for any visitor state.* The
-  runner test asserts that `fetch` is never called during a full `ai` script. Unit layer.
-
-## Plan — Issue I5 (verbatim)
-
-| I5 | The demo breaks, or spends a real key, when the real AI status isn't "disconnected" | Claude (adversarial) | Fixed | A local fake connection replaces the real one, and the real hook is disabled. No `/api/ai/*` calls. Design §3. |
-
-## Plan — §1 abort note relevant to this stage (verbatim excerpt)
-
-- Abort (I8): `useDemoRunner` owns one `AbortController`. … On abort or on finish it hides the pointer and
-  caption, drops the fake AI connection back to the real one (§3), …
-
-Implications for this stage:
-- "After an abort, App switches back to `realAi`, which then re-checks status" → flipping `enabled` from false to true must trigger the `/api/ai/status` check (e.g. effect keyed on `enabled`). Test it.
-- The demo hook must expose a way for the runner's `DemoActions.setAiStatus(status: DemoAiStatus)` to drive it (stage 1 ledger: `DemoAiStatus` is separate from app `AiConnectionStatus`; stage 3 maps `connecting` → modal `isBusy`). Map `DemoAiStatus` onto whatever fields `AiConnection` exposes (status / busy flag / provider) and document the mapping in Key decisions for stages 4 and 8.
+## Notes
+- Existing: scripts/install-hooks.sh writes only .git/hooks/post-commit (wrapper exec'ing scripts/version-bump.sh). Keep that behaviour; add a commit-msg wrapper that exec's the tracked script (same pattern), passing "$1".
+- Expected files: scripts/readme-reminder.sh (new), scripts/__tests__/readme-reminder.test.sh (new), scripts/install-hooks.sh (edit). Update the install-hooks final echo to mention both hooks. Add a line about the hook to README.md only if README documents scripts/hooks (check; do not edit CLAUDE.md).
+- Make the script testable: staged-file list overridable via env var README_REMINDER_STAGED_FILES, else `git diff --cached --name-only`.
+- Keep the gh command a printed example only (placeholder description/topic); never execute gh.
+- Do NOT touch the post-commit hook or version-bump.sh. Comments only where they state a non-obvious why.
