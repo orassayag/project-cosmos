@@ -27,15 +27,15 @@
     "record:demo": "node scripts/record-demo.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.122.0",
+    "@anthropic-ai/sdk": "^0.130.0",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.4.0",
-    "eslint": "^10.9.1",
+    "@types/node": "^26.6.3",
+    "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "playwright": "^1.63.0",
-    "tsx": "^4.23.12",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.68.0"
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.71.0"
   },
   "engines": {
     "node": ">=22"
