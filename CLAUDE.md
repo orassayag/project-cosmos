@@ -7,7 +7,7 @@ npm run dev        # client dev server on :5173
 npm run dev:client # client dev server on :5173 (plain Vite)
 npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
 npm run typecheck  # every workspace, no emit
-npm run lint       # eslint over client/, server/, drift-sync/
+npm run lint       # eslint over client/, server/, drift-sync/, scripts/
 npm run snapshot   # regenerate server/src/generated/cosmos-map.json from the map data
 npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok, snapshot fresh
 ```
@@ -24,7 +24,7 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 - `client/src/components/` — UI shell: intro, playback controls, step panel, tech icons.
 - `server/` — Node service workspace. `server/src/generated/cosmos-map.json` is a committed snapshot of the map data (written by `npm run snapshot`, checked by `npm run validate`); commit it with every data edit.
 - `drift-sync/` — the nightly honesty pipeline (its own README).
-- `.claude/skills/` — `add-service` and `add-scenario`: THE documented procedures for growing the map. Follow them rather than improvising.
+- `.claude/skills/` — `add-service`, `add-scenario` (plus `update`): THE documented procedures for growing the map. Follow them rather than improvising.
 
 ## Versioning (local change ledger)
 

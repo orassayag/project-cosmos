@@ -88,12 +88,13 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 | `npm run dev` | Client dev server on `:5173` (no AI) |
 | `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
 | `npm run typecheck` | Type-checks every workspace, no emit |
-| `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/` |
+| `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `npm test` | Vitest in the client and server workspaces |
 | `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
 | `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
 | `npm run fresh` | Replaces AstroMart with a minimal 2-star starter cosmos |
 | `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
+| `npm run sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
 
 ### Run with AI locally
 
@@ -195,7 +196,7 @@ npm run record:demo -- ai
 npm run record:demo -- all
 ```
 
-The recorder uses Playwright and fails if the tour aborts or runs over its time limit.
+The recorder uses Playwright and fails if the tour aborts or runs over its time limit. It targets `http://localhost:5173` unless `BASE_URL` is set.
 
 ## Mobile
 
@@ -335,6 +336,7 @@ client/                 Vite + React app (the map)
   src/components/       UI shell: intro, playback, step panel, Ask box, Connect window
   src/demo/             self-playing demo tours
   src/hooks/            viewport, deep links, map view, AI connection
+  src/overlays/         overlay manager (one panel at a time)
   src/styles/           tokens, app, components, responsive.css (loaded last)
 server/                 Hono API for the AI agent (Vercel Function)
   src/agent/            JEV triage, routing, LangGraph agent, map-action tools
@@ -342,7 +344,10 @@ server/                 Hono API for the AI agent (Vercel Function)
 drift-sync/             the nightly honesty pipeline (its own README)
 scripts/                fresh-start, demo recorder, version + README-reminder hooks
 versions/               the version ledger, one file per year
+pages-redirect/         the GitHub Pages redirect page to the Vercel app
+skills/                 add-service, add-scenario as a plugin (.claude-plugin/)
 .claude/skills/         add-service, add-scenario, update
+docs/                   plans and working status
 ```
 
 ## Deployment

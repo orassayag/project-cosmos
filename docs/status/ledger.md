@@ -18,3 +18,10 @@ Plan: docs/plans/unfork-project.md
 **What was built:** Non-blocking commit-msg hook that, on feat/breaking commits without README.md staged, prints a warning plus a ready-to-run `gh repo edit` example. Installed by install-hooks.sh next to the untouched post-commit hook.
 **Key decisions:** Advisory only (always exit 0, never runs gh). `docs/README.md` does not count as README staged. Staged files overridable via README_REMINDER_STAGED_FILES for tests.
 **User overrides during review:** None.
+
+## Stage 4 — Docs-vs-code audit and mismatch fixes (committed 2026-09-30)
+**Files:** README.md, CLAUDE.md, .claude/status/stage-4-report.md
+**What was built:** Audited README/CLAUDE.md against code. Fixed lint scope (now includes `scripts/`), added a `sync` pointer row to the command table, documented `BASE_URL` for demo recording, completed the README folder tree (overlays, pages-redirect, skills, docs), and noted the `update` skill in CLAUDE.md.
+**Key decisions:** Docs changed to match code; no code changed. Routes, shortcuts and deploy steps already matched. `so forks don't run a failing cron` wording in cosmos-sync.yml left (describes third-party copies; workflows out of stage scope).
+**Open item:** `VITE_ANTHROPIC_API_KEY` fallback in drift-sync is undocumented; unverified whether still used.
+**User overrides during review:** None.
