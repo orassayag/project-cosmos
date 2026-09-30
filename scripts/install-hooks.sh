@@ -14,4 +14,15 @@ exec "$(git rev-parse --show-toplevel)/scripts/version-bump.sh"
 EOF
 chmod +x "$hook"
 
+commitMsgHook="$REPO/.git/hooks/commit-msg"
+
+cat > "$commitMsgHook" <<'EOF'
+#!/usr/bin/env bash
+# Local hook (not tracked in git). On feat/breaking commits without README.md staged,
+# prints a reminder to refresh the README and GitHub description. Never blocks a commit.
+exec "$(git rev-parse --show-toplevel)/scripts/readme-reminder.sh" "$1"
+EOF
+chmod +x "$commitMsgHook"
+
 echo "Installed post-commit hook → $hook"
+echo "Installed commit-msg hook → $commitMsgHook"

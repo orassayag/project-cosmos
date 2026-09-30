@@ -340,7 +340,7 @@ server/                 Hono API for the AI agent (Vercel Function)
   src/agent/            JEV triage, routing, LangGraph agent, map-action tools
   src/generated/        cosmos-map.json — committed snapshot of the map data
 drift-sync/             the nightly honesty pipeline (its own README)
-scripts/                fresh-start, demo recorder, version hooks
+scripts/                fresh-start, demo recorder, version + README-reminder hooks
 versions/               the version ledger, one file per year
 .claude/skills/         add-service, add-scenario, update
 ```
@@ -358,7 +358,7 @@ The old GitHub Pages address now serves only a redirect page (`pages-redirect/`)
 
 ## Versioning
 
-Every commit is auto-versioned by a local post-commit hook (`scripts/version-bump.sh`): the Conventional Commits type decides the bump (`feat` → minor, `!` / `BREAKING CHANGE` → major, anything else → patch), a plain-English row is added to `versions/<year>.md`, and the commit is tagged `vX.Y.Z`. The top bar shows the current version. Install the hook once per clone:
+Every commit is auto-versioned by a local post-commit hook (`scripts/version-bump.sh`): the Conventional Commits type decides the bump (`feat` → minor, `!` / `BREAKING CHANGE` → major, anything else → patch), a plain-English row is added to `versions/<year>.md`, and the commit is tagged `vX.Y.Z`. The top bar shows the current version. A companion `commit-msg` hook (`scripts/readme-reminder.sh`) prints a non-blocking reminder to refresh `README.md` and the GitHub description when a `feat` or breaking commit does not stage the README. Install both hooks once per clone:
 
 ```bash
 bash scripts/install-hooks.sh
