@@ -153,12 +153,10 @@ export function IntroOverlay({ onStart, onExitComplete }: IntroOverlayProps) {
       <div className="lc-intro-vignette" aria-hidden="true" />
 
       <motion.div className="lc-intro-inner" variants={stagger} initial="hidden" animate="visible">
-        <motion.span className="lc-intro-eyebrow" variants={child}>PROJECT COSMOS · {BRAND.badge.toUpperCase()} · 0.1</motion.span>
+        <motion.span className="lc-intro-eyebrow" variants={child}>LIVE ARCHITECTURE MAP · 0.1</motion.span>
         <motion.h1 className="lc-intro-title" variants={child}>
-          <span className="lc-intro-title-line">{BRAND.universeName}</span>
-          <span className="lc-intro-title-line lc-intro-title-line--accent">
-            Project Cosmos
-          </span>
+          <img className="lc-intro-emblem" src={`${import.meta.env.BASE_URL}logo-emblem.png`} alt="" />
+          <img className="lc-intro-wordmark" src={`${import.meta.env.BASE_URL}logo-wordmark.png`} alt="Project Cosmos" />
         </motion.h1>
         <motion.p className="lc-intro-sub" variants={child}>
           {BRAND.tagline}

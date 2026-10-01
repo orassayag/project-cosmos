@@ -1,25 +1,33 @@
-# Project Cosmos
+<p align="center">
+  <img src="images/readme-header.jpeg" alt="Project Cosmos" width="100%">
+</p>
 
-[![Validate](https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml/badge.svg)](https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml)
-[![Live demo](https://img.shields.io/badge/demo-live-6f42c1)](https://project-cosmos-six.vercel.app/)
-[![Release](https://img.shields.io/github/v/release/orassayag/project-cosmos)](https://github.com/orassayag/project-cosmos/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml"><img alt="Validate" src="https://github.com/orassayag/project-cosmos/actions/workflows/validate-on-pr.yml/badge.svg"></a>
+  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-43AF11"></a>
+  <a href="https://project-cosmos-six.vercel.app/"><img alt="Live demo" src="https://img.shields.io/badge/demo-live-6f42c1"></a>
+  <a href="https://github.com/orassayag/project-cosmos/releases"><img alt="Release" src="https://img.shields.io/github/v/release/orassayag/project-cosmos"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+</p>
+
+<p align="center">
+  <a href="https://project-cosmos-six.vercel.app/">Live demo</a> -
+  <a href="#quickstart">Quickstart</a> -
+  <a href="#ask-the-agent-ai">AI agent</a> -
+  <a href="#make-it-your-cosmos">Make it yours</a> -
+  <a href="#drift-sync">Drift Sync</a> -
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <a href="https://project-cosmos-six.vercel.app/"><img src="images/demo.png" alt="The Project Cosmos map — services as planets grouped into the Shopping, Fulfillment and Engagement domains, connected by their real calls and Kafka flows, with the Incidents, Drift Sync, Changelog, Ownership, Blast radius and Health controls" width="100%"></a>
+</p>
+
+## Project Cosmos is a living map of your architecture
+
+Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.
 
 > Originally based on [Cosmos OS](https://github.com/ludeo-labs/cosmos-os) — see [Origin & credits](#origin--credits).
-
-**A living map of your architecture.** Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.
-
-<p align="center">
-  <a href="https://project-cosmos-six.vercel.app/"><b>▶ Live demo</b></a> ·
-  <a href="#quickstart">Quickstart</a> ·
-  <a href="#ask-the-agent-ai">AI agent</a> ·
-  <a href="#make-it-your-cosmos">Make it yours</a> ·
-  <a href="#drift-sync">Drift Sync</a>
-</p>
-
-<p align="center">
-  <img src="images/demo.png" alt="The Project Cosmos map playing the Place an order scenario — services as stars, Kafka topics as orbitals, the step panel showing the real request payload, and the Incidents, Changelog, Ownership, Blast radius and Health controls" width="100%">
-</p>
 
 ## Why
 

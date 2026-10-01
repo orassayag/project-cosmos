@@ -243,6 +243,7 @@ body:has(.lc-map-stage[data-panning='true']) * {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-std), color var(--dur-fast) var(--ease-std);
 }
@@ -254,7 +255,8 @@ body:has(.lc-map-stage[data-panning='true']) * {
 .lc-layout-btn--done:hover { background: color-mix(in srgb, var(--svc-cyan) 12%, transparent); }
 .lc-layout-btn--danger { color: var(--svc-red); }
 .lc-layout-btn--danger:hover { background: color-mix(in srgb, var(--svc-red) 10%, transparent); }
-.lc-layout-btn--copy { width: 84px; }
+/* Sized to "Copy coords" so swapping to "Copied!" doesn't shift the row. */
+.lc-layout-btn--copy { min-width: calc(11ch + 11 * 0.04em + 26px); }
 
 /* Grabbing cursor while dragging a node */
 .lc-map-svg[data-layout='true'] { cursor: default; }
@@ -3000,6 +3002,33 @@ body:has(.lc-map-stage[data-panning='true']) * {
 /* Brand wordmark — subtle mono-glow. */
 .lc-topbar-brand {
   text-shadow: 0 0 18px color-mix(in srgb, white 10%, transparent);
+}
+
+.lc-topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-topbar-logo-emblem {
+  height: 36px;
+  width: auto;
+}
+.lc-topbar-logo-wordmark {
+  height: 30px;
+  width: auto;
+}
+.lc-intro-emblem,
+.lc-intro-wordmark {
+  --lc-intro-logo-size: min(300px, 55vw, 30vh);
+  align-self: center;
+  height: auto;
+}
+.lc-intro-emblem {
+  width: var(--lc-intro-logo-size);
+}
+.lc-intro-wordmark {
+  width: calc(var(--lc-intro-logo-size) * 1.4);
+  margin-top: 6px;
 }
 
 /* The wordmark doubles as a "reset the galaxy" control. */

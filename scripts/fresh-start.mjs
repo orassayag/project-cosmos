@@ -149,8 +149,6 @@ writeFileSync(dir('brand.ts'), `/**
  * Universe branding — the strings that name YOUR system in the UI.
  */
 export const BRAND = {
-  universeName: 'Your System',
-  badge: 'my cosmos',
   tagline:
     'A live map of your architecture. Pick a domain, pick a scenario, watch the request travel along constellations of services and topics.',
   helpTitle: 'A live map of your platform.',

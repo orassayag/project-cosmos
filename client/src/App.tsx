@@ -567,7 +567,10 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
               onClick={onResetGalaxy}
               title="Reset the galaxy — clear the current scenario, filters and URL"
             >
-              Project Cosmos
+              <span className="lc-topbar-logo">
+                <img className="lc-topbar-logo-emblem" src={`${import.meta.env.BASE_URL}logo-emblem.png`} alt="" />
+                <img className="lc-topbar-logo-wordmark" src={`${import.meta.env.BASE_URL}logo-wordmark.png`} alt="Project Cosmos" />
+              </span>
               <span className="lc-topbar-version">v{APP_VERSION}</span>
             </button>
             {(projectCosmosState || driftDate) && (

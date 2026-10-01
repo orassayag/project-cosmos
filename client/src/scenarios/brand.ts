@@ -3,15 +3,11 @@
  * `npm run fresh` rewrites this file; edit freely.
  */
 export const BRAND = {
-  /** Big line on the intro screen. */
-  universeName: 'AstroMart',
-  /** Small badge next to the app name in the top bar. */
-  badge: 'AstroMart demo',
-  /** One-liner on the intro screen under the title. */
+  /** Description on the intro screen under the logo. */
   tagline:
-    'A live schematic of AstroMart — a fictional space-gear shop, outfitting the galaxy since 2199. Pick a domain, pick a scenario, watch the request travel along constellations of services and topics.',
+    'A living map of your architecture. Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.',
   /** Headline of the help overlay. */
-  helpTitle: 'A live map of the AstroMart platform.',
+  helpTitle: 'A live map of your architecture.',
   /** Base URL for `Service.repo` links (no trailing slash). */
   repoBaseUrl: 'https://github.com/astromart',
   /** Link to the nightly Drift Sync workflow runs (the "last run" summary). */

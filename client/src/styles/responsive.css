@@ -331,10 +331,13 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-topbar-brand { font-size: 15px; }
   .lc-topbar--mobile .lc-topbar-brand {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     white-space: nowrap;
     line-height: 1.15;
   }
+  .lc-topbar--mobile .lc-topbar-logo { gap: 4px; }
+  .lc-topbar--mobile .lc-topbar-logo-emblem { height: 28px; }
+  .lc-topbar--mobile .lc-topbar-logo-wordmark { height: 22px; }
   .lc-topbar--mobile .lc-topbar-version { margin-left: 6px; font-size: 9px; letter-spacing: 0.1em; }
   .lc-topbar--mobile .lc-topbar-side--left { flex: 0 1 auto; min-width: 0; }
   .lc-topbar--mobile .lc-topbar-side--right { flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
@@ -574,6 +577,10 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
    scarce height on the portrait card size. */
 @media (max-height: 480px) {
   .lc-topbar-search .lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 190px; }
+  /* The intro is taller than a landscape phone: scroll it, and keep "Jump in" reachable. */
+  .lc-intro { overflow-y: auto; place-items: safe center; }
+  .lc-intro-inner { padding-block: 16px; }
+  .lc-intro-sub { font-size: 13px; line-height: 1.5; }
 }
 
 /* Very small phones — tighten transport so the row never overflows. */
@@ -582,6 +589,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-controls .lc-pb-play { width: 52px; height: 42px; }
   .lc-controls .lc-pb-pill { padding: 8px 10px; }
   .lc-topbar-brand { font-size: 14px; }
+  .lc-topbar--mobile .lc-topbar-version { display: none; }
 }
 
 /* Short viewports (landscape phones) need no special clamp: the card
