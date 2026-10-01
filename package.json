@@ -27,7 +27,7 @@
     "record:demo": "node scripts/record-demo.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.130.0",
+    "@anthropic-ai/sdk": "^0.131.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.3",
     "eslint": "^10.11.0",
