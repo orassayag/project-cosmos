@@ -1,0 +1,150 @@
+# Server-owned data migration — decisions log
+
+Companion to [`server-owned-data-migration-plan.md`](server-owned-data-migration-plan.md). Each entry records an
+ambiguity, the smaller change chosen, and why. Newest phase last.
+
+## Phase 0 — Baseline and parity oracle (2026-10-02)
+
+### Baseline gates
+
+The plan says to run the gates on `main`. Phase 0 ran inside a `/master` stage that may not switch branches or
+create worktrees, so the gates ran on **`feature/add-ai` at HEAD `0dc2b6e`** instead. That branch is the one
+the migration builds on, so it is the baseline that matters.
+
+| Gate | Result |
+| --- | --- |
+| `npm run build` | ✅ pass |
+| `npm test` | ✅ client 140/140 (17 files), server 103/103 (13 files) |
+| `npm run validate` | ✅ 0 errors, 0 warnings (12 services, 8 topics, 40 steps, 5 scenarios) |
+| `npm run lint` | ✅ 0 errors, 1 warning (pre-existing `react-hooks/exhaustive-deps`, `client/src/map/Map.tsx:814`) |
+
+**Caveat — that lint result was not really green.** It came from a stale local `node_modules` that still had
+TypeScript 6. Commit `a86f10b` ("Update outdated packages") pinned `typescript` `^7.0.2`. typescript-eslint
+8.71.0 supports only `<6.1.0`, so:
+
+- `npm ci` fails with ERESOLVE. CI "Validate Project Cosmos" has been red on `main` since `a86f10b` (2026-10-01; for example, run 36961974815).
+- Once local `node_modules` matches the lock, `npm run lint` crashes with "typescript-eslint does not support TS 7.0".
+
+### TypeScript pinned to `^6.0.3` (owner decision)
+
+The owner chose to pin `typescript` back to `^6.0.3` in the root `package.json` (the only `package.json` that
+declares it). `package-lock.json` was regenerated with a plain `npm install`, with no `--legacy-peer-deps`.
+
+- Reason: typescript-eslint 8.71 supports TypeScript `>=4.8.4 <6.1.0`. With TS 7, `npm ci` fails and lint crashes.
+- Verified on the honest install: `npm ci` succeeds, `node_modules/typescript` is 6.0.3, and `npm ls typescript`
+  shows a single deduped 6.0.3. Build, typecheck, lint (0 errors, the same 1 warning), test, validate,
+  `cosmos:check --phase 0` and `parity:screens` all pass.
+- **Revisit** when a typescript-eslint release supports TypeScript 7. Then bump both together and re-run the gates.
+
+### Drift Sync pause (I5)
+
+- Before the change, `gh variable get DRIFT_SYNC_ENABLED` returned "variable not found". The job condition
+  `vars.DRIFT_SYNC_ENABLED == 'true'` was therefore already false, so the workflow was effectively off.
+- Ran `gh variable set DRIFT_SYNC_ENABLED --body false`. `gh variable get DRIFT_SYNC_ENABLED` now prints `false`.
+- To undo this in Phase 10, set the variable to `true`. Deleting it again would also keep the workflow off.
+- `gh pr list --search "head:drift-sync" --state open` returned none, and `gh pr list --state open` returned none.
+  No Drift Sync PR needed a decision, so the baseline includes every merged change and nothing pending.
+
+### Baseline fixtures
+
+- `npm run baseline:dump` (`scripts/dump-baseline.ts`) writes `server/src/__tests__/fixtures/baseline-full.json`.
+  It has two parts:
+  - `data`: every client data export, steps with payloads, and per-scenario steps.
+  - `derived`: the derived values.
+- It also copies `server/src/generated/cosmos-map.json` to `baseline-cosmos-map.json`.
+- `DEPENDENTS_OF` is module-private in `client/src/map/blast-radius.ts`. Exporting it would be a product change,
+  so the dump rebuilds it from `computeBlastRadius(id)`, taking the 1-hop dependents. It also stores the full blast
+  result for every node as `BLAST_RADIUS`, which is a stronger oracle.
+- Maps and Sets are serialized in insertion order: a Map becomes an object, a Set becomes an array. The edge list is
+  `deriveEdges()` with no layout overrides.
+
+### Screenshot oracle (A2)
+
+`npm run parity:screens` builds the client, serves it with `vite preview` on port 4317, and stops the server when it
+finishes. It captures 16 views:
+
+- the default map
+- 5 scenarios mid-play
+- 3 incidents mid-play
+- blast radius on `payments`
+- health view
+- ownership view
+- drift overlay
+- changelog open
+- `realtime-hub` selected
+- a 390×844 phone view of the default map
+
+How the views are kept deterministic:
+
+- Playwright `page.clock` freezes time, and JS animations are advanced with `runFor`.
+- `Math.random` is seeded.
+- CSS transitions and keyframes are disabled, so every shot shows the settled end state.
+- `/api/**` gets a stubbed 404.
+- The version badge is masked, because it changes with every commit.
+- **Web fonts are blocked.** Google Fonts arrive at an unpredictable moment relative to the first camera fit, which
+  measures the layout. When they arrived at different times, scenario and incident views came out at two camera
+  scales (for example 1.2618 vs 1.2602), giving about 0.1–0.28% pixel differences. Shots use fallback fonts. This
+  makes the oracle stable and offline-safe, but the baselines do not show the production typeface.
+  **The owner accepted fallback fonts in the parity baselines** (2026-10-02). No code change.
+
+Two views differ from the plan's list:
+
+- **Mid-play via Next, not `?step=`.** A `?scenario=…&step=N` deep link landed on step 1 in this build. Mid-play is
+  reached by pressing the real Next control until the middle step. The deep-link step bug is recorded but not fixed
+  (product code).
+- **`realtime-hub` expanded is unreachable.** `expandedServiceId` is a constant `null` (`client/src/map/Map.tsx:174`),
+  so the expanded ecosystem cannot be opened in the UI. The view used instead is `realtime-hub-selected`: clicking the
+  hub opens its inspector, which is the closest real view.
+
+**Threshold: keep 0.1%.**
+
+- After `--update`, two plain runs both passed 16/16. The worst view was 41 px (0.0020%), and most views were 0–25 px.
+- Nudge check: payments `x` 1560 → 1580 failed `default-map` (0.1555%) and `health-view` (0.1915%). The command
+  exited 1 and named both views.
+- The nudge was reverted, and `git diff -- client/` is empty.
+- Limitation: on the phone view the same 20 px nudge measured only 0.0459%, under the threshold, because the whole
+  world is drawn small there. Small position changes are caught by the desktop views.
+
+### Bundle size and first paint (`vite preview`, local, 2026-10-02)
+
+| Metric | Value |
+| --- | --- |
+| JS `index-*.js` | 666,249 B raw / 213,087 B gzip |
+| CSS `index-*.css` | 128,952 B raw / 20,640 B gzip |
+| `client/dist` total | 1.3 MB |
+| First contentful paint (median of 5) | 336 ms |
+| First service node in DOM (median of 5, intro skipped) | 403 ms |
+
+These were measured on a 1920×1080 headless Chromium with real time and fonts from the network. They are a reference
+point for Phase 13, not a CI gate.
+
+### Known issues (pre-existing, not fixed in Phase 0)
+
+- `drift-sync/scripts/validate.ts` has no checks for:
+  - `phaseId` uniqueness
+  - capsule spacing (≥150px)
+  - service `hex` against its `color` token
+  - incident steps
+
+  `CLAUDE.md` lists all of these as invariants. Phase 1's `validateCosmos()` must cover them.
+- `client/src/scenarios/steps/core.ts` (`CORE_STEPS`) is an unused leftover from `npm run fresh`. Nothing imports it;
+  only `scripts/fresh-start.mjs` writes it.
+- `client/src/scenarios/drift.ts` and `health.ts` are hand-written fictional fixtures, not produced by any pipeline.
+- The `?step=` deep link does not land on the requested step (see above).
+- CI and `npm ci` were broken by the TypeScript 7 / typescript-eslint mismatch. This is fixed by the TypeScript 6 pin
+  (see Baseline gates).
+- The new root `scripts/*.ts` files are not covered by any tsconfig. They run under `tsx` and are linted, but they
+  have not been type-checked.
+
+### Progress report (A3)
+
+`npm run cosmos:check [-- --phase <n>]` (`scripts/cosmos-check.ts`) runs a table of checks. Each check carries the
+phase that activates it. There are three kinds of check:
+
+- `files-exist`
+- `grep-absent`
+- `grep-present`
+
+Both grep kinds use `git grep --untracked`, so new uncommitted files count. Later phases append their entries to
+`COSMOS_CHECKS`. The unit tests in `scripts/__tests__/cosmosCheck.test.ts` run under `npm run test:scripts`, which is
+now part of `npm test`.

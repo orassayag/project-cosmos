@@ -1,14 +1,21 @@
 # Master Stage Plan
-Plan: docs/plans/unfork-project.md
+Plan: docs/plans/server-owned-data-migration-plan.md
 Branch: feature/add-ai
+Split: medium (cap 10 stages, ~450 LOC/stage target)
 Review budget: 120 minutes
-Generated: 2026-09-30
+Generated: 2026-10-02
 
 ## Scope estimate
-~250 LOC estimated across ~12 files (mostly metadata/docs edits, one shell hook + test) → 4 stages, ~60 LOC/stage average, well under the ceilings. Plan step 6 (GitHub detach) is manual and outward-facing, so it is not a stage.
+~9,500 changed LOC (≈2,100 data lines copied server-side, ≈2,000 deleted in Phase 11, the rest new server/derive/route/agent/client/test/tooling code) across ~140 files → ceil(9500 / 450) = 22, clamped to the 10-stage cap; stages grow (~950 LOC avg), plan phases strictly in order.
 
 ## Stages
-- Stage 1: COMMITTED — Licence and authorship metadata (LICENSE, package.json, plugin manifests)
-- Stage 2: COMMITTED — Fork wording removal and "Origin & credits" (README, SECURITY)
-- Stage 3: COMMITTED — README/GitHub-description reminder hook + shell test + install-hooks wiring
-- Stage 4: COMMITTED — Docs-vs-code audit checklist and mismatch fixes
+- Stage 1: COMMITTED — P0: baseline gates, Drift Sync pause, decisions log, dump-baseline fixtures, parity:screens + baseline screenshots, cosmos:check runner ⚠ large (~900 LOC + generated fixtures/PNGs)
+- Stage 2: PLANNED — P1: server/src/cosmos data copy, apiTypes/types, Zod schema, validateCosmos(), schema/validate/parity tests ⚠ large (~2,600 LOC, mostly copied data)
+- Stage 3: PLANNED — P2: palette, groupServiceId, clusters/nebula, ecosystem/role fields + component refactors, fixture regen, equivalence + clusters tests ⚠ large (~900 LOC)
+- Stage 4: PLANNED — P3: derive/* modules (graph, blastRadius, ownership, health, topicGroups, drift, playable) + getCosmosView() + derived parity ⚠ large (~900 LOC)
+- Stage 5: PLANNED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
+- Stage 6: PLANNED — P6: agents on getCosmosView(), digest additions, read tools, new map actions, unknown-action test, agent eval suite ⚠ large (~900 LOC)
+- Stage 7: PLANNED — P7: no-account dev loop, cosmosClient (retry-safe), CosmosProvider, loading gate + error/Retry, A1 Playwright E2E + CI job ⚠ large (~850 LOC)
+- Stage 8: PLANNED — P8: migrate every client feature to useCosmos(), renderWithCosmos fixture, Ask map-action handlers ⚠ large (~1,400 LOC)
+- Stage 9: PLANNED — P9+P10: drift/health source + demo data server-side, demo scripts rewrite, retarget Drift Sync/validate/fresh/skills/record-demo ⚠ large (~900 LOC)
+- Stage 10: PLANNED — P11+P12: delete client data copies + snapshot tooling, docs (README/CLAUDE.md/CONTRIBUTING/decision record), dev live polling + tests ⚠ large (~2,300 LOC, mostly deletions)

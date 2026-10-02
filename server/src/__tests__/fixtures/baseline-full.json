@@ -1,0 +1,3931 @@
+{
+  "data": {
+    "SERVICES": [
+      {
+        "id": "storefront",
+        "x": 260,
+        "y": 700,
+        "width": 230,
+        "height": 66,
+        "color": "var(--svc-cyan)",
+        "hex": "#22d3ee",
+        "name": "storefront",
+        "sub": "shop.astromart.dev · React",
+        "code": "SF-01",
+        "lang": "TypeScript",
+        "team": "team-shopping",
+        "role": "Customer-facing web store",
+        "desc": "The React storefront every customer lands on — product pages, cart drawer, checkout, order tracking. Talks exclusively to api-gateway over HTTP and keeps one WebSocket open to realtime-hub (via hub-push) for live updates: order confirmations, parcel tracking, and back-in-stock banners. The only thing a shopper ever touches directly.",
+        "tech": [
+          "typescript",
+          "react"
+        ],
+        "repo": "storefront"
+      },
+      {
+        "id": "api-gateway",
+        "x": 660,
+        "y": 560,
+        "width": 230,
+        "height": 66,
+        "color": "var(--svc-blue)",
+        "hex": "#4f8ff7",
+        "name": "api-gateway",
+        "sub": "Node.js · Koa · edge auth",
+        "code": "GW-02",
+        "lang": "TypeScript",
+        "team": "team-shopping",
+        "role": "Single HTTP front door",
+        "desc": "The single HTTP entry point for the storefront. Terminates sessions, validates the shopper's JWT, applies rate limits, and routes each request to the owning service: /v1/search → search, /v1/products → catalog, /v1/cart → cart, /v1/orders → orders. Stamps every request with x-astro-request-id so a checkout can be traced across the whole cosmos.",
+        "tech": [
+          "typescript",
+          "nodejs",
+          "koa",
+          "redis"
+        ],
+        "repo": "api-gateway"
+      },
+      {
+        "id": "cart",
+        "x": 700,
+        "y": 280,
+        "width": 200,
+        "height": 66,
+        "color": "var(--svc-red)",
+        "hex": "#f55b5b",
+        "name": "cart",
+        "sub": "Node.js · Redis",
+        "code": "CRT-03",
+        "lang": "TypeScript",
+        "team": "team-shopping",
+        "role": "Session cart store",
+        "desc": "Holds the shopper's cart as a Redis hash keyed by cartId, with a 30-day TTL that refreshes on every touch. Serves GET/PUT /v1/cart through api-gateway, validates line items against catalog prices on read, and hands the final cart snapshot to orders at checkout. Deliberately boring: no Kafka, no Postgres — just fast Redis reads on the hottest path in the shop.",
+        "tech": [
+          "typescript",
+          "nodejs",
+          "redis"
+        ],
+        "repo": "cart"
+      },
+      {
+        "id": "search",
+        "x": 1140,
+        "y": 260,
+        "width": 210,
+        "height": 66,
+        "color": "var(--svc-amber)",
+        "hex": "#f5b731",
+        "name": "search",
+        "sub": "Node.js · Elasticsearch",
+        "code": "SRC-04",
+        "lang": "TypeScript",
+        "team": "team-shopping",
+        "role": "Product search & ranking",
+        "desc": "Full-text product search over an Elasticsearch index of the entire AstroMart catalog — helmets, mag-boots, thruster packs. Receives /v1/search queries from api-gateway, runs a bool query with typo tolerance and category boosts, then calls catalog over HTTP to hydrate the top hits with live price and stock before responding. Re-indexes nightly from catalog's Postgres.",
+        "tech": [
+          "typescript",
+          "nodejs",
+          "elastic"
+        ],
+        "repo": "search"
+      },
+      {
+        "id": "catalog",
+        "x": 1140,
+        "y": 540,
+        "width": 210,
+        "height": 66,
+        "color": "var(--svc-green)",
+        "hex": "#34d399",
+        "name": "catalog",
+        "sub": "NestJS · Postgres",
+        "code": "CTL-05",
+        "lang": "TypeScript",
+        "team": "team-shopping",
+        "role": "Product record owner",
+        "desc": "Owns the Product record in Postgres — SKUs, variants, pricing, spec sheets (\"rated to -270°C\"). Serves /v1/products to the storefront through api-gateway and hydrates search results with live price and stock on request. Product images live in object-storage; catalog resolves each SKU's gallery to short-lived signed URLs so the storefront never talks to the bucket directly.",
+        "tech": [
+          "typescript",
+          "nestjs",
+          "postgres"
+        ],
+        "repo": "catalog"
+      },
+      {
+        "id": "orders",
+        "x": 1600,
+        "y": 720,
+        "width": 210,
+        "height": 66,
+        "color": "var(--svc-purple)",
+        "hex": "#a855f7",
+        "name": "orders",
+        "sub": "NestJS · Postgres",
+        "code": "ORD-06",
+        "lang": "TypeScript",
+        "team": "team-fulfillment",
+        "role": "Order lifecycle owner",
+        "desc": "The source of truth for every order. Receives checkout POSTs from api-gateway, writes a draft order row in Postgres, calls payments synchronously to capture, then flips the order to confirmed when payments.captured arrives. Publishes orders.created (consumed by inventory, shipping, notifications) and orders.cancelled (consumed by payments, inventory). Consumes inventory.reserved to attach the stock hold, and broadcasts \"Order confirmed!\" to the shopper's live tab via hub.broadcasts through realtime-hub.",
+        "tech": [
+          "typescript",
+          "nestjs",
+          "postgres",
+          "kafka"
+        ],
+        "repo": "orders"
+      },
+      {
+        "id": "payments",
+        "x": 1560,
+        "y": 1060,
+        "width": 220,
+        "height": 66,
+        "color": "var(--svc-pink)",
+        "hex": "#f472b6",
+        "name": "payments",
+        "sub": "NestJS · Postgres · PCI zone",
+        "code": "PAY-07",
+        "lang": "TypeScript",
+        "team": "team-fulfillment",
+        "role": "Payment capture & refunds",
+        "desc": "The only service allowed to touch card data — runs in its own locked-down PCI segment, everything else sees tokens. orders calls POST /v1/payments/capture synchronously at checkout; payments talks to the processor, vaults the payment method, and answers on Kafka: payments.captured on success (also emitted with a negative amount for refunds), payments.failed when the processor declines. Consumes orders.cancelled to issue refunds. Ledger rows in Postgres, immutable, double-entry.",
+        "tech": [
+          "typescript",
+          "nestjs",
+          "postgres",
+          "kafka"
+        ],
+        "repo": "payments"
+      },
+      {
+        "id": "inventory",
+        "x": 2060,
+        "y": 720,
+        "width": 220,
+        "height": 66,
+        "color": "var(--svc-teal)",
+        "hex": "#38bdf8",
+        "name": "inventory",
+        "sub": "Node.js · DynamoDB",
+        "code": "INV-08",
+        "lang": "TypeScript",
+        "team": "team-fulfillment",
+        "role": "Stock levels & reservations",
+        "desc": "Tracks stock per SKU per warehouse in DynamoDB, using conditional writes so two shoppers can never claim the last mag-boot. Consumes orders.created to place a reservation and answers with inventory.reserved; consumes orders.cancelled to release the hold. An internal restock watcher notices when a zero-stock SKU comes back and publishes inventory.back-in-stock — the trigger for wishlist emails and live \"It's back!\" banners via realtime-hub.",
+        "tech": [
+          "typescript",
+          "nodejs",
+          "dynamodb",
+          "kafka"
+        ],
+        "repo": "inventory"
+      },
+      {
+        "id": "shipping",
+        "x": 2060,
+        "y": 1060,
+        "width": 210,
+        "height": 66,
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "name": "shipping",
+        "sub": "NestJS · Postgres · courier APIs",
+        "code": "SHP-09",
+        "lang": "TypeScript",
+        "team": "team-fulfillment",
+        "role": "Packing, labels & couriers",
+        "desc": "Turns a confirmed order into a parcel. Consumes orders.created, builds the pick list, rate-shops the courier APIs (Orbital Express vs. LunaPost), and uploads the generated label PDF to object-storage. Once the courier scans the parcel it publishes shipping.dispatched — notifications mails the tracking link, and shipping pushes live tracking to the shopper's open tab via hub.broadcasts through realtime-hub.",
+        "tech": [
+          "typescript",
+          "nestjs",
+          "postgres",
+          "kafka",
+          "s3"
+        ],
+        "repo": "shipping"
+      },
+      {
+        "id": "notifications",
+        "x": 1180,
+        "y": 1250,
+        "width": 240,
+        "height": 66,
+        "color": "var(--svc-rose)",
+        "hex": "#ec4899",
+        "name": "notifications",
+        "sub": "Node.js · email + push",
+        "code": "NTF-10",
+        "lang": "TypeScript",
+        "team": "team-engagement",
+        "role": "Email & push delivery",
+        "desc": "Everything AstroMart sends that isn't a WebSocket frame. Consumes orders.created (order confirmation email), shipping.dispatched (tracking email), and inventory.back-in-stock (wishlist \"it's back\" blast). Renders MJML templates, batches sends through the mail relay, honors per-customer channel preferences, and dedupes so nobody gets the same \"your helmet shipped\" email twice.",
+        "tech": [
+          "typescript",
+          "nodejs",
+          "kafka",
+          "redis"
+        ],
+        "repo": "notifications"
+      },
+      {
+        "id": "realtime-hub",
+        "x": 840,
+        "y": 1020,
+        "width": 240,
+        "height": 66,
+        "color": "var(--svc-magenta)",
+        "hex": "#e879f9",
+        "name": "realtime-hub",
+        "sub": "hub-ingest → hub-push",
+        "code": "HUB-11",
+        "lang": "Node.js",
+        "team": "team-engagement",
+        "role": "Realtime pub/sub fan-out",
+        "desc": "The WebSocket layer that makes the storefront feel alive. Every browser tab holds one socket to hub-push; every backend broadcast lands on the hub.broadcasts Kafka topic. hub-ingest consumes it, asks hub-presence which socket(s) belong to the target customer, then calls hub-push to deliver — per-tab when a socket_id is set, fan-out to all of a customer's tabs otherwise. Order confirmations, live parcel tracking, and back-in-stock banners all flow through here.",
+        "tech": [
+          "nodejs",
+          "typescript",
+          "kafka"
+        ],
+        "repo": "realtime-hub",
+        "subServices": [
+          {
+            "id": "hub-ingest",
+            "name": "hub-ingest",
+            "sub": "Kafka → WS fan-out",
+            "role": "Broadcast consumer (intake)",
+            "desc": "Consumes the hub.broadcasts Kafka topic — the single intake into the entire realtime-hub ecosystem. Every backend broadcast at AstroMart lands here first. Calls hub-presence to resolve the target socket(s) by socket_id (single tab) or customer_id (all of a customer's tabs), then calls hub-push to deliver the message.",
+            "tech": [
+              "nodejs",
+              "typescript",
+              "kafka"
+            ],
+            "repo": "hub-ingest"
+          },
+          {
+            "id": "hub-router",
+            "name": "hub-router",
+            "sub": "Channel routing",
+            "role": "Topic & channel routing rules",
+            "desc": "Owns the channel-subscription rules — which event types a given page is allowed to receive (order events on /orders, stock banners on product pages). hub-push consults it out-of-band when a socket subscribes or changes page, so routing decisions stay off the hot broadcast path.",
+            "tech": [
+              "nodejs",
+              "typescript",
+              "redis"
+            ],
+            "repo": "hub-router"
+          },
+          {
+            "id": "hub-presence",
+            "name": "hub-presence",
+            "sub": "Connection ledger",
+            "role": "Session ledger + presence",
+            "desc": "Connection registry and presence ledger. Tracks every live WebSocket's lifecycle — open, heartbeat, close — and maps socket_id / customer_id to the hub-push pod hosting that connection. hub-ingest calls it on every broadcast to resolve delivery targets.",
+            "tech": [
+              "nodejs",
+              "typescript",
+              "redis"
+            ],
+            "repo": "hub-presence"
+          },
+          {
+            "id": "hub-push",
+            "name": "hub-push",
+            "sub": "WebSocket gateway",
+            "role": "Browser-facing WS endpoint",
+            "desc": "Long-lived WebSocket server every storefront tab connects to. Owns the live socket → socket_id mapping and is the only hub process the browser talks to. Receives delivery calls from hub-ingest (POST /sockets/:socketId/send) and pushes messages down the open WebSocket to the storefront.",
+            "tech": [
+              "nodejs",
+              "typescript"
+            ],
+            "repo": "hub-push"
+          }
+        ]
+      },
+      {
+        "id": "object-storage",
+        "x": 2360,
+        "y": 360,
+        "width": 220,
+        "height": 66,
+        "color": "var(--svc-emerald)",
+        "hex": "#34a853",
+        "name": "object-storage",
+        "sub": "S3-compatible · astromart-assets",
+        "code": "OBJ-12",
+        "lang": "Infra",
+        "role": "Object store · images & labels",
+        "desc": "S3-compatible bucket (astromart-assets) holding everything too big for a database row. Two main tenants: product image galleries, written by the catalog ingest pipeline and read back as signed URLs on every product page; and courier label PDFs, uploaded by shipping at pack time under labels/<orderId>/<parcelId>.pdf. Nothing talks to it without a presigned URL.",
+        "tech": [
+          "s3"
+        ]
+      }
+    ],
+    "TOPICS": [
+      {
+        "id": "orders.created",
+        "x": 1830,
+        "y": 810,
+        "labelSide": "below",
+        "name": "orders.created",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by orders the moment an order flips to confirmed (payment captured). Keyed by orderId so every event for the same order lands on the same partition. Fan-out to three consumers: inventory (places the stock reservation), shipping (queues the pick-and-pack job), and notifications (sends the confirmation email)."
+      },
+      {
+        "id": "orders.cancelled",
+        "x": 1716,
+        "y": 909,
+        "labelSide": "below",
+        "pinned": true,
+        "name": "orders.cancelled",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by orders when a shopper (or fraud review) cancels an order. Keyed by orderId. Consumers: payments (issues the refund against the original capture) and inventory (releases the reserved units back to sellable stock)."
+      },
+      {
+        "id": "payments.captured",
+        "x": 1510,
+        "y": 918,
+        "labelSide": "above",
+        "pinned": true,
+        "name": "payments.captured",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by payments after the processor confirms a capture — and again on refunds, with a negative amount and reason: 'refund'. Carries the ledger entry id, order id, amount, currency, and the tokenized payment method. Sole consumer: orders, which flips the order to confirmed (or refunded) on receipt."
+      },
+      {
+        "id": "payments.failed",
+        "x": 1400,
+        "y": 1180,
+        "labelSide": "below",
+        "name": "payments.failed",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by payments when the processor declines a capture (insufficient funds, expired card, suspected fraud on a suspiciously large thruster order). Carries the decline code and a shopper-safe message. Consumer: orders, which parks the order in payment_failed so the storefront can offer a retry. Error-path sibling of payments.captured."
+      },
+      {
+        "id": "inventory.reserved",
+        "x": 1830,
+        "y": 650,
+        "labelSide": "above",
+        "name": "inventory.reserved",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by inventory once every line item of an order has been reserved via DynamoDB conditional writes. Carries the reservation id, per-SKU warehouse assignments, and an expiry. Sole consumer: orders, which attaches the reservation to the order row — the last gate before the shopper sees \"Order confirmed!\"."
+      },
+      {
+        "id": "inventory.back-in-stock",
+        "x": 2053,
+        "y": 912,
+        "labelSide": "above",
+        "pinned": true,
+        "name": "inventory.back-in-stock",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by inventory's restock watcher when a SKU's sellable count crosses zero → positive (a restock delivery was scanned in). Carries skuId, warehouse, and the new count. Consumer: notifications, which emails everyone with the SKU wishlisted. inventory also broadcasts the same moment to live browsing sessions via hub.broadcasts."
+      },
+      {
+        "id": "shipping.dispatched",
+        "x": 1929,
+        "y": 1233,
+        "labelSide": "below",
+        "pinned": true,
+        "name": "shipping.dispatched",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "Kafka topic. Published by shipping when the courier scans the parcel and the tracking number goes live. Carries orderId, parcelId, courier, trackingNumber, and the label's object-storage key. Consumer: notifications (tracking email). shipping also pushes the same event to the shopper's open tab via hub.broadcasts."
+      },
+      {
+        "id": "hub-broadcasts",
+        "x": 1056,
+        "y": 1022,
+        "pinned": true,
+        "name": "hub.broadcasts",
+        "color": "var(--svc-orange)",
+        "hex": "#fb923c",
+        "desc": "realtime-hub's input topic — every WebSocket push at AstroMart starts life as a record here. Producers: orders (order confirmed / refund confirmed), shipping (live parcel tracking), inventory (back-in-stock banners). hub-ingest consumes, calls hub-presence to resolve the target socket(s), then calls hub-push to deliver — fan-out by customer_id when no socket_id is set, precise per-tab when it is."
+      }
+    ],
+    "SCENARIOS": [
+      {
+        "id": "shopping.search",
+        "domain": "shopping",
+        "phaseId": 1,
+        "label": "Search for a product",
+        "color": "var(--svc-amber)",
+        "status": "ready",
+        "short": "A shopper types \"mag boots\" — the query fans through search, gets hydrated by catalog, and comes back with signed image URLs from object-storage."
+      },
+      {
+        "id": "shopping.place-order",
+        "domain": "shopping",
+        "phaseId": 2,
+        "label": "Place an order",
+        "color": "var(--svc-purple)",
+        "status": "ready",
+        "short": "The hero flow: checkout POST → order drafted → payment captured → stock reserved → \"Order confirmed!\" pushed to the shopper's tab via realtime-hub, with the confirmation email in parallel."
+      },
+      {
+        "id": "fulfillment.pack-and-ship",
+        "domain": "fulfillment",
+        "phaseId": 3,
+        "label": "Pack & ship",
+        "color": "var(--svc-orange)",
+        "status": "ready",
+        "short": "A confirmed order lands in the packing queue — shipping rate-shops couriers, uploads the label PDF to object-storage, and shipping.dispatched fans out to email + live tracking."
+      },
+      {
+        "id": "fulfillment.cancel-refund",
+        "domain": "fulfillment",
+        "phaseId": 4,
+        "label": "Cancel & refund",
+        "color": "var(--svc-pink)",
+        "status": "ready",
+        "short": "The shopper cancels — orders.cancelled fans out to payments (refund at the processor) and inventory (stock released), and the refund receipt closes the loop back to the shopper's tab."
+      },
+      {
+        "id": "engagement.back-in-stock",
+        "domain": "engagement",
+        "phaseId": 5,
+        "label": "Back in stock",
+        "color": "var(--svc-teal)",
+        "status": "ready",
+        "short": "A restock delivery is scanned in — inventory.back-in-stock triggers wishlist emails via notifications and a live \"It's back!\" banner to browsing sessions through realtime-hub."
+      }
+    ],
+    "STEPS": [
+      {
+        "phase": 1,
+        "from": "storefront",
+        "to": "api-gateway",
+        "type": "http",
+        "label": "GET /v1/search?q=mag+boots",
+        "title": "Shopper searches — GET /v1/search",
+        "plain": "The shopper types \"mag boots\" into the storefront search bar. After a 150ms debounce the browser fires the query at the api-gateway — the single front door for every HTTP call at AstroMart.",
+        "payload": "GET /v1/search?q=mag+boots&limit=12\nHeaders:\n  Accept: application/json\n  Authorization: Bearer eyJhbGciOi...\n  x-astro-session: \":sessionId\"\n\n// 200 OK (see final step for the response body)"
+      },
+      {
+        "phase": 1,
+        "from": "api-gateway",
+        "to": "search",
+        "type": "http",
+        "label": "Route to search",
+        "title": "api-gateway validates & routes the query",
+        "plain": "The gateway checks the shopper's JWT, applies the per-session rate limit, stamps the request with x-astro-request-id, and proxies it to the search service. Every downstream hop carries that request id — one checkout, one trace.",
+        "payload": "GET /internal/search?q=mag+boots&limit=12\nHeaders:\n  x-astro-request-id: \"req_01JXPZ8Q4T\"\n  x-astro-customer-id: \":customerId\"\n  x-astro-session: \":sessionId\""
+      },
+      {
+        "phase": 1,
+        "from": "search",
+        "to": "search",
+        "type": "internal",
+        "label": "Elasticsearch bool query",
+        "title": "search: ranked query against the product index",
+        "plain": "search runs a bool query against the Elasticsearch product index — full-text match on name and description, typo tolerance (\"mag botos\" still works), and a boost for in-stock items and the shopper's favorite categories. Twelve ranked SKU ids come back in ~15ms."
+      },
+      {
+        "phase": 1,
+        "from": "search",
+        "to": "catalog",
+        "type": "http",
+        "label": "Hydrate top hits",
+        "title": "search → catalog: hydrate hits with live price & stock",
+        "plain": "The index stores lean documents, so search asks catalog to hydrate the top hits with the freshest data — current price, sellable stock, and the variant matrix. A single batched call, not twelve.",
+        "payload": "POST /internal/products/batch\nHeaders:\n  Content-Type: application/json\n  x-astro-request-id: \"req_01JXPZ8Q4T\"\n\nBody:\n{\n  \"skuIds\": [\"sku_magboot_gravlock_9\", \"sku_magboot_titan_2\", \"sku_magboot_luna_lite\"],\n  \"fields\": [\"name\", \"price\", \"stock\", \"variants\", \"imageKeys\"]\n}\n\n// 200 OK\n{\n  \"products\": [\n    {\n      \"skuId\": \"sku_magboot_gravlock_9\",\n      \"name\": \"GravLock Mag Boots Mk IX\",\n      \"price\": { \"amount\": 42900, \"currency\": \"GCR\" },\n      \"stock\": 17,\n      \"imageKeys\": [\"products/magboot-gravlock-9/hero.webp\"]\n    }\n  ]\n}"
+      },
+      {
+        "phase": 1,
+        "from": "catalog",
+        "to": "object-storage",
+        "type": "http",
+        "label": "Sign image URLs (read)",
+        "title": "catalog → object-storage: presign the gallery images",
+        "plain": "Product images live in the astromart-assets bucket, never behind a public URL. catalog presigns a short-lived GET URL for each hero image so the storefront can render the grid without ever holding bucket credentials. A pure read hop — nothing is written.",
+        "payload": "GET s3://astromart-assets/products/magboot-gravlock-9/hero.webp\nHeaders:\n  x-amz-expires: 900\n\n// catalog generates presigned GET URLs (15 min TTL) for each image key\n// and inlines them into the product payload:\n{\n  \"imageUrls\": [\n    \"https://assets.astromart.dev/products/magboot-gravlock-9/hero.webp?X-Amz-Signature=...\"\n  ]\n}"
+      },
+      {
+        "phase": 1,
+        "from": "search",
+        "to": "api-gateway",
+        "type": "http",
+        "label": "Ranked + hydrated results",
+        "title": "search returns the assembled results page",
+        "plain": "search merges the Elasticsearch ranking with catalog's hydrated product data and hands the finished results page back to the gateway. Ranking decisions stay in search; product truth stays in catalog."
+      },
+      {
+        "phase": 1,
+        "from": "api-gateway",
+        "to": "storefront",
+        "type": "http",
+        "label": "200 OK — results grid",
+        "title": "Results land in the browser — grid renders",
+        "plain": "The gateway streams the response back to the browser. Twelve product cards render with prices, stock badges, and signed image URLs. Total round trip: ~80ms — fast enough that the shopper never sees a spinner.",
+        "payload": "// 200 OK\n{\n  \"query\": \"mag boots\",\n  \"total\": 34,\n  \"results\": [\n    {\n      \"skuId\": \"sku_magboot_gravlock_9\",\n      \"name\": \"GravLock Mag Boots Mk IX\",\n      \"price\": { \"amount\": 42900, \"currency\": \"GCR\" },\n      \"stock\": 17,\n      \"badge\": \"BESTSELLER\",\n      \"imageUrl\": \"https://assets.astromart.dev/products/magboot-gravlock-9/hero.webp?X-Amz-Signature=...\"\n    }\n  ]\n}"
+      },
+      {
+        "phase": 2,
+        "from": "storefront",
+        "to": "storefront",
+        "type": "internal",
+        "label": "Shopper clicks \"Place order\"",
+        "title": "Checkout begins — cart snapshot + idempotency key",
+        "plain": "The shopper hits \"Place order\" on a cart holding one pair of GravLock Mag Boots and a spare O₂ scrubber. The storefront freezes the cart snapshot, generates an idempotency key, and disables the button — double-clicking will never create two orders."
+      },
+      {
+        "phase": 2,
+        "from": "storefront",
+        "to": "api-gateway",
+        "type": "http",
+        "label": "POST /v1/orders",
+        "title": "POST /v1/orders — the checkout request",
+        "plain": "The browser ships the checkout payload: cart snapshot, shipping address (Luna Colony addresses are surprisingly long), the tokenized payment method, and the socketId of its live realtime-hub connection — so the confirmation can be pushed to this exact tab later.",
+        "payload": "POST /v1/orders\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n  x-astro-idempotency-key: \"idem_01JXQ0A7C3\"\n\nBody:\n{\n  \"cartId\":   \":cartId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"unitPrice\": 42900 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1, \"unitPrice\": 7900 }\n  ],\n  \"currency\": \"GCR\",\n  \"shippingAddress\": {\n    \"name\":   \"R. Vega\",\n    \"line1\":  \"Hab-Ring 4, Module 17B\",\n    \"city\":   \"Luna Colony\",\n    \"system\": \"Sol\"\n  },\n  \"paymentMethodToken\": \"pm_tok_9f2c...\",\n  \"socketId\": \":socketId\"\n}\n\n// 202 Accepted\n{ \"orderId\": \":orderId\", \"status\": \"processing\" }"
+      },
+      {
+        "phase": 2,
+        "from": "api-gateway",
+        "to": "orders",
+        "type": "http",
+        "label": "Route to orders",
+        "title": "api-gateway forwards checkout with auth context",
+        "plain": "The gateway validates the JWT one more time, resolves the customerId, checks the idempotency key against Redis (fresh — proceed), and forwards the request to the orders service with the full auth context attached."
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "to": "orders",
+        "type": "internal",
+        "label": "Draft order row (Postgres)",
+        "title": "Order drafted — status: draft",
+        "plain": "orders writes the draft order row to Postgres inside a transaction: line items, totals, address, status 'draft'. The order now exists and has an id — everything after this point is recoverable, even if the process dies mid-checkout."
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "to": "payments",
+        "type": "http",
+        "label": "POST /v1/payments/capture",
+        "title": "orders → payments: capture 508.00 GCR",
+        "plain": "orders calls payments synchronously — checkout is the one place a shopper is actively waiting, so this hop stays HTTP rather than Kafka. payments lives in its own PCI segment; orders only ever sees the token, never the card.",
+        "payload": "POST /v1/payments/capture\nHeaders:\n  Content-Type: application/json\n  x-astro-request-id: \"req_01JXQ0A9RD\"\n\nBody:\n{\n  \"orderId\":            \":orderId\",\n  \"amount\":             50800,\n  \"currency\":           \"GCR\",\n  \"paymentMethodToken\": \"pm_tok_9f2c...\",\n  \"idempotencyKey\":     \"idem_01JXQ0A7C3\"\n}\n\n// 202 Accepted — capture running, result arrives on Kafka\n{ \"captureId\": \":captureId\", \"status\": \"pending\" }"
+      },
+      {
+        "phase": 2,
+        "from": "payments",
+        "to": "payments",
+        "type": "internal",
+        "label": "Processor round-trip (PCI)",
+        "title": "payments: card authorized at the processor",
+        "plain": "Inside the PCI zone, payments detokenizes the payment method, calls the card processor, and writes the double-entry ledger rows. The galaxy's banks still take ~900ms to say yes — some things never change, even in 2199."
+      },
+      {
+        "phase": 2,
+        "from": "payments",
+        "to": "orders",
+        "via": "payments.captured",
+        "type": "kafka",
+        "label": "payments.captured",
+        "title": "Capture confirmed — receipt on Kafka",
+        "plain": "The processor approved. payments publishes the capture receipt on payments.captured — keyed by orderId. orders consumes it as the authoritative \"the money is real\" signal. (Declines would arrive on payments.failed instead, parking the order for retry.)",
+        "payload": "// Kafka record on payments.captured\n// key: orderId\n{\n  \"captureId\":  \":captureId\",\n  \"orderId\":    \":orderId\",\n  \"amount\":     50800,\n  \"currency\":   \"GCR\",\n  \"method\":     \"card_vault\",\n  \"processorRef\": \"prc_8842190\",\n  \"capturedAt\": \"2199-07-22T14:03:22.412Z\"\n}"
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "to": "orders",
+        "type": "internal",
+        "label": "Status → confirmed",
+        "title": "Order flips draft → confirmed",
+        "plain": "orders matches the capture receipt to the draft row and flips the status to confirmed inside the same Postgres transaction that records the ledger reference. This is the moment the order becomes a promise to ship."
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "to": "inventory",
+        "via": "orders.created",
+        "type": "kafka",
+        "label": "orders.created → reserve stock",
+        "title": "orders.created — inventory reserves the units",
+        "plain": "orders announces the confirmed order on orders.created. inventory consumes it and places a reservation: one GravLock Mk IX from the Luna warehouse, one O₂ scrubber from Phobos. DynamoDB conditional writes guarantee two shoppers can never claim the same last unit.",
+        "payload": "// Kafka record on orders.created\n// key: orderId — fan-out to inventory, shipping, notifications\n{\n  \"orderId\":    \":orderId\",\n  \"customerId\": \":customerId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1 }\n  ],\n  \"total\":      { \"amount\": 50800, \"currency\": \"GCR\" },\n  \"shippingRegion\": \"luna-colony\",\n  \"confirmedAt\": \"2199-07-22T14:03:22.671Z\"\n}"
+      },
+      {
+        "phase": 2,
+        "from": "inventory",
+        "to": "orders",
+        "via": "inventory.reserved",
+        "type": "kafka",
+        "label": "inventory.reserved",
+        "title": "Stock held — reservation confirmed",
+        "plain": "Both conditional writes succeeded, so inventory publishes inventory.reserved with the per-SKU warehouse assignments and a 48-hour expiry. orders attaches the reservation id to the order row — the last gate before the shopper gets the good news.",
+        "payload": "// Kafka record on inventory.reserved\n// key: orderId\n{\n  \"reservationId\": \":reservationId\",\n  \"orderId\":       \":orderId\",\n  \"lines\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"warehouse\": \"wh-luna-1\" },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1, \"warehouse\": \"wh-phobos-2\" }\n  ],\n  \"expiresAt\": \"2199-07-24T14:03:23.008Z\"\n}"
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "through": "realtime-hub",
+        "to": "storefront",
+        "via": "hub-broadcasts",
+        "type": "kafka",
+        "label": "\"Order confirmed!\" → shopper's tab",
+        "title": "hub.broadcasts: Order confirmed! pushed to the originating tab",
+        "plain": "orders publishes the confirmation on hub.broadcasts with the socket_id from checkout. hub-ingest consumes, asks hub-presence exactly which socket that is, and hub-push delivers it down the open WebSocket — the checkout page flips to \"Order confirmed!\" without a single poll.",
+        "payload": "// Kafka record on hub.broadcasts — routed to ONE tab\n{\n  \"customer_id\": \":customerId\",\n  \"socket_id\":   \":socketId\",\n  \"event_name\":  \"order-confirmed\",\n  \"payload\": {\n    \"orderId\":  \":orderId\",\n    \"total\":    { \"amount\": 50800, \"currency\": \"GCR\" },\n    \"eta\":      \"3 orbital days\",\n    \"message\":  \"Order confirmed — your gear is being prepped.\"\n  }\n}"
+      },
+      {
+        "phase": 2,
+        "from": "orders",
+        "to": "notifications",
+        "via": "orders.created",
+        "type": "kafka",
+        "label": "Confirmation email",
+        "title": "notifications: order confirmation email",
+        "parallel": true,
+        "plain": "In parallel with the WebSocket push, notifications consumes the same orders.created event and renders the confirmation email — line items, totals, and the estimated delivery window. Batched through the mail relay; deduped by orderId so a consumer-group rebalance never double-sends it."
+      },
+      {
+        "phase": 3,
+        "from": "orders",
+        "to": "shipping",
+        "via": "orders.created",
+        "type": "kafka",
+        "label": "orders.created → packing queue",
+        "title": "A confirmed order lands in the packing queue",
+        "plain": "shipping consumes the same orders.created event that inventory and notifications saw — it just cares about different fields. The order joins the wh-luna-1 packing queue, sorted by promised delivery window.",
+        "payload": "// Kafka record on orders.created (shipping consumer group)\n// key: orderId\n{\n  \"orderId\":    \":orderId\",\n  \"customerId\": \":customerId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1 }\n  ],\n  \"shippingAddress\": {\n    \"name\":   \"R. Vega\",\n    \"line1\":  \"Hab-Ring 4, Module 17B\",\n    \"city\":   \"Luna Colony\",\n    \"system\": \"Sol\"\n  },\n  \"shippingRegion\": \"luna-colony\"\n}"
+      },
+      {
+        "phase": 3,
+        "from": "shipping",
+        "to": "shipping",
+        "type": "internal",
+        "label": "Pick list + courier rate-shop",
+        "title": "shipping: pick list built, couriers rate-shopped",
+        "plain": "shipping explodes the order into a warehouse pick list, weighs the parcel (mag boots are heavy — that's the point), and rate-shops the courier APIs. Orbital Express wins on price for Luna Colony; LunaPost keeps losing on the vacuum surcharge."
+      },
+      {
+        "phase": 3,
+        "from": "shipping",
+        "to": "object-storage",
+        "type": "http",
+        "label": "PUT label PDF (write)",
+        "title": "Courier label PDF uploaded to object-storage",
+        "plain": "The Orbital Express API returns a label PDF. shipping uploads it to the astromart-assets bucket under labels/<orderId>/<parcelId>.pdf — a pure write hop. The warehouse printer and any future support ticket both read it from here, never from the courier API again.",
+        "payload": "PUT s3://astromart-assets/labels/:orderId/:parcelId.pdf\nHeaders:\n  Content-Type: application/pdf\n  Content-Length: 48211\n  x-amz-meta-courier: orbital-express\n\n// 200 OK\n{ \"etag\": \"\\\"9d38b2a1\\\"\", \"key\": \"labels/:orderId/:parcelId.pdf\" }"
+      },
+      {
+        "phase": 3,
+        "from": "shipping",
+        "to": "shipping",
+        "type": "internal",
+        "label": "Courier scan → dispatched",
+        "title": "Parcel scanned by the courier — status: dispatched",
+        "plain": "A few hours later the Orbital Express pickup drone scans the parcel at the dock. The courier webhook flips the parcel to dispatched and the tracking number goes live. This scan is the trigger for everything that follows."
+      },
+      {
+        "phase": 3,
+        "from": "shipping",
+        "to": "notifications",
+        "via": "shipping.dispatched",
+        "type": "kafka",
+        "label": "shipping.dispatched → tracking email",
+        "title": "shipping.dispatched — notifications mails the tracking link",
+        "plain": "shipping publishes shipping.dispatched with the courier, tracking number, and the label's storage key. notifications consumes it and renders the \"your gear is on the way\" email with a live tracking link.",
+        "payload": "// Kafka record on shipping.dispatched\n// key: orderId\n{\n  \"orderId\":        \":orderId\",\n  \"parcelId\":       \":parcelId\",\n  \"customerId\":     \":customerId\",\n  \"courier\":        \"orbital-express\",\n  \"trackingNumber\": \"OE-449-LUNA-88121\",\n  \"labelKey\":       \"labels/:orderId/:parcelId.pdf\",\n  \"eta\":            \"2199-07-25T09:00:00.000Z\",\n  \"dispatchedAt\":   \"2199-07-22T21:14:05.881Z\"\n}"
+      },
+      {
+        "phase": 3,
+        "from": "shipping",
+        "through": "realtime-hub",
+        "to": "storefront",
+        "via": "hub-broadcasts",
+        "type": "kafka",
+        "label": "Live tracking → open tab",
+        "title": "hub.broadcasts: live tracking pushed to the shopper's tab",
+        "parallel": true,
+        "plain": "In parallel with the email, shipping broadcasts the dispatch on hub.broadcasts. No socket_id this time — hub-presence fans out to every open tab the customer has, and the order-status page animates from \"packing\" to \"in transit\" while they watch.",
+        "payload": "// Kafka record on hub.broadcasts — fan-out to all of the customer's tabs\n{\n  \"customer_id\": \":customerId\",\n  \"event_name\":  \"parcel-dispatched\",\n  \"payload\": {\n    \"orderId\":        \":orderId\",\n    \"trackingNumber\": \"OE-449-LUNA-88121\",\n    \"courier\":        \"orbital-express\",\n    \"eta\":            \"3 orbital days\",\n    \"position\":       \"departed wh-luna-1\"\n  }\n}"
+      },
+      {
+        "phase": 3,
+        "from": "notifications",
+        "to": "notifications",
+        "type": "internal",
+        "label": "Tracking email rendered + sent",
+        "title": "notifications: tracking email out the door",
+        "plain": "notifications renders the MJML template with the tracking widget, checks the customer's channel preferences (email: yes, push: muted after 22:00 Luna time), and hands the message to the mail relay. Deduped by parcelId — one scan, one email."
+      },
+      {
+        "phase": 4,
+        "from": "storefront",
+        "to": "api-gateway",
+        "type": "http",
+        "label": "POST /v1/orders/:id/cancel",
+        "title": "Shopper cancels — POST /v1/orders/:id/cancel",
+        "plain": "Buyer's remorse strikes before the parcel leaves the dock: the shopper hits \"Cancel order\" on the order-status page. The storefront calls the cancel endpoint through the gateway.",
+        "payload": "POST /v1/orders/:orderId/cancel\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n\nBody:\n{\n  \"reason\":   \"changed_mind\",\n  \"socketId\": \":socketId\"\n}\n\n// 202 Accepted\n{ \"orderId\": \":orderId\", \"status\": \"cancelling\" }"
+      },
+      {
+        "phase": 4,
+        "from": "api-gateway",
+        "to": "orders",
+        "type": "http",
+        "label": "Route cancel to orders",
+        "title": "api-gateway forwards the cancellation",
+        "plain": "The gateway verifies the shopper actually owns this order, then forwards the cancel to the orders service. orders checks the state machine: not yet dispatched, so cancellation is still allowed — it flips the order to cancelling."
+      },
+      {
+        "phase": 4,
+        "from": "orders",
+        "to": "payments",
+        "via": "orders.cancelled",
+        "type": "kafka",
+        "label": "orders.cancelled → refund",
+        "title": "orders.cancelled — payments starts the refund",
+        "plain": "orders publishes orders.cancelled. payments consumes it, looks up the original capture in its ledger, and queues a full refund against the processor.",
+        "payload": "// Kafka record on orders.cancelled\n// key: orderId — fan-out to payments and inventory\n{\n  \"orderId\":     \":orderId\",\n  \"customerId\":  \":customerId\",\n  \"reason\":      \"changed_mind\",\n  \"captureId\":   \":captureId\",\n  \"reservationId\": \":reservationId\",\n  \"cancelledAt\": \"2199-07-23T08:41:12.007Z\"\n}"
+      },
+      {
+        "phase": 4,
+        "from": "orders",
+        "to": "inventory",
+        "via": "orders.cancelled",
+        "type": "kafka",
+        "label": "Release reserved stock",
+        "title": "inventory releases the hold",
+        "parallel": true,
+        "plain": "In parallel, inventory consumes the same orders.cancelled event and releases the reservation — the GravLock boots and the O₂ scrubber flow back into sellable stock with a single DynamoDB update each. Someone else's search results just got one unit better."
+      },
+      {
+        "phase": 4,
+        "from": "payments",
+        "to": "payments",
+        "type": "internal",
+        "label": "Refund at the processor",
+        "title": "payments: refund issued in the PCI zone",
+        "plain": "payments issues the refund against the original processor reference and writes the reversing double-entry ledger rows. The money takes 2–3 business days to appear — banking regulations survived the colonization of Mars."
+      },
+      {
+        "phase": 4,
+        "from": "payments",
+        "to": "orders",
+        "via": "payments.captured",
+        "type": "kafka",
+        "label": "Refund receipt (negative capture)",
+        "title": "payments.captured — the refund receipt closes the ledger",
+        "plain": "The refund receipt travels back on payments.captured — same topic as the original capture, with a negative amount and reason: 'refund'. orders matches it to the cancelling order and flips the final status to refunded.",
+        "payload": "// Kafka record on payments.captured (refund event)\n// key: orderId\n{\n  \"captureId\":    \":refundCaptureId\",\n  \"orderId\":      \":orderId\",\n  \"amount\":       -50800,\n  \"currency\":     \"GCR\",\n  \"reason\":       \"refund\",\n  \"originalCaptureId\": \":captureId\",\n  \"processorRef\": \"prc_8842190-R1\",\n  \"capturedAt\":   \"2199-07-23T08:41:14.339Z\"\n}"
+      },
+      {
+        "phase": 4,
+        "from": "orders",
+        "through": "realtime-hub",
+        "to": "storefront",
+        "via": "hub-broadcasts",
+        "type": "kafka",
+        "label": "\"Refund on the way\" → shopper's tab",
+        "title": "hub.broadcasts: refund confirmation pushed to the tab",
+        "plain": "orders broadcasts the resolution on hub.broadcasts with the socket_id from the cancel request. hub-ingest → hub-presence → hub-push, and the order page flips to \"Cancelled — refund on the way\" in the same tab that asked. The loop closes in under two seconds.",
+        "payload": "// Kafka record on hub.broadcasts — routed to ONE tab\n{\n  \"customer_id\": \":customerId\",\n  \"socket_id\":   \":socketId\",\n  \"event_name\":  \"order-refunded\",\n  \"payload\": {\n    \"orderId\": \":orderId\",\n    \"amount\":  { \"amount\": 50800, \"currency\": \"GCR\" },\n    \"message\": \"Order cancelled — your refund is on the way.\"\n  }\n}"
+      },
+      {
+        "phase": 5,
+        "from": "inventory",
+        "to": "inventory",
+        "type": "internal",
+        "label": "Restock scanned — watcher fires",
+        "title": "inventory: zero → 24 units, the watcher notices",
+        "plain": "A restock delivery from the GravLock factory ship is scanned into wh-luna-1: 24 pairs of the Mk IX that have been sold out for two weeks. inventory's restock watcher sees the sellable count cross zero → positive — the exact transition wishlists and banners care about."
+      },
+      {
+        "phase": 5,
+        "from": "inventory",
+        "to": "notifications",
+        "via": "inventory.back-in-stock",
+        "type": "kafka",
+        "label": "inventory.back-in-stock",
+        "title": "inventory.back-in-stock — the wishlist trigger",
+        "plain": "The watcher publishes inventory.back-in-stock with the SKU, warehouse, and new count. notifications consumes it as the trigger for the wishlist email blast — the most-clicked email AstroMart sends.",
+        "payload": "// Kafka record on inventory.back-in-stock\n// key: skuId\n{\n  \"skuId\":      \"sku_magboot_gravlock_9\",\n  \"warehouse\":  \"wh-luna-1\",\n  \"previousCount\": 0,\n  \"newCount\":   24,\n  \"restockedAt\": \"2199-07-24T06:12:44.203Z\"\n}"
+      },
+      {
+        "phase": 5,
+        "from": "inventory",
+        "through": "realtime-hub",
+        "to": "storefront",
+        "via": "hub-broadcasts",
+        "type": "kafka",
+        "label": "\"It's back!\" → browsing sessions",
+        "title": "hub.broadcasts: live banner for everyone on the product page",
+        "parallel": true,
+        "plain": "In parallel, inventory broadcasts the restock on hub.broadcasts targeting the product-page channel. hub-ingest consumes, hub-presence resolves every socket currently subscribed to that SKU's page, and hub-push delivers — every shopper staring longingly at the sold-out page gets the \"It's back!\" banner at the same moment.",
+        "payload": "// Kafka record on hub.broadcasts — channel fan-out (no socket_id)\n{\n  \"channel\":    \"product:sku_magboot_gravlock_9\",\n  \"event_name\": \"back-in-stock\",\n  \"payload\": {\n    \"skuId\":   \"sku_magboot_gravlock_9\",\n    \"name\":    \"GravLock Mag Boots Mk IX\",\n    \"stock\":   24,\n    \"message\": \"It's back! GravLock Mk IX just restocked.\"\n  }\n}"
+      },
+      {
+        "phase": 5,
+        "from": "notifications",
+        "to": "notifications",
+        "type": "internal",
+        "label": "Wishlist audience + batch send",
+        "title": "notifications: 1,882 wishlist emails, batched",
+        "plain": "notifications resolves the wishlist audience for the SKU — 1,882 customers — applies channel preferences and the per-customer frequency cap, then batches the sends through the mail relay. First come, first served on 24 pairs; the copy says exactly that."
+      },
+      {
+        "phase": 5,
+        "from": "storefront",
+        "to": "storefront",
+        "type": "internal",
+        "label": "Banner renders — add-to-cart re-enabled",
+        "title": "The product page comes back to life",
+        "plain": "In every subscribed tab, the storefront receives the WebSocket frame, renders the \"It's back!\" banner, swaps the greyed-out button for a live \"Add to cart\", and updates the stock badge. No refresh, no polling — the page just changes."
+      },
+      {
+        "phase": 5,
+        "from": "storefront",
+        "to": "api-gateway",
+        "type": "http",
+        "label": "PUT /v1/cart/items",
+        "title": "The fastest shopper adds to cart",
+        "plain": "Eleven seconds after the banner lands, the first shopper adds the boots to their cart. The request flows through the gateway toward the cart service — and the whole shopping cycle begins again.",
+        "payload": "PUT /v1/cart/items\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n\nBody:\n{\n  \"cartId\": \":cartId\",\n  \"skuId\":  \"sku_magboot_gravlock_9\",\n  \"qty\":    1\n}\n\n// 200 OK\n{ \"cartId\": \":cartId\", \"items\": 3, \"subtotal\": { \"amount\": 42900, \"currency\": \"GCR\" } }"
+      },
+      {
+        "phase": 5,
+        "from": "api-gateway",
+        "to": "cart",
+        "type": "http",
+        "label": "Line item → Redis",
+        "title": "cart: line item written to Redis",
+        "plain": "The gateway routes the add-to-cart to the cart service, which validates the price against catalog and writes the line item to the shopper's Redis hash — TTL refreshed for another 30 days. Total time from restock scan to a claimed pair: about 14 seconds."
+      }
+    ],
+    "STEPS_BY_SCENARIO": {
+      "shopping.search": [
+        {
+          "phase": 1,
+          "from": "storefront",
+          "to": "api-gateway",
+          "type": "http",
+          "label": "GET /v1/search?q=mag+boots",
+          "title": "Shopper searches — GET /v1/search",
+          "plain": "The shopper types \"mag boots\" into the storefront search bar. After a 150ms debounce the browser fires the query at the api-gateway — the single front door for every HTTP call at AstroMart.",
+          "payload": "GET /v1/search?q=mag+boots&limit=12\nHeaders:\n  Accept: application/json\n  Authorization: Bearer eyJhbGciOi...\n  x-astro-session: \":sessionId\"\n\n// 200 OK (see final step for the response body)"
+        },
+        {
+          "phase": 1,
+          "from": "api-gateway",
+          "to": "search",
+          "type": "http",
+          "label": "Route to search",
+          "title": "api-gateway validates & routes the query",
+          "plain": "The gateway checks the shopper's JWT, applies the per-session rate limit, stamps the request with x-astro-request-id, and proxies it to the search service. Every downstream hop carries that request id — one checkout, one trace.",
+          "payload": "GET /internal/search?q=mag+boots&limit=12\nHeaders:\n  x-astro-request-id: \"req_01JXPZ8Q4T\"\n  x-astro-customer-id: \":customerId\"\n  x-astro-session: \":sessionId\""
+        },
+        {
+          "phase": 1,
+          "from": "search",
+          "to": "search",
+          "type": "internal",
+          "label": "Elasticsearch bool query",
+          "title": "search: ranked query against the product index",
+          "plain": "search runs a bool query against the Elasticsearch product index — full-text match on name and description, typo tolerance (\"mag botos\" still works), and a boost for in-stock items and the shopper's favorite categories. Twelve ranked SKU ids come back in ~15ms."
+        },
+        {
+          "phase": 1,
+          "from": "search",
+          "to": "catalog",
+          "type": "http",
+          "label": "Hydrate top hits",
+          "title": "search → catalog: hydrate hits with live price & stock",
+          "plain": "The index stores lean documents, so search asks catalog to hydrate the top hits with the freshest data — current price, sellable stock, and the variant matrix. A single batched call, not twelve.",
+          "payload": "POST /internal/products/batch\nHeaders:\n  Content-Type: application/json\n  x-astro-request-id: \"req_01JXPZ8Q4T\"\n\nBody:\n{\n  \"skuIds\": [\"sku_magboot_gravlock_9\", \"sku_magboot_titan_2\", \"sku_magboot_luna_lite\"],\n  \"fields\": [\"name\", \"price\", \"stock\", \"variants\", \"imageKeys\"]\n}\n\n// 200 OK\n{\n  \"products\": [\n    {\n      \"skuId\": \"sku_magboot_gravlock_9\",\n      \"name\": \"GravLock Mag Boots Mk IX\",\n      \"price\": { \"amount\": 42900, \"currency\": \"GCR\" },\n      \"stock\": 17,\n      \"imageKeys\": [\"products/magboot-gravlock-9/hero.webp\"]\n    }\n  ]\n}"
+        },
+        {
+          "phase": 1,
+          "from": "catalog",
+          "to": "object-storage",
+          "type": "http",
+          "label": "Sign image URLs (read)",
+          "title": "catalog → object-storage: presign the gallery images",
+          "plain": "Product images live in the astromart-assets bucket, never behind a public URL. catalog presigns a short-lived GET URL for each hero image so the storefront can render the grid without ever holding bucket credentials. A pure read hop — nothing is written.",
+          "payload": "GET s3://astromart-assets/products/magboot-gravlock-9/hero.webp\nHeaders:\n  x-amz-expires: 900\n\n// catalog generates presigned GET URLs (15 min TTL) for each image key\n// and inlines them into the product payload:\n{\n  \"imageUrls\": [\n    \"https://assets.astromart.dev/products/magboot-gravlock-9/hero.webp?X-Amz-Signature=...\"\n  ]\n}"
+        },
+        {
+          "phase": 1,
+          "from": "search",
+          "to": "api-gateway",
+          "type": "http",
+          "label": "Ranked + hydrated results",
+          "title": "search returns the assembled results page",
+          "plain": "search merges the Elasticsearch ranking with catalog's hydrated product data and hands the finished results page back to the gateway. Ranking decisions stay in search; product truth stays in catalog."
+        },
+        {
+          "phase": 1,
+          "from": "api-gateway",
+          "to": "storefront",
+          "type": "http",
+          "label": "200 OK — results grid",
+          "title": "Results land in the browser — grid renders",
+          "plain": "The gateway streams the response back to the browser. Twelve product cards render with prices, stock badges, and signed image URLs. Total round trip: ~80ms — fast enough that the shopper never sees a spinner.",
+          "payload": "// 200 OK\n{\n  \"query\": \"mag boots\",\n  \"total\": 34,\n  \"results\": [\n    {\n      \"skuId\": \"sku_magboot_gravlock_9\",\n      \"name\": \"GravLock Mag Boots Mk IX\",\n      \"price\": { \"amount\": 42900, \"currency\": \"GCR\" },\n      \"stock\": 17,\n      \"badge\": \"BESTSELLER\",\n      \"imageUrl\": \"https://assets.astromart.dev/products/magboot-gravlock-9/hero.webp?X-Amz-Signature=...\"\n    }\n  ]\n}"
+        }
+      ],
+      "shopping.place-order": [
+        {
+          "phase": 2,
+          "from": "storefront",
+          "to": "storefront",
+          "type": "internal",
+          "label": "Shopper clicks \"Place order\"",
+          "title": "Checkout begins — cart snapshot + idempotency key",
+          "plain": "The shopper hits \"Place order\" on a cart holding one pair of GravLock Mag Boots and a spare O₂ scrubber. The storefront freezes the cart snapshot, generates an idempotency key, and disables the button — double-clicking will never create two orders."
+        },
+        {
+          "phase": 2,
+          "from": "storefront",
+          "to": "api-gateway",
+          "type": "http",
+          "label": "POST /v1/orders",
+          "title": "POST /v1/orders — the checkout request",
+          "plain": "The browser ships the checkout payload: cart snapshot, shipping address (Luna Colony addresses are surprisingly long), the tokenized payment method, and the socketId of its live realtime-hub connection — so the confirmation can be pushed to this exact tab later.",
+          "payload": "POST /v1/orders\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n  x-astro-idempotency-key: \"idem_01JXQ0A7C3\"\n\nBody:\n{\n  \"cartId\":   \":cartId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"unitPrice\": 42900 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1, \"unitPrice\": 7900 }\n  ],\n  \"currency\": \"GCR\",\n  \"shippingAddress\": {\n    \"name\":   \"R. Vega\",\n    \"line1\":  \"Hab-Ring 4, Module 17B\",\n    \"city\":   \"Luna Colony\",\n    \"system\": \"Sol\"\n  },\n  \"paymentMethodToken\": \"pm_tok_9f2c...\",\n  \"socketId\": \":socketId\"\n}\n\n// 202 Accepted\n{ \"orderId\": \":orderId\", \"status\": \"processing\" }"
+        },
+        {
+          "phase": 2,
+          "from": "api-gateway",
+          "to": "orders",
+          "type": "http",
+          "label": "Route to orders",
+          "title": "api-gateway forwards checkout with auth context",
+          "plain": "The gateway validates the JWT one more time, resolves the customerId, checks the idempotency key against Redis (fresh — proceed), and forwards the request to the orders service with the full auth context attached."
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "to": "orders",
+          "type": "internal",
+          "label": "Draft order row (Postgres)",
+          "title": "Order drafted — status: draft",
+          "plain": "orders writes the draft order row to Postgres inside a transaction: line items, totals, address, status 'draft'. The order now exists and has an id — everything after this point is recoverable, even if the process dies mid-checkout."
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "to": "payments",
+          "type": "http",
+          "label": "POST /v1/payments/capture",
+          "title": "orders → payments: capture 508.00 GCR",
+          "plain": "orders calls payments synchronously — checkout is the one place a shopper is actively waiting, so this hop stays HTTP rather than Kafka. payments lives in its own PCI segment; orders only ever sees the token, never the card.",
+          "payload": "POST /v1/payments/capture\nHeaders:\n  Content-Type: application/json\n  x-astro-request-id: \"req_01JXQ0A9RD\"\n\nBody:\n{\n  \"orderId\":            \":orderId\",\n  \"amount\":             50800,\n  \"currency\":           \"GCR\",\n  \"paymentMethodToken\": \"pm_tok_9f2c...\",\n  \"idempotencyKey\":     \"idem_01JXQ0A7C3\"\n}\n\n// 202 Accepted — capture running, result arrives on Kafka\n{ \"captureId\": \":captureId\", \"status\": \"pending\" }"
+        },
+        {
+          "phase": 2,
+          "from": "payments",
+          "to": "payments",
+          "type": "internal",
+          "label": "Processor round-trip (PCI)",
+          "title": "payments: card authorized at the processor",
+          "plain": "Inside the PCI zone, payments detokenizes the payment method, calls the card processor, and writes the double-entry ledger rows. The galaxy's banks still take ~900ms to say yes — some things never change, even in 2199."
+        },
+        {
+          "phase": 2,
+          "from": "payments",
+          "to": "orders",
+          "via": "payments.captured",
+          "type": "kafka",
+          "label": "payments.captured",
+          "title": "Capture confirmed — receipt on Kafka",
+          "plain": "The processor approved. payments publishes the capture receipt on payments.captured — keyed by orderId. orders consumes it as the authoritative \"the money is real\" signal. (Declines would arrive on payments.failed instead, parking the order for retry.)",
+          "payload": "// Kafka record on payments.captured\n// key: orderId\n{\n  \"captureId\":  \":captureId\",\n  \"orderId\":    \":orderId\",\n  \"amount\":     50800,\n  \"currency\":   \"GCR\",\n  \"method\":     \"card_vault\",\n  \"processorRef\": \"prc_8842190\",\n  \"capturedAt\": \"2199-07-22T14:03:22.412Z\"\n}"
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "to": "orders",
+          "type": "internal",
+          "label": "Status → confirmed",
+          "title": "Order flips draft → confirmed",
+          "plain": "orders matches the capture receipt to the draft row and flips the status to confirmed inside the same Postgres transaction that records the ledger reference. This is the moment the order becomes a promise to ship."
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "to": "inventory",
+          "via": "orders.created",
+          "type": "kafka",
+          "label": "orders.created → reserve stock",
+          "title": "orders.created — inventory reserves the units",
+          "plain": "orders announces the confirmed order on orders.created. inventory consumes it and places a reservation: one GravLock Mk IX from the Luna warehouse, one O₂ scrubber from Phobos. DynamoDB conditional writes guarantee two shoppers can never claim the same last unit.",
+          "payload": "// Kafka record on orders.created\n// key: orderId — fan-out to inventory, shipping, notifications\n{\n  \"orderId\":    \":orderId\",\n  \"customerId\": \":customerId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1 }\n  ],\n  \"total\":      { \"amount\": 50800, \"currency\": \"GCR\" },\n  \"shippingRegion\": \"luna-colony\",\n  \"confirmedAt\": \"2199-07-22T14:03:22.671Z\"\n}"
+        },
+        {
+          "phase": 2,
+          "from": "inventory",
+          "to": "orders",
+          "via": "inventory.reserved",
+          "type": "kafka",
+          "label": "inventory.reserved",
+          "title": "Stock held — reservation confirmed",
+          "plain": "Both conditional writes succeeded, so inventory publishes inventory.reserved with the per-SKU warehouse assignments and a 48-hour expiry. orders attaches the reservation id to the order row — the last gate before the shopper gets the good news.",
+          "payload": "// Kafka record on inventory.reserved\n// key: orderId\n{\n  \"reservationId\": \":reservationId\",\n  \"orderId\":       \":orderId\",\n  \"lines\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"warehouse\": \"wh-luna-1\" },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1, \"warehouse\": \"wh-phobos-2\" }\n  ],\n  \"expiresAt\": \"2199-07-24T14:03:23.008Z\"\n}"
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "through": "realtime-hub",
+          "to": "storefront",
+          "via": "hub-broadcasts",
+          "type": "kafka",
+          "label": "\"Order confirmed!\" → shopper's tab",
+          "title": "hub.broadcasts: Order confirmed! pushed to the originating tab",
+          "plain": "orders publishes the confirmation on hub.broadcasts with the socket_id from checkout. hub-ingest consumes, asks hub-presence exactly which socket that is, and hub-push delivers it down the open WebSocket — the checkout page flips to \"Order confirmed!\" without a single poll.",
+          "payload": "// Kafka record on hub.broadcasts — routed to ONE tab\n{\n  \"customer_id\": \":customerId\",\n  \"socket_id\":   \":socketId\",\n  \"event_name\":  \"order-confirmed\",\n  \"payload\": {\n    \"orderId\":  \":orderId\",\n    \"total\":    { \"amount\": 50800, \"currency\": \"GCR\" },\n    \"eta\":      \"3 orbital days\",\n    \"message\":  \"Order confirmed — your gear is being prepped.\"\n  }\n}"
+        },
+        {
+          "phase": 2,
+          "from": "orders",
+          "to": "notifications",
+          "via": "orders.created",
+          "type": "kafka",
+          "label": "Confirmation email",
+          "title": "notifications: order confirmation email",
+          "parallel": true,
+          "plain": "In parallel with the WebSocket push, notifications consumes the same orders.created event and renders the confirmation email — line items, totals, and the estimated delivery window. Batched through the mail relay; deduped by orderId so a consumer-group rebalance never double-sends it."
+        }
+      ],
+      "fulfillment.pack-and-ship": [
+        {
+          "phase": 3,
+          "from": "orders",
+          "to": "shipping",
+          "via": "orders.created",
+          "type": "kafka",
+          "label": "orders.created → packing queue",
+          "title": "A confirmed order lands in the packing queue",
+          "plain": "shipping consumes the same orders.created event that inventory and notifications saw — it just cares about different fields. The order joins the wh-luna-1 packing queue, sorted by promised delivery window.",
+          "payload": "// Kafka record on orders.created (shipping consumer group)\n// key: orderId\n{\n  \"orderId\":    \":orderId\",\n  \"customerId\": \":customerId\",\n  \"items\": [\n    { \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 },\n    { \"skuId\": \"sku_o2_scrubber_std\",    \"qty\": 1 }\n  ],\n  \"shippingAddress\": {\n    \"name\":   \"R. Vega\",\n    \"line1\":  \"Hab-Ring 4, Module 17B\",\n    \"city\":   \"Luna Colony\",\n    \"system\": \"Sol\"\n  },\n  \"shippingRegion\": \"luna-colony\"\n}"
+        },
+        {
+          "phase": 3,
+          "from": "shipping",
+          "to": "shipping",
+          "type": "internal",
+          "label": "Pick list + courier rate-shop",
+          "title": "shipping: pick list built, couriers rate-shopped",
+          "plain": "shipping explodes the order into a warehouse pick list, weighs the parcel (mag boots are heavy — that's the point), and rate-shops the courier APIs. Orbital Express wins on price for Luna Colony; LunaPost keeps losing on the vacuum surcharge."
+        },
+        {
+          "phase": 3,
+          "from": "shipping",
+          "to": "object-storage",
+          "type": "http",
+          "label": "PUT label PDF (write)",
+          "title": "Courier label PDF uploaded to object-storage",
+          "plain": "The Orbital Express API returns a label PDF. shipping uploads it to the astromart-assets bucket under labels/<orderId>/<parcelId>.pdf — a pure write hop. The warehouse printer and any future support ticket both read it from here, never from the courier API again.",
+          "payload": "PUT s3://astromart-assets/labels/:orderId/:parcelId.pdf\nHeaders:\n  Content-Type: application/pdf\n  Content-Length: 48211\n  x-amz-meta-courier: orbital-express\n\n// 200 OK\n{ \"etag\": \"\\\"9d38b2a1\\\"\", \"key\": \"labels/:orderId/:parcelId.pdf\" }"
+        },
+        {
+          "phase": 3,
+          "from": "shipping",
+          "to": "shipping",
+          "type": "internal",
+          "label": "Courier scan → dispatched",
+          "title": "Parcel scanned by the courier — status: dispatched",
+          "plain": "A few hours later the Orbital Express pickup drone scans the parcel at the dock. The courier webhook flips the parcel to dispatched and the tracking number goes live. This scan is the trigger for everything that follows."
+        },
+        {
+          "phase": 3,
+          "from": "shipping",
+          "to": "notifications",
+          "via": "shipping.dispatched",
+          "type": "kafka",
+          "label": "shipping.dispatched → tracking email",
+          "title": "shipping.dispatched — notifications mails the tracking link",
+          "plain": "shipping publishes shipping.dispatched with the courier, tracking number, and the label's storage key. notifications consumes it and renders the \"your gear is on the way\" email with a live tracking link.",
+          "payload": "// Kafka record on shipping.dispatched\n// key: orderId\n{\n  \"orderId\":        \":orderId\",\n  \"parcelId\":       \":parcelId\",\n  \"customerId\":     \":customerId\",\n  \"courier\":        \"orbital-express\",\n  \"trackingNumber\": \"OE-449-LUNA-88121\",\n  \"labelKey\":       \"labels/:orderId/:parcelId.pdf\",\n  \"eta\":            \"2199-07-25T09:00:00.000Z\",\n  \"dispatchedAt\":   \"2199-07-22T21:14:05.881Z\"\n}"
+        },
+        {
+          "phase": 3,
+          "from": "shipping",
+          "through": "realtime-hub",
+          "to": "storefront",
+          "via": "hub-broadcasts",
+          "type": "kafka",
+          "label": "Live tracking → open tab",
+          "title": "hub.broadcasts: live tracking pushed to the shopper's tab",
+          "parallel": true,
+          "plain": "In parallel with the email, shipping broadcasts the dispatch on hub.broadcasts. No socket_id this time — hub-presence fans out to every open tab the customer has, and the order-status page animates from \"packing\" to \"in transit\" while they watch.",
+          "payload": "// Kafka record on hub.broadcasts — fan-out to all of the customer's tabs\n{\n  \"customer_id\": \":customerId\",\n  \"event_name\":  \"parcel-dispatched\",\n  \"payload\": {\n    \"orderId\":        \":orderId\",\n    \"trackingNumber\": \"OE-449-LUNA-88121\",\n    \"courier\":        \"orbital-express\",\n    \"eta\":            \"3 orbital days\",\n    \"position\":       \"departed wh-luna-1\"\n  }\n}"
+        },
+        {
+          "phase": 3,
+          "from": "notifications",
+          "to": "notifications",
+          "type": "internal",
+          "label": "Tracking email rendered + sent",
+          "title": "notifications: tracking email out the door",
+          "plain": "notifications renders the MJML template with the tracking widget, checks the customer's channel preferences (email: yes, push: muted after 22:00 Luna time), and hands the message to the mail relay. Deduped by parcelId — one scan, one email."
+        }
+      ],
+      "fulfillment.cancel-refund": [
+        {
+          "phase": 4,
+          "from": "storefront",
+          "to": "api-gateway",
+          "type": "http",
+          "label": "POST /v1/orders/:id/cancel",
+          "title": "Shopper cancels — POST /v1/orders/:id/cancel",
+          "plain": "Buyer's remorse strikes before the parcel leaves the dock: the shopper hits \"Cancel order\" on the order-status page. The storefront calls the cancel endpoint through the gateway.",
+          "payload": "POST /v1/orders/:orderId/cancel\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n\nBody:\n{\n  \"reason\":   \"changed_mind\",\n  \"socketId\": \":socketId\"\n}\n\n// 202 Accepted\n{ \"orderId\": \":orderId\", \"status\": \"cancelling\" }"
+        },
+        {
+          "phase": 4,
+          "from": "api-gateway",
+          "to": "orders",
+          "type": "http",
+          "label": "Route cancel to orders",
+          "title": "api-gateway forwards the cancellation",
+          "plain": "The gateway verifies the shopper actually owns this order, then forwards the cancel to the orders service. orders checks the state machine: not yet dispatched, so cancellation is still allowed — it flips the order to cancelling."
+        },
+        {
+          "phase": 4,
+          "from": "orders",
+          "to": "payments",
+          "via": "orders.cancelled",
+          "type": "kafka",
+          "label": "orders.cancelled → refund",
+          "title": "orders.cancelled — payments starts the refund",
+          "plain": "orders publishes orders.cancelled. payments consumes it, looks up the original capture in its ledger, and queues a full refund against the processor.",
+          "payload": "// Kafka record on orders.cancelled\n// key: orderId — fan-out to payments and inventory\n{\n  \"orderId\":     \":orderId\",\n  \"customerId\":  \":customerId\",\n  \"reason\":      \"changed_mind\",\n  \"captureId\":   \":captureId\",\n  \"reservationId\": \":reservationId\",\n  \"cancelledAt\": \"2199-07-23T08:41:12.007Z\"\n}"
+        },
+        {
+          "phase": 4,
+          "from": "orders",
+          "to": "inventory",
+          "via": "orders.cancelled",
+          "type": "kafka",
+          "label": "Release reserved stock",
+          "title": "inventory releases the hold",
+          "parallel": true,
+          "plain": "In parallel, inventory consumes the same orders.cancelled event and releases the reservation — the GravLock boots and the O₂ scrubber flow back into sellable stock with a single DynamoDB update each. Someone else's search results just got one unit better."
+        },
+        {
+          "phase": 4,
+          "from": "payments",
+          "to": "payments",
+          "type": "internal",
+          "label": "Refund at the processor",
+          "title": "payments: refund issued in the PCI zone",
+          "plain": "payments issues the refund against the original processor reference and writes the reversing double-entry ledger rows. The money takes 2–3 business days to appear — banking regulations survived the colonization of Mars."
+        },
+        {
+          "phase": 4,
+          "from": "payments",
+          "to": "orders",
+          "via": "payments.captured",
+          "type": "kafka",
+          "label": "Refund receipt (negative capture)",
+          "title": "payments.captured — the refund receipt closes the ledger",
+          "plain": "The refund receipt travels back on payments.captured — same topic as the original capture, with a negative amount and reason: 'refund'. orders matches it to the cancelling order and flips the final status to refunded.",
+          "payload": "// Kafka record on payments.captured (refund event)\n// key: orderId\n{\n  \"captureId\":    \":refundCaptureId\",\n  \"orderId\":      \":orderId\",\n  \"amount\":       -50800,\n  \"currency\":     \"GCR\",\n  \"reason\":       \"refund\",\n  \"originalCaptureId\": \":captureId\",\n  \"processorRef\": \"prc_8842190-R1\",\n  \"capturedAt\":   \"2199-07-23T08:41:14.339Z\"\n}"
+        },
+        {
+          "phase": 4,
+          "from": "orders",
+          "through": "realtime-hub",
+          "to": "storefront",
+          "via": "hub-broadcasts",
+          "type": "kafka",
+          "label": "\"Refund on the way\" → shopper's tab",
+          "title": "hub.broadcasts: refund confirmation pushed to the tab",
+          "plain": "orders broadcasts the resolution on hub.broadcasts with the socket_id from the cancel request. hub-ingest → hub-presence → hub-push, and the order page flips to \"Cancelled — refund on the way\" in the same tab that asked. The loop closes in under two seconds.",
+          "payload": "// Kafka record on hub.broadcasts — routed to ONE tab\n{\n  \"customer_id\": \":customerId\",\n  \"socket_id\":   \":socketId\",\n  \"event_name\":  \"order-refunded\",\n  \"payload\": {\n    \"orderId\": \":orderId\",\n    \"amount\":  { \"amount\": 50800, \"currency\": \"GCR\" },\n    \"message\": \"Order cancelled — your refund is on the way.\"\n  }\n}"
+        }
+      ],
+      "engagement.back-in-stock": [
+        {
+          "phase": 5,
+          "from": "inventory",
+          "to": "inventory",
+          "type": "internal",
+          "label": "Restock scanned — watcher fires",
+          "title": "inventory: zero → 24 units, the watcher notices",
+          "plain": "A restock delivery from the GravLock factory ship is scanned into wh-luna-1: 24 pairs of the Mk IX that have been sold out for two weeks. inventory's restock watcher sees the sellable count cross zero → positive — the exact transition wishlists and banners care about."
+        },
+        {
+          "phase": 5,
+          "from": "inventory",
+          "to": "notifications",
+          "via": "inventory.back-in-stock",
+          "type": "kafka",
+          "label": "inventory.back-in-stock",
+          "title": "inventory.back-in-stock — the wishlist trigger",
+          "plain": "The watcher publishes inventory.back-in-stock with the SKU, warehouse, and new count. notifications consumes it as the trigger for the wishlist email blast — the most-clicked email AstroMart sends.",
+          "payload": "// Kafka record on inventory.back-in-stock\n// key: skuId\n{\n  \"skuId\":      \"sku_magboot_gravlock_9\",\n  \"warehouse\":  \"wh-luna-1\",\n  \"previousCount\": 0,\n  \"newCount\":   24,\n  \"restockedAt\": \"2199-07-24T06:12:44.203Z\"\n}"
+        },
+        {
+          "phase": 5,
+          "from": "inventory",
+          "through": "realtime-hub",
+          "to": "storefront",
+          "via": "hub-broadcasts",
+          "type": "kafka",
+          "label": "\"It's back!\" → browsing sessions",
+          "title": "hub.broadcasts: live banner for everyone on the product page",
+          "parallel": true,
+          "plain": "In parallel, inventory broadcasts the restock on hub.broadcasts targeting the product-page channel. hub-ingest consumes, hub-presence resolves every socket currently subscribed to that SKU's page, and hub-push delivers — every shopper staring longingly at the sold-out page gets the \"It's back!\" banner at the same moment.",
+          "payload": "// Kafka record on hub.broadcasts — channel fan-out (no socket_id)\n{\n  \"channel\":    \"product:sku_magboot_gravlock_9\",\n  \"event_name\": \"back-in-stock\",\n  \"payload\": {\n    \"skuId\":   \"sku_magboot_gravlock_9\",\n    \"name\":    \"GravLock Mag Boots Mk IX\",\n    \"stock\":   24,\n    \"message\": \"It's back! GravLock Mk IX just restocked.\"\n  }\n}"
+        },
+        {
+          "phase": 5,
+          "from": "notifications",
+          "to": "notifications",
+          "type": "internal",
+          "label": "Wishlist audience + batch send",
+          "title": "notifications: 1,882 wishlist emails, batched",
+          "plain": "notifications resolves the wishlist audience for the SKU — 1,882 customers — applies channel preferences and the per-customer frequency cap, then batches the sends through the mail relay. First come, first served on 24 pairs; the copy says exactly that."
+        },
+        {
+          "phase": 5,
+          "from": "storefront",
+          "to": "storefront",
+          "type": "internal",
+          "label": "Banner renders — add-to-cart re-enabled",
+          "title": "The product page comes back to life",
+          "plain": "In every subscribed tab, the storefront receives the WebSocket frame, renders the \"It's back!\" banner, swaps the greyed-out button for a live \"Add to cart\", and updates the stock badge. No refresh, no polling — the page just changes."
+        },
+        {
+          "phase": 5,
+          "from": "storefront",
+          "to": "api-gateway",
+          "type": "http",
+          "label": "PUT /v1/cart/items",
+          "title": "The fastest shopper adds to cart",
+          "plain": "Eleven seconds after the banner lands, the first shopper adds the boots to their cart. The request flows through the gateway toward the cart service — and the whole shopping cycle begins again.",
+          "payload": "PUT /v1/cart/items\nHeaders:\n  Content-Type: application/json\n  Authorization: Bearer eyJhbGciOi...\n\nBody:\n{\n  \"cartId\": \":cartId\",\n  \"skuId\":  \"sku_magboot_gravlock_9\",\n  \"qty\":    1\n}\n\n// 200 OK\n{ \"cartId\": \":cartId\", \"items\": 3, \"subtotal\": { \"amount\": 42900, \"currency\": \"GCR\" } }"
+        },
+        {
+          "phase": 5,
+          "from": "api-gateway",
+          "to": "cart",
+          "type": "http",
+          "label": "Line item → Redis",
+          "title": "cart: line item written to Redis",
+          "plain": "The gateway routes the add-to-cart to the cart service, which validates the price against catalog and writes the line item to the shopper's Redis hash — TTL refreshed for another 30 days. Total time from restock scan to a claimed pair: about 14 seconds."
+        }
+      ]
+    },
+    "INCIDENTS": [
+      {
+        "incident": true,
+        "id": "hub-silence-2026-07-19",
+        "domain": "incidents",
+        "phaseId": 103,
+        "status": "ready",
+        "label": "Realtime-hub silence",
+        "color": "var(--svc-cyan)",
+        "date": "2026-07-19",
+        "time": "21:12 UTC",
+        "note": "Orders confirmed fine, but no shopper saw the live \"Order confirmed!\" update. A Redis failover left hub-presence unable to resolve socket ids, and it failed closed — dropping every broadcast instead of falling back to a poll.",
+        "short": "A Redis failover makes hub-presence drop every live broadcast — confirmations never reach tabs.",
+        "refs": [
+          {
+            "label": "Post-mortem ticket",
+            "url": "https://tickets.astromart.dev/INC-2301"
+          },
+          {
+            "label": "realtime-hub dashboards",
+            "url": "https://grafana.astromart.dev/d/hub-delivery"
+          }
+        ],
+        "steps": [
+          {
+            "phase": 103,
+            "from": "orders",
+            "to": "orders",
+            "type": "internal",
+            "label": "Order confirmed (healthy)",
+            "title": "Orders were fine the whole time",
+            "plain": "Checkout, capture and reservation all succeeded — this incident produced zero failed orders. That is what made it slow to spot: the only symptom was tabs that never updated."
+          },
+          {
+            "phase": 103,
+            "from": "orders",
+            "through": "realtime-hub",
+            "to": "storefront",
+            "via": "hub-broadcasts",
+            "type": "kafka",
+            "label": "hub.broadcasts published",
+            "title": "The confirmation was published as normal",
+            "plain": "orders published the confirmation on hub.broadcasts with the shopper's socket_id, exactly as designed. hub-ingest consumed it and asked hub-presence to resolve which live socket that was.",
+            "payload": "// Kafka record on hub.broadcasts\n{\n  \"customer_id\": \"[redacted]\",\n  \"socket_id\": \"sock_9920...\",\n  \"event_name\": \"order-confirmed\",\n  \"payload\": { \"orderId\": \"ord_C551...\", \"message\": \"Order confirmed!\" }\n}"
+          },
+          {
+            "phase": 103,
+            "from": "realtime-hub",
+            "to": "realtime-hub",
+            "type": "internal",
+            "label": "Presence lookup fails",
+            "title": "hub-presence can't reach Redis after failover",
+            "plain": "A Redis primary failover had just happened. hub-presence's client held a dead connection and every socket lookup errored. The code failed *closed* — treating \"can't resolve\" as \"socket gone\" — so it silently discarded the broadcast.",
+            "payload": "// hub-presence → Redis (post-failover)\n{\n  \"error\": \"ReplyError\",\n  \"command\": \"HGET presence:sock_9920...\",\n  \"detail\": \"READONLY You can't write against a read only replica.\",\n  \"action_taken\": \"DROP_BROADCAST\"\n}"
+          },
+          {
+            "phase": 103,
+            "from": "realtime-hub",
+            "to": "storefront",
+            "type": "ws",
+            "label": "Nothing delivered",
+            "title": "The push that never happened",
+            "plain": "hub-push had nothing to send, so the shopper's WebSocket stayed quiet. The page sat on its spinner until a manual refresh pulled the (already-confirmed) order over HTTP. The fix: hub-presence now fails *open* to a short poll, and delivery has a dead-letter alarm.",
+            "payload": "// hub-push delivery log\n{\n  \"socket_id\": \"sock_9920...\",\n  \"delivered\": false,\n  \"reason\": \"no_target_from_presence\",\n  \"fallback\": \"none\"   // <-- the bug: should have queued a poll\n}"
+          }
+        ]
+      },
+      {
+        "incident": true,
+        "id": "inventory-oversell-2026-05-04",
+        "domain": "incidents",
+        "phaseId": 102,
+        "status": "ready",
+        "label": "Inventory oversell",
+        "color": "var(--svc-amber)",
+        "date": "2026-05-04",
+        "time": "09:41 UTC",
+        "note": "A flash sale on the last GravLock Mk IX let two orders reserve the same unit. The conditional write was correct, but a stale read outside the condition let both pass the app-level stock check first.",
+        "short": "A reservation race oversells the last unit of a hot SKU during a flash sale.",
+        "refs": [
+          {
+            "label": "Post-mortem ticket",
+            "url": "https://tickets.astromart.dev/INC-2188"
+          }
+        ],
+        "steps": [
+          {
+            "phase": 102,
+            "from": "orders",
+            "to": "inventory",
+            "via": "orders.created",
+            "type": "kafka",
+            "label": "orders.created (order A)",
+            "title": "Order A confirmed — reserve last unit",
+            "plain": "Order A is confirmed and announced on orders.created. inventory begins reserving the one remaining GravLock Mk IX from the Luna warehouse.",
+            "payload": "// Kafka record on orders.created\n// key: ord_A991...\n{\n  \"orderId\": \"ord_A991...\",\n  \"items\": [{ \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 }],\n  \"shippingRegion\": \"luna-colony\"\n}"
+          },
+          {
+            "phase": 102,
+            "from": "orders",
+            "to": "inventory",
+            "via": "orders.created",
+            "type": "kafka",
+            "label": "orders.created (order B)",
+            "title": "Order B confirmed — same SKU, same instant",
+            "parallel": true,
+            "plain": "~40ms later, Order B for the same SKU lands. Both consumers read sellable stock = 1 with a plain GetItem *before* the conditional write — so both believed the unit was theirs.",
+            "payload": "// Kafka record on orders.created\n// key: ord_B004...\n{\n  \"orderId\": \"ord_B004...\",\n  \"items\": [{ \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1 }],\n  \"shippingRegion\": \"luna-colony\"\n}"
+          },
+          {
+            "phase": 102,
+            "from": "inventory",
+            "to": "inventory",
+            "type": "internal",
+            "label": "Two conditional writes race",
+            "title": "inventory: both writes target the same item",
+            "plain": "Both handlers issue a DynamoDB conditional write. The condition itself is sound — but the app had already logged \"stock available\" for both from the earlier stale read, so both orders were told they were fine before the writes resolved.",
+            "payload": "// DynamoDB UpdateItem (order A)  → SUCCESS  available 1 → 0\n// DynamoDB UpdateItem (order B)  → ConditionalCheckFailedException\n{\n  \"error\": \"ConditionalCheckFailedException\",\n  \"table\": \"inventory-stock\",\n  \"key\": { \"skuId\": \"sku_magboot_gravlock_9\", \"warehouse\": \"wh-luna-1\" },\n  \"attemptedBy\": \"ord_B004...\"\n}"
+          },
+          {
+            "phase": 102,
+            "from": "inventory",
+            "to": "orders",
+            "via": "inventory.reserved",
+            "type": "kafka",
+            "label": "inventory.reserved (A only)",
+            "title": "Only Order A actually got the unit",
+            "plain": "inventory.reserved fires for Order A alone. Order B's write failed — correct at the database layer. The bug was that the shopper for Order B had *already* seen \"Order confirmed\"; the fix was to move the stock check inside the conditional write and treat the failure as a hard user-facing decline.",
+            "payload": "// Kafka record on inventory.reserved\n// key: ord_A991...\n{\n  \"reservationId\": \"rsv_77C2...\",\n  \"orderId\": \"ord_A991...\",\n  \"lines\": [{ \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"warehouse\": \"wh-luna-1\" }]\n}"
+          },
+          {
+            "phase": 102,
+            "from": "orders",
+            "through": "realtime-hub",
+            "to": "storefront",
+            "via": "hub-broadcasts",
+            "type": "kafka",
+            "label": "\"Confirmed\" already sent to B",
+            "title": "The wrong promise reached Order B's tab",
+            "plain": "Order B's tab had already flipped to \"Order confirmed!\" from the optimistic path. Reversing that — an apologetic \"we oversold, here is a refund\" push — is the ugly manual cleanup every oversell forces. The banner you are reading is why this replay exists.",
+            "payload": "// hub.broadcasts — the message we wish we hadn't sent to Order B\n{\n  \"socket_id\": \"[redacted]\",\n  \"event_name\": \"order-confirmed\",\n  \"payload\": { \"orderId\": \"ord_B004...\", \"message\": \"Order confirmed!\" }\n}"
+          }
+        ]
+      },
+      {
+        "incident": true,
+        "id": "payment-cascade-2026-03-12",
+        "domain": "incidents",
+        "phaseId": 101,
+        "status": "ready",
+        "label": "Payment cascade",
+        "color": "var(--svc-red)",
+        "date": "2026-03-12",
+        "time": "14:03 UTC",
+        "note": "The card processor started timing out at 30s. Captures hung, orders never left \"draft\", and automatic retries stormed payments until the circuit breaker finally tripped.",
+        "short": "Processor timeout hangs captures; orders stall in draft and retries storm payments.",
+        "refs": [
+          {
+            "label": "Post-mortem ticket",
+            "url": "https://tickets.astromart.dev/INC-2041"
+          },
+          {
+            "label": "payments logs (14:00–14:40 UTC)",
+            "url": "https://logs.astromart.dev/r/inc-2041-payments"
+          }
+        ],
+        "steps": [
+          {
+            "phase": 101,
+            "from": "storefront",
+            "to": "api-gateway",
+            "type": "http",
+            "label": "POST /v1/orders",
+            "title": "Checkout arrives — nothing looks wrong yet",
+            "plain": "A shopper places a normal order. The gateway accepts it and forwards to orders — this hop behaved exactly as designed. The trouble is one hop downstream.",
+            "payload": "POST /v1/orders\nHeaders:\n  x-astro-idempotency-key: \"idem_01JYP3M2K7\"\n\nBody:\n{\n  \"cartId\": \"[redacted]\",\n  \"items\": [{ \"skuId\": \"sku_magboot_gravlock_9\", \"qty\": 1, \"unitPrice\": 42900 }],\n  \"currency\": \"GCR\"\n}\n\n// 202 Accepted\n{ \"orderId\": \"ord_5F1A...\", \"status\": \"processing\" }"
+          },
+          {
+            "phase": 101,
+            "from": "orders",
+            "to": "orders",
+            "type": "internal",
+            "label": "Draft order row",
+            "title": "Order drafted — status: draft",
+            "plain": "orders writes the draft row to Postgres and calls payments to capture. Because the capture never confirms, this row is where hundreds of orders got stuck for the next 37 minutes."
+          },
+          {
+            "phase": 101,
+            "from": "orders",
+            "to": "payments",
+            "type": "http",
+            "label": "POST /v1/payments/capture",
+            "title": "orders → payments: capture request hangs",
+            "plain": "orders calls payments synchronously. payments forwards to the card processor — which had begun timing out at the full 30-second budget. Every capture request now blocks a connection-pool slot for 30s instead of ~900ms.",
+            "payload": "POST /v1/payments/capture\nHeaders:\n  x-astro-request-id: \"req_01JYP3M4RD\"\n\nBody:\n{\n  \"orderId\": \"ord_5F1A...\",\n  \"amount\": 42900,\n  \"currency\": \"GCR\",\n  \"paymentMethodToken\": \"[redacted]\",\n  \"idempotencyKey\": \"idem_01JYP3M2K7\"\n}\n\n// no response for 30s — upstream processor timeout"
+          },
+          {
+            "phase": 101,
+            "from": "payments",
+            "to": "payments",
+            "type": "internal",
+            "label": "Processor timeout (30s)",
+            "title": "payments: processor round-trip times out",
+            "plain": "Inside the PCI zone, payments waits the full 30-second budget and gives up. The pool is now saturated — healthy requests queue behind timed-out ones. This is the moment a slow dependency turned into an outage.",
+            "payload": "// payments → processor\n// ERROR after 30000ms\n{\n  \"error\": \"UpstreamTimeout\",\n  \"processor\": \"orbital-pay\",\n  \"waitedMs\": 30000,\n  \"poolInUse\": 64,\n  \"poolMax\": 64\n}"
+          },
+          {
+            "phase": 101,
+            "from": "payments",
+            "to": "orders",
+            "via": "payments.failed",
+            "type": "kafka",
+            "label": "payments.failed",
+            "title": "Capture reported failed — retry armed",
+            "plain": "payments publishes payments.failed keyed by orderId. orders parks the order and, per policy, schedules an automatic retry — which is exactly the wrong move while the processor is already overwhelmed.",
+            "payload": "// Kafka record on payments.failed\n// key: orderId\n{\n  \"orderId\": \"ord_5F1A...\",\n  \"reason\": \"capture_timeout\",\n  \"retryable\": true,\n  \"attempt\": 1,\n  \"failedAt\": \"2026-03-12T14:03:52.118Z\"\n}"
+          },
+          {
+            "phase": 101,
+            "from": "orders",
+            "to": "payments",
+            "type": "http",
+            "label": "Retry capture (storm)",
+            "title": "orders retries — the storm builds",
+            "plain": "The retry (no backoff, no jitter in the code at the time) fires straight back at payments. Multiply by hundreds of parked orders and payments is now taking more load failing than it ever did succeeding. The fix shipped after this incident: exponential backoff + jitter and a circuit breaker.",
+            "payload": "POST /v1/payments/capture\nHeaders:\n  x-astro-request-id: \"req_01JYP3P9QT\"\n  x-astro-retry-attempt: \"2\"\n\nBody:\n{ \"orderId\": \"ord_5F1A...\", \"idempotencyKey\": \"idem_01JYP3M2K7\" }\n\n// 503 Service Unavailable — circuit breaker OPEN\n{ \"error\": \"CircuitOpen\", \"service\": \"payments\", \"retryAfterMs\": 60000 }"
+          }
+        ]
+      }
+    ],
+    "DOMAINS": [
+      {
+        "id": "shopping",
+        "label": "Shopping",
+        "glyph": "·",
+        "short": "Browse & buy"
+      },
+      {
+        "id": "fulfillment",
+        "label": "Fulfillment",
+        "glyph": "·",
+        "short": "After the checkout"
+      },
+      {
+        "id": "engagement",
+        "label": "Engagement",
+        "glyph": "·",
+        "short": "Live updates & notifications"
+      }
+    ],
+    "TEAM_OWNERS": {
+      "team-shopping": {
+        "label": "Shopping team",
+        "color": "var(--svc-cyan)",
+        "hex": "#22d3ee",
+        "githubTeam": "astromart/team-shopping",
+        "reviewers": [],
+        "slack": "#team-shopping"
+      },
+      "team-fulfillment": {
+        "label": "Fulfillment team",
+        "color": "var(--svc-amber)",
+        "hex": "#f5b731",
+        "githubTeam": "astromart/team-fulfillment",
+        "reviewers": [],
+        "slack": "#team-fulfillment"
+      },
+      "team-engagement": {
+        "label": "Engagement team",
+        "color": "var(--svc-pink)",
+        "hex": "#e879f9",
+        "githubTeam": "astromart/team-engagement",
+        "reviewers": [],
+        "slack": "#team-engagement"
+      }
+    },
+    "FALLBACK_OWNER": {
+      "label": "Platform · unowned",
+      "color": "var(--text-3)",
+      "hex": "#8a94a6",
+      "githubTeam": "astromart/cosmos-maintainers",
+      "reviewers": []
+    },
+    "DRIFT_ENTRIES": [
+      {
+        "id": "d-2026-08-13-shipping-dispatched",
+        "date": "2026-08-13",
+        "kind": "added",
+        "title": "New topic: shipping.dispatched",
+        "detail": "Shipping now publishes a dispatched event when a parcel leaves the depot; Notifications subscribes to it.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "shipping",
+          "shipping.dispatched",
+          "notifications"
+        ],
+        "evidence": [
+          "shipping/src/dispatch/publisher.ts:44 — producer.send({ topic: \"shipping.dispatched\" })",
+          "notifications/src/handlers/dispatched.ts:12 — new consumer group \"notif-dispatched\""
+        ],
+        "prNumber": 128,
+        "prTitle": "feat(shipping): emit dispatched event on depot handoff",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "kafka",
+          "events",
+          "shipping"
+        ],
+        "source": {
+          "repo": "shipping",
+          "sha": "a1b2c3d",
+          "branch": "feat/dispatched-event"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-13-orders-payload",
+        "date": "2026-08-13",
+        "kind": "changed",
+        "title": "orders.created payload gained `giftWrap`",
+        "detail": "The Orders event now carries a giftWrap flag. The map step payload was stale.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "orders",
+          "orders.created"
+        ],
+        "evidence": [
+          "orders/src/events/orderCreated.schema.ts:31 — giftWrap: z.boolean().default(false)"
+        ],
+        "prNumber": 128,
+        "prTitle": "feat(orders): add giftWrap flag to orders.created",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "schema",
+          "payload",
+          "orders"
+        ],
+        "source": {
+          "repo": "orders",
+          "sha": "e4f5a6b",
+          "branch": "feat/gift-wrap"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-13-catalog-search",
+        "date": "2026-08-13",
+        "kind": "risk",
+        "title": "Search reads Catalog’s Postgres directly",
+        "detail": "Search added a direct DB read against Catalog’s tables, bypassing the API — a coupling the map doesn’t model.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "search",
+          "catalog"
+        ],
+        "evidence": [
+          "search/src/index/backfill.ts:88 — new Pool({ host: \"catalog-db.internal\" })"
+        ],
+        "prNumber": 129,
+        "prTitle": "perf(search): backfill index straight from catalog db",
+        "prOwner": "diego-ramos",
+        "tags": [
+          "coupling",
+          "database",
+          "search"
+        ],
+        "source": {
+          "repo": "search",
+          "sha": "7c8d9e0",
+          "branch": "perf/direct-backfill"
+        },
+        "confidence": "medium"
+      },
+      {
+        "id": "d-2026-08-12-payments-retry",
+        "date": "2026-08-12",
+        "kind": "changed",
+        "title": "payments.captured now retried with backoff",
+        "detail": "Payments wraps capture publishing in an exponential-backoff retry; downstream consumers may now see duplicate captures.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "payments",
+          "payments.captured"
+        ],
+        "evidence": [
+          "payments/src/capture/publisher.ts:61 — retry({ attempts: 5, backoff: \"expo\" })"
+        ],
+        "prNumber": 131,
+        "prTitle": "fix(payments): retry capture publish with jittered backoff",
+        "prOwner": "ana-belkova",
+        "tags": [
+          "reliability",
+          "retry",
+          "payments"
+        ],
+        "source": {
+          "repo": "payments",
+          "sha": "c2d3e4f",
+          "branch": "fix/capture-retry"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-12-hub-presence",
+        "date": "2026-08-12",
+        "kind": "added",
+        "title": "Realtime hub gained a presence channel",
+        "detail": "The realtime hub now tracks live presence; the storefront subscribes for “others viewing this item”.",
+        "team": "team-engagement",
+        "nodeIds": [
+          "realtime-hub",
+          "hub-presence",
+          "storefront"
+        ],
+        "evidence": [
+          "realtime-hub/src/presence/tracker.ts:20 — channel \"presence:item\""
+        ],
+        "prNumber": 133,
+        "prTitle": "feat(hub): live presence channel for product pages",
+        "prOwner": "sora-lindqvist",
+        "tags": [
+          "realtime",
+          "websocket",
+          "presence"
+        ],
+        "source": {
+          "repo": "realtime-hub",
+          "sha": "d5e6f7a",
+          "branch": "feat/presence"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-06-back-in-stock",
+        "date": "2026-08-06",
+        "kind": "added",
+        "title": "New topic: inventory.back-in-stock",
+        "detail": "Inventory now emits a back-in-stock event; Notifications fans out restock alerts.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "inventory",
+          "inventory.back-in-stock",
+          "notifications"
+        ],
+        "evidence": [
+          "inventory/src/restock/emitter.ts:52 — topic: \"inventory.back-in-stock\""
+        ],
+        "prNumber": 121,
+        "prTitle": "feat(inventory): publish back-in-stock restock events",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "kafka",
+          "events",
+          "inventory"
+        ],
+        "source": {
+          "repo": "inventory",
+          "sha": "3f2a1b0",
+          "branch": "feat/restock-events"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-06-cart-legacy-route",
+        "date": "2026-08-06",
+        "kind": "removed",
+        "title": "Removed legacy Cart → Payments route",
+        "detail": "Cart no longer calls Payments directly for quick-buy; the flow goes through Orders now. The old edge is dead.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "cart",
+          "payments"
+        ],
+        "evidence": [
+          "cart/src/quickbuy/index.ts:— deleted paymentsClient.authorize() call"
+        ],
+        "prNumber": 122,
+        "prTitle": "refactor(cart): route quick-buy through orders",
+        "prOwner": "diego-ramos",
+        "tags": [
+          "refactor",
+          "routing",
+          "cart"
+        ],
+        "source": {
+          "repo": "cart",
+          "sha": "b9c8d7e",
+          "branch": "refactor/quickbuy"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-06-gateway-ratelimit",
+        "date": "2026-08-06",
+        "kind": "risk",
+        "title": "API gateway rate-limit lowered to 40 rps",
+        "detail": "The gateway’s per-tenant limit dropped from 100 to 40 rps; the storefront’s burst traffic may now be throttled.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "api-gateway",
+          "storefront"
+        ],
+        "evidence": [
+          "api-gateway/src/config/limits.ts:14 — perTenantRps: 40"
+        ],
+        "prNumber": 124,
+        "prTitle": "chore(gateway): tighten per-tenant rate limit",
+        "prOwner": "ana-belkova",
+        "tags": [
+          "rate-limit",
+          "gateway",
+          "capacity"
+        ],
+        "source": {
+          "repo": "api-gateway",
+          "sha": "f1a2b3c",
+          "branch": "chore/rate-limit"
+        },
+        "confidence": "medium"
+      },
+      {
+        "id": "d-2026-07-30-notifications-templates",
+        "date": "2026-07-30",
+        "kind": "changed",
+        "title": "Notifications switched to a new template engine",
+        "detail": "Notification rendering moved to the new MJML pipeline; the payload shape the map documented no longer matches.",
+        "team": "team-engagement",
+        "nodeIds": [
+          "notifications"
+        ],
+        "evidence": [
+          "notifications/src/render/engine.ts:9 — import { renderMjml } from \"./mjml\""
+        ],
+        "prNumber": 118,
+        "prTitle": "feat(notifications): render emails with MJML",
+        "prOwner": "sora-lindqvist",
+        "tags": [
+          "templates",
+          "email",
+          "notifications"
+        ],
+        "source": {
+          "repo": "notifications",
+          "sha": "a9b8c7d",
+          "branch": "feat/mjml"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-07-30-object-storage",
+        "date": "2026-07-30",
+        "kind": "added",
+        "title": "Catalog media moved to object storage",
+        "detail": "Catalog now writes product imagery to object storage instead of the local disk cache the map still shows.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "catalog",
+          "object-storage"
+        ],
+        "evidence": [
+          "catalog/src/media/store.ts:33 — s3.putObject({ Bucket: \"astromart-media\" })"
+        ],
+        "prNumber": 119,
+        "prTitle": "feat(catalog): store product media in object storage",
+        "prOwner": "diego-ramos",
+        "tags": [
+          "storage",
+          "media",
+          "catalog"
+        ],
+        "source": {
+          "repo": "catalog",
+          "sha": "e0f1a2b",
+          "branch": "feat/media-storage"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-07-30-orders-cancelled",
+        "date": "2026-07-30",
+        "kind": "added",
+        "title": "New topic: orders.cancelled",
+        "detail": "Orders now emits a cancelled event; Inventory releases the reservation and Payments voids the authorization.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "orders",
+          "orders.cancelled",
+          "inventory",
+          "payments"
+        ],
+        "evidence": [
+          "orders/src/cancel/publisher.ts:27 — topic: \"orders.cancelled\""
+        ],
+        "prNumber": 120,
+        "prTitle": "feat(orders): emit orders.cancelled with compensation",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "kafka",
+          "events",
+          "saga",
+          "orders"
+        ],
+        "source": {
+          "repo": "orders",
+          "sha": "b3c4d5e",
+          "branch": "feat/cancel-event"
+        },
+        "confidence": "high"
+      }
+    ],
+    "LATEST_DRIFT_DATE": "2026-08-13",
+    "LATEST_DRIFT_ENTRIES": [
+      {
+        "id": "d-2026-08-13-shipping-dispatched",
+        "date": "2026-08-13",
+        "kind": "added",
+        "title": "New topic: shipping.dispatched",
+        "detail": "Shipping now publishes a dispatched event when a parcel leaves the depot; Notifications subscribes to it.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "shipping",
+          "shipping.dispatched",
+          "notifications"
+        ],
+        "evidence": [
+          "shipping/src/dispatch/publisher.ts:44 — producer.send({ topic: \"shipping.dispatched\" })",
+          "notifications/src/handlers/dispatched.ts:12 — new consumer group \"notif-dispatched\""
+        ],
+        "prNumber": 128,
+        "prTitle": "feat(shipping): emit dispatched event on depot handoff",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "kafka",
+          "events",
+          "shipping"
+        ],
+        "source": {
+          "repo": "shipping",
+          "sha": "a1b2c3d",
+          "branch": "feat/dispatched-event"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-13-orders-payload",
+        "date": "2026-08-13",
+        "kind": "changed",
+        "title": "orders.created payload gained `giftWrap`",
+        "detail": "The Orders event now carries a giftWrap flag. The map step payload was stale.",
+        "team": "team-fulfillment",
+        "nodeIds": [
+          "orders",
+          "orders.created"
+        ],
+        "evidence": [
+          "orders/src/events/orderCreated.schema.ts:31 — giftWrap: z.boolean().default(false)"
+        ],
+        "prNumber": 128,
+        "prTitle": "feat(orders): add giftWrap flag to orders.created",
+        "prOwner": "maya-okonkwo",
+        "tags": [
+          "schema",
+          "payload",
+          "orders"
+        ],
+        "source": {
+          "repo": "orders",
+          "sha": "e4f5a6b",
+          "branch": "feat/gift-wrap"
+        },
+        "confidence": "high"
+      },
+      {
+        "id": "d-2026-08-13-catalog-search",
+        "date": "2026-08-13",
+        "kind": "risk",
+        "title": "Search reads Catalog’s Postgres directly",
+        "detail": "Search added a direct DB read against Catalog’s tables, bypassing the API — a coupling the map doesn’t model.",
+        "team": "team-shopping",
+        "nodeIds": [
+          "search",
+          "catalog"
+        ],
+        "evidence": [
+          "search/src/index/backfill.ts:88 — new Pool({ host: \"catalog-db.internal\" })"
+        ],
+        "prNumber": 129,
+        "prTitle": "perf(search): backfill index straight from catalog db",
+        "prOwner": "diego-ramos",
+        "tags": [
+          "coupling",
+          "database",
+          "search"
+        ],
+        "source": {
+          "repo": "search",
+          "sha": "7c8d9e0",
+          "branch": "perf/direct-backfill"
+        },
+        "confidence": "medium"
+      }
+    ],
+    "LATEST_DRIFT_BY_NODE": {
+      "shipping": "added",
+      "shipping.dispatched": "added",
+      "notifications": "added",
+      "orders": "changed",
+      "orders.created": "changed",
+      "search": "risk",
+      "catalog": "risk"
+    },
+    "SERVICE_HEALTH": [
+      {
+        "serviceId": "storefront",
+        "lastCommit": "2026-08-14",
+        "openPrs": 2
+      },
+      {
+        "serviceId": "api-gateway",
+        "lastCommit": "2026-08-13",
+        "openPrs": 4
+      },
+      {
+        "serviceId": "cart",
+        "lastCommit": "2026-08-02",
+        "openPrs": 1
+      },
+      {
+        "serviceId": "search",
+        "lastCommit": "2026-07-15",
+        "openPrs": 1
+      },
+      {
+        "serviceId": "catalog",
+        "lastCommit": "2026-08-11",
+        "openPrs": 7
+      },
+      {
+        "serviceId": "orders",
+        "lastCommit": "2026-08-14",
+        "openPrs": 5
+      },
+      {
+        "serviceId": "payments",
+        "lastCommit": "2026-08-10",
+        "openPrs": 3
+      },
+      {
+        "serviceId": "inventory",
+        "lastCommit": "2026-08-12",
+        "openPrs": 0
+      },
+      {
+        "serviceId": "shipping",
+        "lastCommit": "2026-08-13",
+        "openPrs": 1
+      },
+      {
+        "serviceId": "notifications",
+        "lastCommit": "2026-07-25",
+        "openPrs": 2
+      },
+      {
+        "serviceId": "realtime-hub",
+        "lastCommit": "2026-08-09",
+        "openPrs": 1
+      }
+    ],
+    "HEALTH_AS_OF": "2026-08-14",
+    "BRAND": {
+      "tagline": "A living map of your architecture. Every service is a star. Kafka topics orbit between them. Real flows play as comets you can watch, pause, and inspect — payloads included. Ask the map a question in plain English and an AI agent answers from the map itself. And a nightly AI agent keeps the whole map honest against your actual code.",
+      "helpTitle": "A live map of your architecture.",
+      "repoBaseUrl": "https://github.com/astromart",
+      "driftSyncUrl": "https://github.com/orassayag/project-cosmos/actions/workflows/cosmos-sync.yml"
+    }
+  },
+  "derived": {
+    "DEPENDENTS_OF": {
+      "storefront": [
+        "api-gateway"
+      ],
+      "api-gateway": [
+        "search",
+        "storefront"
+      ],
+      "cart": [
+        "api-gateway"
+      ],
+      "search": [
+        "api-gateway"
+      ],
+      "catalog": [
+        "search"
+      ],
+      "orders": [
+        "api-gateway",
+        "hub-broadcasts",
+        "orders.cancelled",
+        "orders.created"
+      ],
+      "payments": [
+        "orders",
+        "payments.captured"
+      ],
+      "inventory": [
+        "hub-broadcasts",
+        "inventory.back-in-stock",
+        "inventory.reserved"
+      ],
+      "shipping": [
+        "hub-broadcasts",
+        "shipping.dispatched"
+      ],
+      "notifications": [],
+      "realtime-hub": [
+        "storefront"
+      ],
+      "object-storage": [
+        "catalog",
+        "shipping"
+      ],
+      "orders.created": [
+        "inventory",
+        "notifications",
+        "shipping"
+      ],
+      "orders.cancelled": [
+        "inventory",
+        "payments"
+      ],
+      "payments.captured": [
+        "orders"
+      ],
+      "payments.failed": [],
+      "inventory.reserved": [
+        "orders"
+      ],
+      "inventory.back-in-stock": [
+        "notifications"
+      ],
+      "shipping.dispatched": [
+        "notifications"
+      ],
+      "hub-broadcasts": [
+        "realtime-hub"
+      ]
+    },
+    "BLAST_RADIUS": {
+      "storefront": {
+        "sourceId": "storefront",
+        "levels": {
+          "storefront": "source",
+          "api-gateway": "high",
+          "search": "med"
+        },
+        "dependents": [
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "med",
+            "hops": 2
+          }
+        ]
+      },
+      "api-gateway": {
+        "sourceId": "api-gateway",
+        "levels": {
+          "api-gateway": "source",
+          "storefront": "high",
+          "search": "high"
+        },
+        "dependents": [
+          {
+            "id": "search",
+            "name": "search",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "high",
+            "hops": 1
+          }
+        ]
+      },
+      "cart": {
+        "sourceId": "cart",
+        "levels": {
+          "cart": "source",
+          "api-gateway": "high",
+          "storefront": "med",
+          "search": "med"
+        },
+        "dependents": [
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "med",
+            "hops": 2
+          }
+        ]
+      },
+      "search": {
+        "sourceId": "search",
+        "levels": {
+          "search": "source",
+          "api-gateway": "high",
+          "storefront": "med"
+        },
+        "dependents": [
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "med",
+            "hops": 2
+          }
+        ]
+      },
+      "catalog": {
+        "sourceId": "catalog",
+        "levels": {
+          "catalog": "source",
+          "search": "high",
+          "api-gateway": "med",
+          "storefront": "low"
+        },
+        "dependents": [
+          {
+            "id": "search",
+            "name": "search",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "orders": {
+        "sourceId": "orders",
+        "levels": {
+          "orders": "source",
+          "api-gateway": "high",
+          "orders.created": "high",
+          "hub-broadcasts": "high",
+          "orders.cancelled": "high",
+          "storefront": "med",
+          "search": "med",
+          "inventory": "med",
+          "notifications": "med",
+          "shipping": "med",
+          "realtime-hub": "med",
+          "payments": "med",
+          "inventory.reserved": "low",
+          "inventory.back-in-stock": "low",
+          "shipping.dispatched": "low",
+          "payments.captured": "low"
+        },
+        "dependents": [
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "payments": {
+        "sourceId": "payments",
+        "levels": {
+          "payments": "source",
+          "orders": "high",
+          "payments.captured": "high",
+          "api-gateway": "med",
+          "orders.created": "med",
+          "hub-broadcasts": "med",
+          "orders.cancelled": "med",
+          "storefront": "low",
+          "search": "low",
+          "inventory": "low",
+          "notifications": "low",
+          "shipping": "low",
+          "realtime-hub": "low",
+          "inventory.reserved": "low",
+          "inventory.back-in-stock": "low",
+          "shipping.dispatched": "low"
+        },
+        "dependents": [
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "inventory": {
+        "sourceId": "inventory",
+        "levels": {
+          "inventory": "source",
+          "inventory.reserved": "high",
+          "inventory.back-in-stock": "high",
+          "hub-broadcasts": "high",
+          "orders": "med",
+          "notifications": "med",
+          "realtime-hub": "med",
+          "api-gateway": "low",
+          "orders.created": "low",
+          "orders.cancelled": "low",
+          "storefront": "low",
+          "search": "low",
+          "shipping": "low",
+          "payments": "low",
+          "shipping.dispatched": "low",
+          "payments.captured": "low"
+        },
+        "dependents": [
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "shipping": {
+        "sourceId": "shipping",
+        "levels": {
+          "shipping": "source",
+          "shipping.dispatched": "high",
+          "hub-broadcasts": "high",
+          "notifications": "med",
+          "realtime-hub": "med",
+          "storefront": "low",
+          "api-gateway": "low",
+          "search": "low"
+        },
+        "dependents": [
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "notifications": {
+        "sourceId": "notifications",
+        "levels": {
+          "notifications": "source"
+        },
+        "dependents": []
+      },
+      "realtime-hub": {
+        "sourceId": "realtime-hub",
+        "levels": {
+          "realtime-hub": "source",
+          "storefront": "high",
+          "api-gateway": "med",
+          "search": "low"
+        },
+        "dependents": [
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "object-storage": {
+        "sourceId": "object-storage",
+        "levels": {
+          "object-storage": "source",
+          "catalog": "high",
+          "shipping": "high",
+          "search": "med",
+          "shipping.dispatched": "med",
+          "hub-broadcasts": "med",
+          "api-gateway": "low",
+          "notifications": "low",
+          "realtime-hub": "low",
+          "storefront": "low"
+        },
+        "dependents": [
+          {
+            "id": "catalog",
+            "name": "catalog",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 4
+          }
+        ]
+      },
+      "orders.created": {
+        "sourceId": "orders.created",
+        "levels": {
+          "orders.created": "source",
+          "inventory": "high",
+          "notifications": "high",
+          "shipping": "high",
+          "inventory.reserved": "med",
+          "inventory.back-in-stock": "med",
+          "hub-broadcasts": "med",
+          "shipping.dispatched": "med",
+          "orders": "low",
+          "realtime-hub": "low",
+          "api-gateway": "low",
+          "orders.cancelled": "low",
+          "storefront": "low",
+          "search": "low",
+          "payments": "low",
+          "payments.captured": "low"
+        },
+        "dependents": [
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "low",
+            "hops": 6
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 4
+          }
+        ]
+      },
+      "orders.cancelled": {
+        "sourceId": "orders.cancelled",
+        "levels": {
+          "orders.cancelled": "source",
+          "payments": "high",
+          "inventory": "high",
+          "orders": "med",
+          "payments.captured": "med",
+          "inventory.reserved": "med",
+          "inventory.back-in-stock": "med",
+          "hub-broadcasts": "med",
+          "api-gateway": "low",
+          "orders.created": "low",
+          "notifications": "low",
+          "realtime-hub": "low",
+          "storefront": "low",
+          "search": "low",
+          "shipping": "low",
+          "shipping.dispatched": "low"
+        },
+        "dependents": [
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 5
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 4
+          }
+        ]
+      },
+      "payments.captured": {
+        "sourceId": "payments.captured",
+        "levels": {
+          "payments.captured": "source",
+          "orders": "high",
+          "api-gateway": "med",
+          "orders.created": "med",
+          "hub-broadcasts": "med",
+          "orders.cancelled": "med",
+          "storefront": "low",
+          "search": "low",
+          "inventory": "low",
+          "notifications": "low",
+          "shipping": "low",
+          "realtime-hub": "low",
+          "payments": "low",
+          "inventory.reserved": "low",
+          "inventory.back-in-stock": "low",
+          "shipping.dispatched": "low"
+        },
+        "dependents": [
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "inventory.reserved",
+            "name": "inventory.reserved",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "payments.failed": {
+        "sourceId": "payments.failed",
+        "levels": {
+          "payments.failed": "source"
+        },
+        "dependents": []
+      },
+      "inventory.reserved": {
+        "sourceId": "inventory.reserved",
+        "levels": {
+          "inventory.reserved": "source",
+          "orders": "high",
+          "api-gateway": "med",
+          "orders.created": "med",
+          "hub-broadcasts": "med",
+          "orders.cancelled": "med",
+          "storefront": "low",
+          "search": "low",
+          "inventory": "low",
+          "notifications": "low",
+          "shipping": "low",
+          "realtime-hub": "low",
+          "payments": "low",
+          "inventory.back-in-stock": "low",
+          "shipping.dispatched": "low",
+          "payments.captured": "low"
+        },
+        "dependents": [
+          {
+            "id": "orders",
+            "name": "orders",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "hub-broadcasts",
+            "name": "hub.broadcasts",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.cancelled",
+            "name": "orders.cancelled",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "orders.created",
+            "name": "orders.created",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "inventory",
+            "name": "inventory",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "name": "inventory.back-in-stock",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "payments",
+            "name": "payments",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "payments.captured",
+            "name": "payments.captured",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping",
+            "name": "shipping",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "shipping.dispatched",
+            "name": "shipping.dispatched",
+            "level": "low",
+            "hops": 4
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "low",
+            "hops": 3
+          }
+        ]
+      },
+      "inventory.back-in-stock": {
+        "sourceId": "inventory.back-in-stock",
+        "levels": {
+          "inventory.back-in-stock": "source",
+          "notifications": "high"
+        },
+        "dependents": [
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "high",
+            "hops": 1
+          }
+        ]
+      },
+      "shipping.dispatched": {
+        "sourceId": "shipping.dispatched",
+        "levels": {
+          "shipping.dispatched": "source",
+          "notifications": "high"
+        },
+        "dependents": [
+          {
+            "id": "notifications",
+            "name": "notifications",
+            "level": "high",
+            "hops": 1
+          }
+        ]
+      },
+      "hub-broadcasts": {
+        "sourceId": "hub-broadcasts",
+        "levels": {
+          "hub-broadcasts": "source",
+          "realtime-hub": "high",
+          "storefront": "med",
+          "api-gateway": "low",
+          "search": "low"
+        },
+        "dependents": [
+          {
+            "id": "realtime-hub",
+            "name": "realtime-hub",
+            "level": "high",
+            "hops": 1
+          },
+          {
+            "id": "storefront",
+            "name": "storefront",
+            "level": "med",
+            "hops": 2
+          },
+          {
+            "id": "api-gateway",
+            "name": "api-gateway",
+            "level": "low",
+            "hops": 3
+          },
+          {
+            "id": "search",
+            "name": "search",
+            "level": "low",
+            "hops": 4
+          }
+        ]
+      }
+    },
+    "TOPIC_GROUPS": [
+      {
+        "id": "group-orders",
+        "serviceId": "orders",
+        "members": [
+          {
+            "id": "orders.created",
+            "x": 1830,
+            "y": 810,
+            "labelSide": "below",
+            "name": "orders.created",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by orders the moment an order flips to confirmed (payment captured). Keyed by orderId so every event for the same order lands on the same partition. Fan-out to three consumers: inventory (places the stock reservation), shipping (queues the pick-and-pack job), and notifications (sends the confirmation email)."
+          },
+          {
+            "id": "orders.cancelled",
+            "x": 1716,
+            "y": 909,
+            "labelSide": "below",
+            "pinned": true,
+            "name": "orders.cancelled",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by orders when a shopper (or fraud review) cancels an order. Keyed by orderId. Consumers: payments (issues the refund against the original capture) and inventory (releases the reserved units back to sellable stock)."
+          }
+        ],
+        "memberIds": [
+          "orders.created",
+          "orders.cancelled"
+        ],
+        "cx": 1600,
+        "cy": 720,
+        "ringRadius": 150
+      },
+      {
+        "id": "group-payments",
+        "serviceId": "payments",
+        "members": [
+          {
+            "id": "payments.captured",
+            "x": 1510,
+            "y": 918,
+            "labelSide": "above",
+            "pinned": true,
+            "name": "payments.captured",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by payments after the processor confirms a capture — and again on refunds, with a negative amount and reason: 'refund'. Carries the ledger entry id, order id, amount, currency, and the tokenized payment method. Sole consumer: orders, which flips the order to confirmed (or refunded) on receipt."
+          }
+        ],
+        "memberIds": [
+          "payments.captured"
+        ],
+        "cx": 1560,
+        "cy": 1060,
+        "ringRadius": 150
+      },
+      {
+        "id": "group-inventory",
+        "serviceId": "inventory",
+        "members": [
+          {
+            "id": "inventory.reserved",
+            "x": 1830,
+            "y": 650,
+            "labelSide": "above",
+            "name": "inventory.reserved",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by inventory once every line item of an order has been reserved via DynamoDB conditional writes. Carries the reservation id, per-SKU warehouse assignments, and an expiry. Sole consumer: orders, which attaches the reservation to the order row — the last gate before the shopper sees \"Order confirmed!\"."
+          },
+          {
+            "id": "inventory.back-in-stock",
+            "x": 2053,
+            "y": 912,
+            "labelSide": "above",
+            "pinned": true,
+            "name": "inventory.back-in-stock",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by inventory's restock watcher when a SKU's sellable count crosses zero → positive (a restock delivery was scanned in). Carries skuId, warehouse, and the new count. Consumer: notifications, which emails everyone with the SKU wishlisted. inventory also broadcasts the same moment to live browsing sessions via hub.broadcasts."
+          }
+        ],
+        "memberIds": [
+          "inventory.reserved",
+          "inventory.back-in-stock"
+        ],
+        "cx": 2060,
+        "cy": 720,
+        "ringRadius": 150
+      },
+      {
+        "id": "group-shipping",
+        "serviceId": "shipping",
+        "members": [
+          {
+            "id": "shipping.dispatched",
+            "x": 1929,
+            "y": 1233,
+            "labelSide": "below",
+            "pinned": true,
+            "name": "shipping.dispatched",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "Kafka topic. Published by shipping when the courier scans the parcel and the tracking number goes live. Carries orderId, parcelId, courier, trackingNumber, and the label's object-storage key. Consumer: notifications (tracking email). shipping also pushes the same event to the shopper's open tab via hub.broadcasts."
+          }
+        ],
+        "memberIds": [
+          "shipping.dispatched"
+        ],
+        "cx": 2060,
+        "cy": 1060,
+        "ringRadius": 150
+      },
+      {
+        "id": "group-realtime-hub",
+        "serviceId": "realtime-hub",
+        "members": [
+          {
+            "id": "hub-broadcasts",
+            "x": 1056,
+            "y": 1022,
+            "pinned": true,
+            "name": "hub.broadcasts",
+            "color": "var(--svc-orange)",
+            "hex": "#fb923c",
+            "desc": "realtime-hub's input topic — every WebSocket push at AstroMart starts life as a record here. Producers: orders (order confirmed / refund confirmed), shipping (live parcel tracking), inventory (back-in-stock banners). hub-ingest consumes, calls hub-presence to resolve the target socket(s), then calls hub-push to deliver — fan-out by customer_id when no socket_id is set, precise per-tab when it is."
+          }
+        ],
+        "memberIds": [
+          "hub-broadcasts"
+        ],
+        "cx": 840,
+        "cy": 1020,
+        "ringRadius": 150
+      }
+    ],
+    "CONNECTED_NODE_IDS": [
+      "storefront",
+      "api-gateway",
+      "search",
+      "catalog",
+      "object-storage",
+      "orders",
+      "payments",
+      "payments.captured",
+      "inventory",
+      "orders.created",
+      "inventory.reserved",
+      "hub-broadcasts",
+      "realtime-hub",
+      "notifications",
+      "shipping",
+      "shipping.dispatched",
+      "orders.cancelled",
+      "inventory.back-in-stock",
+      "cart"
+    ],
+    "EDGES": [
+      {
+        "key": "storefront→api-gateway|http",
+        "d": "M 299.6420509673727 686.1252821614196 Q 447.918613038515 593.9682072457273 621.3018073889933 573.5443674138523",
+        "type": "http",
+        "from": "storefront",
+        "to": "api-gateway"
+      },
+      {
+        "key": "api-gateway→search|http",
+        "d": "M 694.7679304642086 538.2700434598696 Q 918.4439631121106 443.28393343219966 1101.840076319771 283.8499523001431",
+        "type": "http",
+        "from": "api-gateway",
+        "to": "search"
+      },
+      {
+        "key": "search→search|internal",
+        "d": "M 1106 222 Q 1140 188 1174 222",
+        "type": "internal",
+        "from": "search",
+        "to": "search"
+      },
+      {
+        "key": "search→catalog|http",
+        "d": "M 1140 305 Q 1106.7 397.5 1140 490",
+        "type": "http",
+        "from": "search",
+        "to": "catalog"
+      },
+      {
+        "key": "catalog→object-storage|http",
+        "d": "M 1189.4645181787241 532.7019563342866 Q 1751.3785193590793 411.3852400709697 2324.3855469113187 365.2545914393137",
+        "type": "http",
+        "from": "catalog",
+        "to": "object-storage"
+      },
+      {
+        "key": "search→api-gateway|http",
+        "d": "M 1101.840076319771 283.8499523001431 Q 878.164043671869 378.836062327813 694.7679304642086 538.2700434598696",
+        "type": "http",
+        "from": "search",
+        "to": "api-gateway"
+      },
+      {
+        "key": "api-gateway→storefront|http",
+        "d": "M 621.3018073889933 573.5443674138523 Q 473.02524531785105 665.7014423295446 299.6420509673727 686.1252821614196",
+        "type": "http",
+        "from": "api-gateway",
+        "to": "storefront"
+      },
+      {
+        "key": "storefront→storefront|internal",
+        "d": "M 229 665 Q 260 631 291 665",
+        "type": "internal",
+        "from": "storefront",
+        "to": "storefront"
+      },
+      {
+        "key": "api-gateway→orders|http",
+        "d": "M 700.4186679611493 566.8797732699828 Q 1138.8409281502982 602.9582939183241 1564.5104378877713 713.959223470259",
+        "type": "http",
+        "from": "api-gateway",
+        "to": "orders"
+      },
+      {
+        "key": "orders→orders|internal",
+        "d": "M 1575 691 Q 1600 657 1625 691",
+        "type": "internal",
+        "from": "orders",
+        "to": "orders"
+      },
+      {
+        "key": "orders→payments|http",
+        "d": "M 1595.7937150875737 755.7534217556235 Q 1618.557611697241 887.4879131773009 1565.84206237837 1010.3424697838561",
+        "type": "http",
+        "from": "orders",
+        "to": "payments"
+      },
+      {
+        "key": "payments→payments|internal",
+        "d": "M 1521 1017 Q 1560 983 1599 1017",
+        "type": "internal",
+        "from": "payments",
+        "to": "payments"
+      },
+      {
+        "key": "payments→payments.captured|kafka",
+        "d": "M 1543.3937440288043 1012.8382330418046 Q 1514.3278189575378 977.1956825192862 1514.6497516719348 931.2052947482947",
+        "type": "kafka",
+        "from": "payments",
+        "to": "payments.captured"
+      },
+      {
+        "key": "payments.captured→orders|kafka",
+        "d": "M 1515.7932412202165 905.2548693155235 Q 1577.8948693155235 841.489804753378 1585.1030940051573 752.7731931886537",
+        "type": "kafka",
+        "from": "payments.captured",
+        "to": "orders"
+      },
+      {
+        "key": "orders→orders.created|kafka",
+        "d": "M 1633.524740069407 733.1183765488985 Q 1738.1640764395386 735.9895778517374 1816.9626010841193 804.8984091198728",
+        "type": "kafka",
+        "from": "orders",
+        "to": "orders.created"
+      },
+      {
+        "key": "orders.created→inventory|kafka",
+        "d": "M 1843.0373989158807 804.8984091198728 Q 1942.895815832636 802.1583915825228 2018.094074913241 736.397970686123",
+        "type": "kafka",
+        "from": "orders.created",
+        "to": "inventory"
+      },
+      {
+        "key": "inventory→inventory.reserved|kafka",
+        "d": "M 2016.9496753807014 706.8977272897787 Q 1920.663691212965 711.7271183452137 1843.3934343260041 654.0762626209578",
+        "type": "kafka",
+        "from": "inventory",
+        "to": "inventory.reserved"
+      },
+      {
+        "key": "inventory.reserved→orders|kafka",
+        "d": "M 1816.6065656739959 654.0762626209578 Q 1715.5438672267617 649.0072871502502 1634.440259695439 709.518181831823",
+        "type": "kafka",
+        "from": "inventory.reserved",
+        "to": "orders"
+      },
+      {
+        "key": "orders→hub-broadcasts|kafka",
+        "d": "M 1568.52488122786 737.4733196124747 Q 1336.8266621883472 909.5628063632926 1068.2403239669432 1015.2048201507043",
+        "type": "kafka",
+        "from": "orders",
+        "to": "hub-broadcasts"
+      },
+      {
+        "key": "hub-broadcasts→realtime-hub|kafka",
+        "d": "M 1042.000600098588 1021.8703759268387 Q 959.2761987326487 991.2214617083916 875.9984568893454 1020.3333190452718",
+        "type": "kafka",
+        "from": "hub-broadcasts",
+        "to": "realtime-hub"
+      },
+      {
+        "key": "realtime-hub→storefront|ws",
+        "d": "M 808.4792033750354 1002.609215655192 Q 534.2697940214496 894.7211840217523 296.7742627291254 720.289248402276",
+        "type": "ws",
+        "from": "realtime-hub",
+        "to": "storefront"
+      },
+      {
+        "key": "orders.created→notifications|kafka",
+        "d": "M 1818.4064673900969 817.8479297667036 Q 1496.5341731656256 989.8430606742696 1217.264926246117 1224.7745114641668",
+        "type": "kafka",
+        "from": "orders.created",
+        "to": "notifications"
+      },
+      {
+        "key": "orders.created→shipping|kafka",
+        "d": "M 1839.4787914314923 820.3030341646656 Q 1962.4710022192257 897.8649211464981 2029.5324561130603 1026.8831044707176",
+        "type": "kafka",
+        "from": "orders.created",
+        "to": "shipping"
+      },
+      {
+        "key": "shipping→shipping|internal",
+        "d": "M 2026 1022 Q 2060 988 2094 1022",
+        "type": "internal",
+        "from": "shipping",
+        "to": "shipping"
+      },
+      {
+        "key": "shipping→object-storage|http",
+        "d": "M 2077.7263684360623 1018.6384736491874 Q 2176.8451257029196 690.8949140189103 2345.8189052511498 393.0892210806501",
+        "type": "http",
+        "from": "shipping",
+        "to": "object-storage"
+      },
+      {
+        "key": "shipping→shipping.dispatched|kafka",
+        "d": "M 2032.8343898305968 1095.8751951092117 Q 1962.4695025429794 1141.6880956487078 1937.4515231638143 1221.838828188245",
+        "type": "kafka",
+        "from": "shipping",
+        "to": "shipping.dispatched"
+      },
+      {
+        "key": "shipping.dispatched→notifications|kafka",
+        "d": "M 1915.0036046615303 1233.3176751945982 Q 1570.858270367215 1279.138504096113 1224.9884135879383 1248.9789011602204",
+        "type": "kafka",
+        "from": "shipping.dispatched",
+        "to": "notifications"
+      },
+      {
+        "key": "shipping→hub-broadcasts|kafka",
+        "d": "M 2015.0321970432628 1058.2980313621952 Q 1543.9483080534922 1002.4409549724005 1069.989983142096 1022.5295013539837",
+        "type": "kafka",
+        "from": "shipping",
+        "to": "hub-broadcasts"
+      },
+      {
+        "key": "notifications→notifications|internal",
+        "d": "M 1146 1212 Q 1180 1178 1214 1212",
+        "type": "internal",
+        "from": "notifications",
+        "to": "notifications"
+      },
+      {
+        "key": "orders→orders.cancelled|kafka",
+        "d": "M 1618.8312641030022 750.681973409202 Q 1637.404490717107 840.047231404839 1708.6767306266102 897.068121451977",
+        "type": "kafka",
+        "from": "orders",
+        "to": "orders.cancelled"
+      },
+      {
+        "key": "orders.cancelled→payments|kafka",
+        "d": "M 1705.9406095665172 918.7369740734354 Q 1670.1013633197656 991.7835920631743 1595.9263944052962 1025.2250925948736",
+        "type": "kafka",
+        "from": "orders.cancelled",
+        "to": "payments"
+      },
+      {
+        "key": "orders.cancelled→inventory|kafka",
+        "d": "M 1728.2700338268842 902.2586151358107 Q 1892.713364323035 855.2680536297521 2020.560605556444 741.6687370634654",
+        "type": "kafka",
+        "from": "orders.cancelled",
+        "to": "inventory"
+      },
+      {
+        "key": "inventory→inventory|internal",
+        "d": "M 2026 682 Q 2060 648 2094 682",
+        "type": "internal",
+        "from": "inventory",
+        "to": "inventory"
+      },
+      {
+        "key": "inventory→inventory.back-in-stock|kafka",
+        "d": "M 2058.360464281842 764.9701225551909 Q 2031.988219953437 830.6166393096066 2053.5100777789826 898.0092952050518",
+        "type": "kafka",
+        "from": "inventory",
+        "to": "inventory.back-in-stock"
+      },
+      {
+        "key": "inventory.back-in-stock→notifications|kafka",
+        "d": "M 2039.9443714634554 917.0547565238855 Q 1644.674499301721 1110.8403684477478 1221.9645202960362 1233.7525683160823",
+        "type": "kafka",
+        "from": "inventory.back-in-stock",
+        "to": "notifications"
+      },
+      {
+        "key": "inventory→hub-broadcasts|kafka",
+        "d": "M 2016.9072791802018 732.9621530752779 Q 1532.211133565168 839.075332922544 1069.4066242550482 1017.967330154358",
+        "type": "kafka",
+        "from": "inventory",
+        "to": "hub-broadcasts"
+      },
+      {
+        "key": "api-gateway→cart|http",
+        "d": "M 665.7982756057297 519.4120707598921 Q 644.6415754494003 416.96910158187586 693.636038969321 324.5477272147525",
+        "type": "http",
+        "from": "api-gateway",
+        "to": "cart"
+      },
+      {
+        "key": "realtime-hub→realtime-hub|internal",
+        "d": "M 815 991 Q 840 957 865 991",
+        "type": "internal",
+        "from": "realtime-hub",
+        "to": "realtime-hub"
+      },
+      {
+        "key": "payments→payments.failed|kafka",
+        "d": "M 1520 1090 Q 1480.2879999999998 1150.384 1411.2 1171.6",
+        "type": "kafka",
+        "from": "payments",
+        "to": "payments.failed"
+      },
+      {
+        "key": "payments.failed→orders|kafka",
+        "d": "M 1405.5821655598022 1167.1610192124547 Q 1530.4626749120641 975.2393628525346 1585.6458599890798 753.0145220251164",
+        "type": "kafka",
+        "from": "payments.failed",
+        "to": "orders"
+      }
+    ],
+    "TEAM_GROUPS": [
+      {
+        "teamId": "team-shopping",
+        "label": "Shopping team",
+        "color": "var(--svc-cyan)",
+        "hex": "#22d3ee",
+        "githubTeam": "astromart/team-shopping",
+        "slack": "#team-shopping",
+        "serviceIds": [
+          "storefront",
+          "api-gateway",
+          "cart",
+          "search",
+          "catalog"
+        ]
+      },
+      {
+        "teamId": "team-fulfillment",
+        "label": "Fulfillment team",
+        "color": "var(--svc-amber)",
+        "hex": "#f5b731",
+        "githubTeam": "astromart/team-fulfillment",
+        "slack": "#team-fulfillment",
+        "serviceIds": [
+          "orders",
+          "payments",
+          "inventory",
+          "shipping"
+        ]
+      },
+      {
+        "teamId": "team-engagement",
+        "label": "Engagement team",
+        "color": "var(--svc-pink)",
+        "hex": "#e879f9",
+        "githubTeam": "astromart/team-engagement",
+        "slack": "#team-engagement",
+        "serviceIds": [
+          "notifications",
+          "realtime-hub"
+        ]
+      },
+      {
+        "teamId": null,
+        "label": "Platform · unowned",
+        "color": "var(--text-3)",
+        "hex": "#8a94a6",
+        "githubTeam": "astromart/cosmos-maintainers",
+        "serviceIds": [
+          "object-storage"
+        ]
+      }
+    ],
+    "HEALTH_BY_SERVICE": {
+      "storefront": {
+        "serviceId": "storefront",
+        "lastCommit": "2026-08-14",
+        "openPrs": 2,
+        "status": "fresh",
+        "ageDays": 0,
+        "onCall": {
+          "handle": "ana-belkova",
+          "until": "2026-08-14T18:00:00Z",
+          "slack": "#team-shopping"
+        },
+        "team": "team-shopping",
+        "teamLabel": "Shopping team"
+      },
+      "api-gateway": {
+        "serviceId": "api-gateway",
+        "lastCommit": "2026-08-13",
+        "openPrs": 4,
+        "status": "warm",
+        "ageDays": 1,
+        "onCall": {
+          "handle": "ana-belkova",
+          "until": "2026-08-14T18:00:00Z",
+          "slack": "#team-shopping"
+        },
+        "team": "team-shopping",
+        "teamLabel": "Shopping team"
+      },
+      "cart": {
+        "serviceId": "cart",
+        "lastCommit": "2026-08-02",
+        "openPrs": 1,
+        "status": "warm",
+        "ageDays": 12,
+        "onCall": {
+          "handle": "ana-belkova",
+          "until": "2026-08-14T18:00:00Z",
+          "slack": "#team-shopping"
+        },
+        "team": "team-shopping",
+        "teamLabel": "Shopping team"
+      },
+      "search": {
+        "serviceId": "search",
+        "lastCommit": "2026-07-15",
+        "openPrs": 1,
+        "status": "hot",
+        "ageDays": 30,
+        "onCall": {
+          "handle": "ana-belkova",
+          "until": "2026-08-14T18:00:00Z",
+          "slack": "#team-shopping"
+        },
+        "team": "team-shopping",
+        "teamLabel": "Shopping team"
+      },
+      "catalog": {
+        "serviceId": "catalog",
+        "lastCommit": "2026-08-11",
+        "openPrs": 7,
+        "status": "hot",
+        "ageDays": 3,
+        "onCall": {
+          "handle": "ana-belkova",
+          "until": "2026-08-14T18:00:00Z",
+          "slack": "#team-shopping"
+        },
+        "team": "team-shopping",
+        "teamLabel": "Shopping team"
+      },
+      "orders": {
+        "serviceId": "orders",
+        "lastCommit": "2026-08-14",
+        "openPrs": 5,
+        "status": "warm",
+        "ageDays": 0,
+        "onCall": {
+          "handle": "maya-okonkwo",
+          "until": "2026-08-14T21:00:00Z",
+          "slack": "#team-fulfillment"
+        },
+        "team": "team-fulfillment",
+        "teamLabel": "Fulfillment team"
+      },
+      "payments": {
+        "serviceId": "payments",
+        "lastCommit": "2026-08-10",
+        "openPrs": 3,
+        "status": "warm",
+        "ageDays": 4,
+        "onCall": {
+          "handle": "maya-okonkwo",
+          "until": "2026-08-14T21:00:00Z",
+          "slack": "#team-fulfillment"
+        },
+        "team": "team-fulfillment",
+        "teamLabel": "Fulfillment team"
+      },
+      "inventory": {
+        "serviceId": "inventory",
+        "lastCommit": "2026-08-12",
+        "openPrs": 0,
+        "status": "fresh",
+        "ageDays": 2,
+        "onCall": {
+          "handle": "maya-okonkwo",
+          "until": "2026-08-14T21:00:00Z",
+          "slack": "#team-fulfillment"
+        },
+        "team": "team-fulfillment",
+        "teamLabel": "Fulfillment team"
+      },
+      "shipping": {
+        "serviceId": "shipping",
+        "lastCommit": "2026-08-13",
+        "openPrs": 1,
+        "status": "fresh",
+        "ageDays": 1,
+        "onCall": {
+          "handle": "maya-okonkwo",
+          "until": "2026-08-14T21:00:00Z",
+          "slack": "#team-fulfillment"
+        },
+        "team": "team-fulfillment",
+        "teamLabel": "Fulfillment team"
+      },
+      "notifications": {
+        "serviceId": "notifications",
+        "lastCommit": "2026-07-25",
+        "openPrs": 2,
+        "status": "warm",
+        "ageDays": 20,
+        "onCall": {
+          "handle": "sora-lindqvist",
+          "until": "2026-08-14T15:30:00Z",
+          "slack": "#team-engagement"
+        },
+        "team": "team-engagement",
+        "teamLabel": "Engagement team"
+      },
+      "realtime-hub": {
+        "serviceId": "realtime-hub",
+        "lastCommit": "2026-08-09",
+        "openPrs": 1,
+        "status": "fresh",
+        "ageDays": 5,
+        "onCall": {
+          "handle": "sora-lindqvist",
+          "until": "2026-08-14T15:30:00Z",
+          "slack": "#team-engagement"
+        },
+        "team": "team-engagement",
+        "teamLabel": "Engagement team"
+      }
+    }
+  }
+}

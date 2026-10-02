@@ -41,3 +41,6 @@ docs/pre-plans/
 .vercel
 .env*
 !.env.example
+
+# screenshots + diffs from npm run parity:screens
+parity-out/

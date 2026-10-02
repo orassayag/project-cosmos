@@ -13,7 +13,7 @@
     "dev:client": "npm run dev --workspace client",
     "build": "npm run build --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces",
+    "test": "npm run test --workspaces && npm run test:scripts",
     "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
     "snapshot": "npm run snapshot --workspace server",
@@ -24,7 +24,11 @@
     "sync:apply": "tsx drift-sync/scripts/apply-edits.ts",
     "sync:clone-repos": "tsx drift-sync/scripts/clone-repos.ts",
     "fresh": "node scripts/fresh-start.mjs",
-    "record:demo": "node scripts/record-demo.mjs"
+    "record:demo": "node scripts/record-demo.mjs",
+    "baseline:dump": "tsx scripts/dump-baseline.ts",
+    "parity:screens": "node scripts/parity-screens.mjs",
+    "cosmos:check": "tsx scripts/cosmos-check.ts",
+    "test:scripts": "tsx --test scripts/__tests__/*.test.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -32,9 +36,11 @@
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "pixelmatch": "^7.2.0",
     "playwright": "^1.63.0",
+    "pngjs": "^7.0.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0"
   },
   "engines": {

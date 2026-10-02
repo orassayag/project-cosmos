@@ -1,27 +1,8 @@
 # Master Run Ledger
-Plan: docs/plans/unfork-project.md
+Plan: docs/plans/server-owned-data-migration-plan.md
 
-## Stage 1 — Licence and authorship metadata (committed 2026-09-30 17:14)
-**Files:** LICENSE, package.json, .claude-plugin/plugin.json, .claude-plugin/marketplace.json
-**What was built:** Added `Copyright (c) 2026 Or Assayag` beneath the unchanged Ludeo line; set Or Assayag as author in package.json, plugin.json, and marketplace.json owner/plugin author.
-**Key decisions:** Ludeo line and MIT text untouched; plugin manifests changed only name strings. No per-file copyright headers exist in client/, server/, drift-sync/.
-**User overrides during review:** None.
-
-## Stage 2 — Fork wording removal and "Origin & credits" (committed 2026-09-30)
-**Files:** README.md, SECURITY.md
-**What was built:** Removed the "About this fork" block and the "fork of" line; added one "Origin & credits" section (ludeo-labs/cosmos-os, MIT, notice preserved in LICENSE, Medium link, list of additions) plus a top pointer. "off by default on forks" is now "off by default". License footer credits Ludeo and Or Assayag.
-**Key decisions:** Additions list moved into Origin & credits rather than duplicated. Ludeo copyright and MIT text untouched. `grep -niE fork README.md SECURITY.md` is empty; `npm run build` passed.
-**User overrides during review:** None.
-
-## Stage 3 — README/GitHub-description reminder hook (committed 2026-09-30 17:18)
-**Files:** scripts/readme-reminder.sh, scripts/__tests__/readme-reminder.test.sh, scripts/install-hooks.sh, README.md
-**What was built:** Non-blocking commit-msg hook that, on feat/breaking commits without README.md staged, prints a warning plus a ready-to-run `gh repo edit` example. Installed by install-hooks.sh next to the untouched post-commit hook.
-**Key decisions:** Advisory only (always exit 0, never runs gh). `docs/README.md` does not count as README staged. Staged files overridable via README_REMINDER_STAGED_FILES for tests.
-**User overrides during review:** None.
-
-## Stage 4 — Docs-vs-code audit and mismatch fixes (committed 2026-09-30)
-**Files:** README.md, CLAUDE.md, .claude/status/stage-4-report.md
-**What was built:** Audited README/CLAUDE.md against code. Fixed lint scope (now includes `scripts/`), added a `sync` pointer row to the command table, documented `BASE_URL` for demo recording, completed the README folder tree (overlays, pages-redirect, skills, docs), and noted the `update` skill in CLAUDE.md.
-**Key decisions:** Docs changed to match code; no code changed. Routes, shortcuts and deploy steps already matched. `so forks don't run a failing cron` wording in cosmos-sync.yml left (describes third-party copies; workflows out of stage scope).
-**Open item:** `VITE_ANTHROPIC_API_KEY` fallback in drift-sync is undocumented; unverified whether still used.
-**User overrides during review:** None.
+## Stage 1 — P0: Baseline and parity oracle (committed 2026-10-02)
+**Files:** .gitignore, package.json, package-lock.json, scripts/dump-baseline.ts, scripts/parity-screens.mjs, scripts/cosmos-check.ts, scripts/__tests__/cosmosCheck.test.ts, docs/plans/server-owned-data-decisions.md, server/src/__tests__/fixtures/baseline-full.json, server/src/__tests__/fixtures/baseline-cosmos-map.json, docs/plans/baseline-screens/*.png (16)
+**What was built:** `npm run baseline:dump` (frozen data + derived values → baseline-full.json, snapshot copy → baseline-cosmos-map.json; idempotent). `npm run parity:screens` (16 deterministic views vs docs/plans/baseline-screens, 0.1% threshold, diffs in gitignored parity-out/, `--update` to rebaseline). `npm run cosmos:check -- --phase N` (extensible phase-tagged check table; unit tests via `npm run test:scripts`, now part of `npm test`). Decisions log at docs/plans/server-owned-data-decisions.md. Drift Sync paused (`DRIFT_SYNC_ENABLED=false`; variable is new). All gates green: build, typecheck, lint (1 pre-existing warning Map.tsx:814), tests client 140 / server 103 / scripts 5, validate, cosmos:check phase 0, parity 16/16.
+**Key decisions:** Screens made deterministic by frozen clock, seeded Math.random, no transitions/animations, `/api` stubbed 404, version badge masked, Google Fonts blocked (fallback fonts). Mid-play reached by pressing Next (`?step=N` deep link always lands on step 1 — logged, not fixed). `realtime-hub-selected` replaces the unreachable expanded state (`expandedServiceId` hard-coded null, Map.tsx:174). DEPENDENTS_OF rebuilt from computeBlastRadius 1-hop results rather than exported. Gates ran on feature/add-ai @ 0dc2b6e, not main. `scripts/*.ts` are NOT type-checked (no covering tsconfig; no-emit tsc was denied) — they run under tsx and pass lint.
+**User overrides during review:** TypeScript pinned to `^6.0.3` in root package.json only (typescript-eslint 8.71 rejects TS 7; CI red since a86f10b; revisit when typescript-eslint supports TS 7), lockfile regenerated with plain `npm install`. Fallback fonts in parity baselines accepted. Open for Phase 10: re-enable Drift Sync by setting `DRIFT_SYNC_ENABLED=true`.
