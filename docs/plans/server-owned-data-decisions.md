@@ -148,3 +148,66 @@ phase that activates it. There are three kinds of check:
 Both grep kinds use `git grep --untracked`, so new uncommitted files count. Later phases append their entries to
 `COSMOS_CHECKS`. The unit tests in `scripts/__tests__/cosmosCheck.test.ts` run under `npm run test:scripts`, which is
 now part of `npm test`.
+
+## Phase 1 — Move the data into the server (2026-10-02)
+
+### What `getCosmosData()` holds
+
+- `server/src/cosmos/index.ts` returns one lazily built, deeply frozen `CosmosData` object:
+  `brand`, `domains`, `services`, `topics`, `scenarios`, `steps`, `incidents`,
+  `owners { teams, fallback, serviceOverrides }`, `drift { runTimeUtc, entries }` and
+  `health { asOf, services, onCallByTeam }`. Keys are camelCase and grouped the way the Phase 4 response groups them.
+- **Facts only.** Presentation metadata stays on the client for now: `DRIFT_KIND_META`, `HEALTH_STATUS_META`
+  (color tokens, glyphs, blurbs) and `INCIDENT_COMET_HEX`. They describe how the UI draws a value, not the system.
+  If a later phase needs them on the server, it adds them then.
+- Lookup tables and derived values are not copied: `*_BY_ID`, `PLAYABLE_BY_ID`, `ALL_STEPS`, `INCIDENT_STEPS`,
+  `LATEST_DRIFT_*`, `KIND_SEVERITY`, `HEALTH_BY_SERVICE`, `HEALTH_STATUS_COUNTS` and every helper belong to Phase 3.
+  `steps/core.ts` is not copied.
+- The incident list keeps the client's newest-first `sort` so the order matches the baseline.
+- `color` is unchanged. The brand file's "`npm run fresh` rewrites this file" note was dropped from the server copy,
+  because `fresh` only writes the client copy.
+
+### Types and schemas
+
+- `apiTypes.ts` has no imports and no runtime code (I3). `types.ts` re-exports it with `export type *` and adds the
+  server-only `CosmosValidationIssue`.
+- `Service.team` and `DriftEntry.team` use a named `TeamId` union instead of the client's
+  `NonNullable<Service['team']>`. The values are the same.
+- `schema.ts` uses `z.strictObject`, so an unknown field fails the parse. Every schema ends in
+  `satisfies z.ZodType<T>`. Limitation: `satisfies` catches a schema field that the type lacks or types differently,
+  but not an **optional** type field the schema omits. Phase 5's `CosmosResponseSchema` has the same gap.
+- `zod` was already a server dependency (`^4.6.5`). No package change.
+
+### `validateCosmos()`
+
+Returns `{ errors, warnings }`, each issue with a named `code`. Ported from `drift-sync/scripts/validate.ts`:
+`unknown-phase`, `unknown-step-from`, `unknown-step-to`, `unknown-step-through`, `kafka-step-missing-via`,
+`unknown-step-via`, and the `service-no-owner` warning. Added: `duplicate-node-id`, `duplicate-playable-id`,
+`duplicate-phase-id` (scenarios and incidents together), `incident-step-phase-mismatch`, `capsules-too-close`,
+`out-of-world`, `unknown-scenario-domain`, `unknown-team`, `unknown-drift-node`, `unknown-health-service`.
+Incident steps run through the same step checks, with `incidentId` in the context.
+
+- **Capsules means services only.** Topic nodes are not capsules: `shipping` and `inventory.back-in-stock` are 148px
+  apart today. Checking topics would fail on unchanged data.
+- **Reference rules kept from the old validator:** `from`/`to` resolve to a service, sub-service or topic; `through`
+  to a service or sub-service; `via` to a topic.
+- **Not ported:**
+  - Snapshot freshness. It compares a file on disk, and the snapshot goes away in Phase 11.
+  - The source-repo greps. They need cloned repos and stay in `drift-sync`.
+  - Service `hex` against its `color` token. That needs `client/src/styles/tokens.css`, which the server may not
+    read. Phase 2 (`palette`) replaces it.
+
+### Parity
+
+- `server/src/__tests__/cosmosParity.test.ts` and its twin `client/src/__tests__/cosmosParity.test.ts` deep-equal
+  (JSON round trip, `toStrictEqual`) the raw-data keys of `baseline-full.json`: `BRAND`, `DOMAINS`, `SERVICES`,
+  `TOPICS`, `SCENARIOS`, `STEPS`, `INCIDENTS`, `TEAM_OWNERS`, `FALLBACK_OWNER`, `DRIFT_ENTRIES`, `SERVICE_HEALTH`,
+  `HEALTH_AS_OF`. `STEPS_BY_SCENARIO` and `LATEST_DRIFT_*` are derived values, so their parity is checked in Phase 3.
+  `SERVICE_OVERRIDES`, `ON_CALL_BY_TEAM` and `DRIFT_RUN_TIME_UTC` are not in the Phase 0 fixture, so the parity tests
+  cannot check them. They were copied by hand.
+
+### A3 check scope
+
+The `phase 1` check greps `server/src`, not all of `server/`. `server/scripts/snapshot-map.ts` still imports the
+client copy to write `cosmos-map.json`. It is existing tooling that Phase 11 deletes, so changing it now would only
+add risk.

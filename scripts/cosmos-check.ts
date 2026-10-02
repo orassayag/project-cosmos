@@ -55,6 +55,25 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     type: 'files-exist',
     paths: ['docs/plans/server-owned-data-decisions.md'],
   },
+  {
+    name: 'server cosmos module exists',
+    phase: 1,
+    type: 'files-exist',
+    paths: [
+      'server/src/cosmos/apiTypes.ts',
+      'server/src/cosmos/schema.ts',
+      'server/src/cosmos/validate.ts',
+      'server/src/cosmos/index.ts',
+    ],
+  },
+  {
+    // server/scripts/snapshot-map.ts still reads the client copy; Phase 11 deletes it.
+    name: 'nothing under server/src imports client/ or drift-sync/',
+    phase: 1,
+    type: 'grep-absent',
+    pattern: `['"](\\.\\./)+(client|drift-sync)/`,
+    pathspecs: ['server/src'],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

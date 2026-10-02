@@ -10,7 +10,7 @@ Generated: 2026-10-02
 
 ## Stages
 - Stage 1: COMMITTED — P0: baseline gates, Drift Sync pause, decisions log, dump-baseline fixtures, parity:screens + baseline screenshots, cosmos:check runner ⚠ large (~900 LOC + generated fixtures/PNGs)
-- Stage 2: PLANNED — P1: server/src/cosmos data copy, apiTypes/types, Zod schema, validateCosmos(), schema/validate/parity tests ⚠ large (~2,600 LOC, mostly copied data)
+- Stage 2: COMMITTED — P1: server/src/cosmos data copy, apiTypes/types, Zod schema, validateCosmos(), schema/validate/parity tests ⚠ large (~2,600 LOC, mostly copied data)
 - Stage 3: PLANNED — P2: palette, groupServiceId, clusters/nebula, ecosystem/role fields + component refactors, fixture regen, equivalence + clusters tests ⚠ large (~900 LOC)
 - Stage 4: PLANNED — P3: derive/* modules (graph, blastRadius, ownership, health, topicGroups, drift, playable) + getCosmosView() + derived parity ⚠ large (~900 LOC)
 - Stage 5: PLANNED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
