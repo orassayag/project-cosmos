@@ -362,3 +362,82 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
   counts, `LATEST_DRIFT_*`, `STEPS_BY_SCENARIO` and incident steps. Against `baseline-cosmos-map.json`: per-service
   `calls`/`publishes`/`consumes`/`domains`/`ownerLabel` and per-topic `producers`/`consumers`.
 - No fixture was regenerated and no data value changed.
+
+## Phases 4 and 5 — The cosmos API route and the client API types (2026-10-02)
+
+### Response shape
+
+- `GET /api/cosmos` returns `{ version, data, derived }`, where `data` and `derived` are exactly `getCosmosView()`.
+  No data was invented to match the plan's key list:
+  - `data` has `palette` and `steps` beyond the plan's list (both added in Phases 1–2), and has `clusters`.
+    `data.demo` is **missing** — it arrives in Phase 9.
+  - `derived` has `serviceLinks`, `topicLinks`, `dependentsOf` and `driftLinks` beyond the plan's list (Phase 3).
+- `version` = first 16 hex chars of the sha256 of `JSON.stringify(view)`. The view and the serialized body are built
+  once per process (`getCosmosResponseBody()` in `view.ts`); `getCosmosVersion()` reads the same memo.
+- `CosmosResponse` (in `apiTypes.ts`) is `CosmosView & { version: string }`.
+
+### Size (I7)
+
+- Gzipped body: **35,290 bytes (~34.5 KB)**, measured with `zlib.gzipSync` on the exact body the route sends.
+  Under the 100 KB limit with room to spare, so `playable.stepsById` stays in the payload.
+- `cosmosRoute.test.ts` asserts the ≤100 KB budget, so a data change that crosses it fails `npm test`.
+
+### HTTP contract
+
+- `ETag: "<version>"` and `Cache-Control: public, max-age=60, s-maxage=31536000, stale-while-revalidate=86400` are
+  sent on both the 200 and the 304.
+- `If-None-Match` matching is a comma-separated list, ignores a `W/` prefix and accepts `*` (RFC 9110 weak comparison).
+  Hono's `etag` middleware was not used: it hashes the body per request, while the version is already known.
+- The route returns the pre-serialized string with `Content-Type: application/json; charset=UTF-8`.
+
+### AI isolation
+
+- Only `answerQuestion` (`./agent/askAnswer.js`) pulled LangChain, LangGraph, `ai` and the provider SDKs into
+  `app.ts`. It is now `await import()`ed inside `POST /ai/ask`, after cookie and body checks — so the import only
+  runs for a connected visitor with a valid question. A load failure there reaches `onError` (500 `INTERNAL_ERROR`).
+- `checkProviderKey`, `config`, `cookieCrypto` and the request schemas stay static: they use `fetch`, `node:crypto`,
+  Hono and Zod only.
+- `generated/cosmos-map.json` is still imported statically for the agent's snapshot (it is plain JSON, not the AI
+  stack). Phase 11 replaces it with the view.
+- `cosmosIsolation.test.ts` mocks `askAnswer`, `graph`, `classify`, `chatModelFactory`, `@langchain/*` and `ai` with
+  factories that throw, then imports `app.ts`; `GET /api/cosmos` still answers 200.
+
+### Build version (I6)
+
+- `server/scripts/print-cosmos-version.ts` runs at the end of the server workspace `build` script and prints
+  `COSMOS_VERSION=<version>`. Local build at this stage: `COSMOS_VERSION=8dd1bb04e4445ec8`.
+- Verified locally that a data change changes the version: temporarily editing `brand.helpTitle` printed
+  `03999d8489c264ac`; reverting restored `8dd1bb04e4445ec8`.
+- **Not verified:** that Vercel Services runs the server workspace's `build` script (and so prints the line) in a
+  deployment build. Check the first preview build log.
+
+### Not done here (no deploy from this stage)
+
+- Preview checks — second request `x-vercel-cache: HIT`, and a second preview from a data change serving the new
+  `version` — need a Vercel deploy. They are left as manual checks for the owner.
+- Cold-start timing after the lazy import was not measured (needs a preview).
+
+### Client types (Phase 5)
+
+- `server/scripts/emit-client-types.ts` (root `npm run types:emit`, run with `tsx`) rejects any line that starts with
+  `import` or `export … from`, then writes the header + the source byte for byte to `client/src/api/cosmos-api.ts`.
+  A comment that mentions "imports" is allowed (only line starts are checked).
+- CI (`validate-on-pr.yml`) runs `npm run types:emit` then `git diff --exit-code client/src/api/cosmos-api.ts`, right
+  after lint. `emitClientTypes.test.ts` also checks that the committed copy equals a fresh emit, so a stale copy
+  fails `npm test` locally too. The `git diff` check only bites once `cosmos-api.ts` is tracked (it is new in this
+  change set).
+- `CosmosResponseSchema satisfies z.ZodType<CosmosResponse>` in `schema.ts`, with a strict schema for every
+  derived type. Same known gap as Phase 1: an optional type field that the schema omits is not a compile error.
+- One `apiTypes.ts` comment named `realtime-hub` as an example. The copy lands in `client/src/`, where the Phase 2
+  grep forbids AstroMart names, so the comment now describes the role instead.
+- **Client runtime guard deferred to Phase 7.** The client has no fetch layer yet, and this stage must not wire the
+  client to fetch. Phase 7 adds the guard (`version` is a string; every top-level `data`/`derived` key exists) inside
+  the fetch layer it creates. `cosmos-api.ts` is type-checked by the client build but imported by nothing yet, so
+  the map is unchanged.
+
+### Checks
+
+- `cosmos:check` phase 4: route tests and version script exist; `/cosmos` route registered; no static import of
+  the agent, LangChain or provider SDKs in `app.ts`; server build calls `print-cosmos-version`.
+- `cosmos:check` phase 5: emitter, its test and the client copy exist; `apiTypes.ts` imports nothing; the
+  `satisfies` line exists; the CI diff step exists.

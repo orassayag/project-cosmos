@@ -99,6 +99,7 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 | `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
 | `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
+| `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
 | `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
 | `npm run baseline:dump` | Writes the frozen data + derived-values baseline to `server/src/__tests__/fixtures/` |
 | `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
@@ -184,6 +185,7 @@ The server (`server/`) is a [Hono](https://hono.dev) app served under `/api`:
 
 | Route | What it does |
 |---|---|
+| `GET /api/cosmos` | The whole map as one JSON — `{ version, data, derived }` — with `ETag: "<version>"` (304 on a matching `If-None-Match`) and a CDN cache that lasts until the next deploy. Does not load the AI stack |
 | `POST /api/ai/connect` | Validates `{ provider, apiKey, gatewayApiKey? }`, checks the key with the provider, sets the encrypted cookie |
 | `POST /api/ai/disconnect` | Clears the cookie (works even when AI is not configured) |
 | `GET /api/ai/status` | `{ connected, provider }`; clears a revoked key |
@@ -370,7 +372,7 @@ The old GitHub Pages address now serves only a redirect page (`pages-redirect/`)
 ## Testing and CI
 
 - **Vitest** in both workspaces (`npm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
-- **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, build, the drift-sync type-check, `npm test`, and `npm run validate` on every PR and push to `main`.
+- **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`npm run types:emit` + `git diff`), build, the drift-sync type-check, `npm test`, and `npm run validate` on every PR and push to `main`.
 
 ## Versioning
 

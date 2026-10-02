@@ -119,6 +119,69 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pattern: 'derived values parity with baseline-full\\.json',
     pathspecs: ['server/src/__tests__/cosmosParity.test.ts'],
   },
+  {
+    name: 'cosmos route, its tests and the build version print exist',
+    phase: 4,
+    type: 'files-exist',
+    paths: [
+      'server/src/__tests__/cosmosRoute.test.ts',
+      'server/src/__tests__/cosmosIsolation.test.ts',
+      'server/scripts/print-cosmos-version.ts',
+    ],
+  },
+  {
+    name: 'GET /api/cosmos is registered',
+    phase: 4,
+    type: 'grep-present',
+    pattern: `app\\.get\\('/cosmos'`,
+    pathspecs: ['server/src/app.ts'],
+  },
+  {
+    // The AI stack loads lazily inside the /ai/* handlers, so a broken agent cannot take the map down.
+    name: 'app.ts has no static import of the agent, LangChain or provider SDKs',
+    phase: 4,
+    type: 'grep-absent',
+    pattern: `^import .* from ['"](\\./agent/|@langchain/|ai['"]|openai|@anthropic-ai/)`,
+    pathspecs: ['server/src/app.ts'],
+  },
+  {
+    name: 'server build prints COSMOS_VERSION',
+    phase: 4,
+    type: 'grep-present',
+    pattern: 'print-cosmos-version',
+    pathspecs: ['server/package.json'],
+  },
+  {
+    name: 'client API types are emitted from the server',
+    phase: 5,
+    type: 'files-exist',
+    paths: [
+      'server/scripts/emit-client-types.ts',
+      'server/scripts/__tests__/emitClientTypes.test.ts',
+      'client/src/api/cosmos-api.ts',
+    ],
+  },
+  {
+    name: 'apiTypes.ts imports nothing',
+    phase: 5,
+    type: 'grep-absent',
+    pattern: `^\\s*(import\\b|export\\b.*\\bfrom\\s*['"])`,
+    pathspecs: ['server/src/cosmos/apiTypes.ts'],
+  },
+  {
+    name: 'CosmosResponseSchema is checked against CosmosResponse',
+    phase: 5,
+    type: 'grep-present',
+    pattern: 'satisfies z\\.ZodType<CosmosResponse>',
+    pathspecs: ['server/src/cosmos/schema.ts'],
+  },
+  {
+    name: 'CI fails when the client copy of the API types is stale',
+    phase: 5,
+    type: 'grep-present',
+    pattern: 'git diff --exit-code client/src/api/cosmos-api\\.ts',
+    pathspecs: ['.github/workflows/validate-on-pr.yml'],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

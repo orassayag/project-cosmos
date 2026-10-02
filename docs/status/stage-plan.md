@@ -13,7 +13,7 @@ Generated: 2026-10-02
 - Stage 2: COMMITTED — P1: server/src/cosmos data copy, apiTypes/types, Zod schema, validateCosmos(), schema/validate/parity tests ⚠ large (~2,600 LOC, mostly copied data)
 - Stage 3: COMMITTED — P2: palette, groupServiceId, clusters/nebula, ecosystem/role fields + component refactors, fixture regen, equivalence + clusters tests ⚠ large (~900 LOC)
 - Stage 4: COMMITTED — P3: derive/* modules (graph, blastRadius, ownership, health, topicGroups, drift, playable) + getCosmosView() + derived parity ⚠ large (~900 LOC)
-- Stage 5: PLANNED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
+- Stage 5: COMMITTED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
 - Stage 6: PLANNED — P6: agents on getCosmosView(), digest additions, read tools, new map actions, unknown-action test, agent eval suite ⚠ large (~900 LOC)
 - Stage 7: PLANNED — P7: no-account dev loop, cosmosClient (retry-safe), CosmosProvider, loading gate + error/Retry, A1 Playwright E2E + CI job ⚠ large (~850 LOC)
 - Stage 8: PLANNED — P8: migrate every client feature to useCosmos(), renderWithCosmos fixture, Ask map-action handlers ⚠ large (~1,400 LOC)

@@ -2,7 +2,6 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { stream } from 'hono/streaming';
 import type { z } from 'zod';
-import { answerQuestion } from './agent/askAnswer.js';
 import { AI_NOT_CONFIGURED, getCookieSecret } from './config.js';
 import {
   AI_COOKIE_NAME,
@@ -11,6 +10,7 @@ import {
   encryptCookiePayload,
   type AiCookiePayload,
 } from './cookieCrypto.js';
+import { getCosmosResponseBody } from './cosmos/view.js';
 import cosmosMap from './generated/cosmos-map.json' with { type: 'json' };
 import { createLogger } from './logger.js';
 import { checkProviderKey } from './providerKeyCheck.js';
@@ -29,6 +29,31 @@ app.notFound((context) => context.json({ errorCode: 'NOT_FOUND' }, 404));
 app.onError((_error, context) => {
   logger.error('Unhandled error in API route', { errorCode: 'INTERNAL_ERROR' });
   return context.json({ errorCode: 'INTERNAL_ERROR' }, 500);
+});
+
+// Browsers revalidate after a minute; the CDN keeps a copy until the next deploy, which is the only way the data changes.
+const COSMOS_CACHE_CONTROL = 'public, max-age=60, s-maxage=31536000, stale-while-revalidate=86400';
+
+function matchesEtag(ifNoneMatch: string | undefined, etag: string): boolean {
+  if (!ifNoneMatch) {
+    return false;
+  }
+  return ifNoneMatch.split(',').some((candidate) => {
+    const tag = candidate.trim();
+    return tag === '*' || tag.replace(/^W\//, '') === etag;
+  });
+}
+
+app.get('/cosmos', (context) => {
+  const { version, json } = getCosmosResponseBody();
+  const etag = `"${version}"`;
+  context.header('ETag', etag);
+  context.header('Cache-Control', COSMOS_CACHE_CONTROL);
+  if (matchesEtag(context.req.header('If-None-Match'), etag)) {
+    return context.body(null, 304);
+  }
+  context.header('Content-Type', 'application/json; charset=UTF-8');
+  return context.body(json);
 });
 
 function clearAiCookie(context: Context): void {
@@ -156,6 +181,8 @@ app.post('/ai/ask', async (context) => {
     return validated.response;
   }
   const { question } = validated.data;
+  // Lazy, so LangChain and the provider SDKs never load for (or can break) the map's own routes.
+  const { answerQuestion } = await import('./agent/askAnswer.js');
 
   context.header('Content-Type', 'application/x-ndjson');
   context.header('Cache-Control', 'no-store');

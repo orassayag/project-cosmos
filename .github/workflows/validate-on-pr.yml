@@ -38,6 +38,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Client API types match the server (types:emit)
+        run: |
+          npm run types:emit
+          git diff --exit-code client/src/api/cosmos-api.ts
+
       - name: Build (typecheck + vite)
         run: npm run build
 

@@ -1,28 +1,44 @@
 import { z } from 'zod';
 import type {
+  BlastNode,
+  BlastResult,
   Brand,
   Cluster,
   CosmosData,
+  CosmosDerived,
   CosmosDrift,
   CosmosHealth,
+  CosmosHealthStatus,
   CosmosOwners,
+  CosmosOwnership,
+  CosmosPlayable,
+  CosmosResponse,
   Domain,
   DriftEntry,
+  DriftLinks,
   Incident,
   IncidentRef,
+  LatestDrift,
+  LogicalEdge,
   OnCall,
   PaletteKey,
   Protocol,
+  ResolvedHealth,
+  ResolvedOwner,
   Scenario,
   Service,
   ServiceEcosystem,
   ServiceHealthInput,
+  ServiceLinks,
   Step,
   SubService,
   Tech,
+  TeamGroup,
   TeamId,
   TeamOwner,
   Topic,
+  TopicGroup,
+  TopicLinks,
 } from './types.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -165,10 +181,12 @@ export const TeamOwnerSchema = z.strictObject({
   slack: z.string().optional(),
 }) satisfies z.ZodType<TeamOwner>;
 
+const DriftKindSchema = z.enum(['added', 'changed', 'risk', 'removed']);
+
 export const DriftEntrySchema = z.strictObject({
   id: z.string().min(1),
   date: z.string().regex(ISO_DATE),
-  kind: z.enum(['added', 'changed', 'risk', 'removed']),
+  kind: DriftKindSchema,
   title: z.string(),
   detail: z.string(),
   team: TeamIdSchema.optional(),
@@ -232,3 +250,120 @@ export const CosmosDataSchema = z.strictObject({
   drift: CosmosDriftSchema,
   health: CosmosHealthSchema,
 }) satisfies z.ZodType<CosmosData>;
+
+const idList = z.array(z.string().min(1));
+
+export const LogicalEdgeSchema = z.strictObject({
+  key: z.string().min(1),
+  type: ProtocolSchema,
+  from: z.string().min(1),
+  to: z.string().min(1),
+}) satisfies z.ZodType<LogicalEdge>;
+
+export const ServiceLinksSchema = z.strictObject({
+  calls: idList,
+  publishes: idList,
+  consumes: idList,
+  domains: idList,
+}) satisfies z.ZodType<ServiceLinks>;
+
+export const TopicLinksSchema = z.strictObject({ producers: idList, consumers: idList }) satisfies z.ZodType<TopicLinks>;
+
+export const BlastNodeSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string(),
+  level: z.enum(['high', 'med', 'low']),
+  hops: z.number().int().positive(),
+}) satisfies z.ZodType<BlastNode>;
+
+export const BlastResultSchema = z.strictObject({
+  sourceId: z.string().min(1),
+  levels: z.record(z.string(), z.enum(['source', 'high', 'med', 'low'])),
+  dependents: z.array(BlastNodeSchema),
+}) satisfies z.ZodType<BlastResult>;
+
+export const ResolvedOwnerSchema = z.strictObject({
+  teamId: TeamIdSchema.optional(),
+  label: z.string(),
+  color: z.string(),
+  hex: z.string().regex(HEX_COLOR),
+  reviewers: z.array(z.string()),
+  githubTeam: z.string().optional(),
+  slack: z.string().optional(),
+  source: z.enum(['override', 'team', 'fallback']),
+}) satisfies z.ZodType<ResolvedOwner>;
+
+export const TeamGroupSchema = z.strictObject({
+  teamId: TeamIdSchema.nullable(),
+  label: z.string(),
+  color: z.string(),
+  hex: z.string().regex(HEX_COLOR),
+  githubTeam: z.string().optional(),
+  slack: z.string().optional(),
+  serviceIds: idList,
+}) satisfies z.ZodType<TeamGroup>;
+
+export const CosmosOwnershipSchema = z.strictObject({
+  byService: z.record(z.string(), ResolvedOwnerSchema),
+  teamGroups: z.array(TeamGroupSchema),
+}) satisfies z.ZodType<CosmosOwnership>;
+
+export const TopicGroupSchema = z.strictObject({
+  id: z.string().min(1),
+  serviceId: z.string().min(1),
+  memberIds: idList,
+}) satisfies z.ZodType<TopicGroup>;
+
+const HealthStatusSchema = z.enum(['fresh', 'warm', 'hot']);
+
+export const ResolvedHealthSchema = z.strictObject({
+  ...ServiceHealthInputSchema.shape,
+  status: HealthStatusSchema,
+  ageDays: z.number(),
+  onCall: OnCallSchema.nullable(),
+  team: TeamIdSchema.nullable(),
+  teamLabel: z.string(),
+}) satisfies z.ZodType<ResolvedHealth>;
+
+export const CosmosHealthStatusSchema = z.strictObject({
+  byService: z.record(z.string(), ResolvedHealthSchema),
+  counts: z.record(HealthStatusSchema, z.number().int().nonnegative()),
+}) satisfies z.ZodType<CosmosHealthStatus>;
+
+export const LatestDriftSchema = z.strictObject({
+  date: z.string().regex(ISO_DATE).nullable(),
+  entries: z.array(DriftEntrySchema),
+  byNode: z.record(z.string(), DriftKindSchema),
+}) satisfies z.ZodType<LatestDrift>;
+
+export const DriftLinksSchema = z.strictObject({
+  prUrl: z.url().nullable(),
+  commitUrl: z.url().nullable(),
+}) satisfies z.ZodType<DriftLinks>;
+
+export const CosmosPlayableSchema = z.strictObject({
+  items: z.array(z.union([IncidentSchema, ScenarioSchema])),
+  stepsById: z.record(z.string(), z.array(StepSchema)),
+}) satisfies z.ZodType<CosmosPlayable>;
+
+export const CosmosDerivedSchema = z.strictObject({
+  edges: z.array(LogicalEdgeSchema),
+  connectedNodeIds: idList,
+  serviceLinks: z.record(z.string(), ServiceLinksSchema),
+  topicLinks: z.record(z.string(), TopicLinksSchema),
+  dependentsOf: z.record(z.string(), idList),
+  blastRadius: z.record(z.string(), BlastResultSchema),
+  ownership: CosmosOwnershipSchema,
+  topicGroups: z.array(TopicGroupSchema),
+  healthStatus: CosmosHealthStatusSchema,
+  latestDrift: LatestDriftSchema,
+  driftSearchText: z.record(z.string(), z.string()),
+  driftLinks: z.record(z.string(), DriftLinksSchema),
+  playable: CosmosPlayableSchema,
+}) satisfies z.ZodType<CosmosDerived>;
+
+export const CosmosResponseSchema = z.strictObject({
+  version: z.string().regex(/^[0-9a-f]{16}$/),
+  data: CosmosDataSchema,
+  derived: CosmosDerivedSchema,
+}) satisfies z.ZodType<CosmosResponse>;
