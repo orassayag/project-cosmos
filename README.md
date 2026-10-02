@@ -97,9 +97,12 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 | `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
 | `npm run typecheck` | Type-checks every workspace, no emit |
 | `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
-| `npm test` | Vitest in the client and server workspaces |
+| `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
 | `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
 | `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
+| `npm run baseline:dump` | Writes the frozen data + derived-values baseline to `server/src/__tests__/fixtures/` |
+| `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
+| `npm run cosmos:check -- --phase N` | Runs the migration checks for phase `N` |
 | `npm run fresh` | Replaces AstroMart with a minimal 2-star starter cosmos |
 | `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
 | `npm run sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
