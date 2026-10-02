@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import cosmosMap from '../generated/cosmos-map.json' with { type: 'json' };
+import { getMapSnapshot } from '../agent/mapSnapshot.js';
+
+const cosmosMap = getMapSnapshot();
 
 function findDuplicates(ids: string[]): string[] {
   return ids.filter((id, index) => ids.indexOf(id) !== index);

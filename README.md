@@ -171,12 +171,17 @@ question → JEV triage (site's or visitor's AI Gateway key; free keyword fallba
    ├─ "play X" with a confident target → plays the scenario directly, 0 tokens
    └─ everything else                  → LangGraph agent on the visitor's Claude / OpenAI key
                                            ├─ streams the answer (NDJSON)
+                                           ├─ read tools  → get_service, get_steps (payloads), blast_radius,
+                                           │                who_owns, on_call, drift (changelog)
                                            ├─ highlight_services → lights up every service it names
-                                           └─ play_scenario      → starts the matching flow
+                                           ├─ play_scenario      → starts the matching flow
+                                           └─ show_blast_radius, open_passport, show_health, show_ownership,
+                                              open_changelog_entry → map actions (the Ask panel ignores
+                                              these until it learns to run them)
 ```
 
 - **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the visitor's model.
-- **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map snapshot (services, topics, scenarios, steps, teams) as its only knowledge. Its two tools accept only ids that exist in the snapshot, so it can never point at an invented service. Answers are capped at ~150 words.
+- **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map (services, topics, scenarios, steps, teams, one health/on-call line per service, the latest drift run) plus read tools for the rest — payloads, blast radius, ownership, on-call and drift history. Relative times ("past 24 hours") are measured from the data's `asOf` date, not the real clock. Its map-action tools accept only ids that exist on the map, so it can never point at an invented service. Answers are capped at ~150 words.
 - **Errors are explained, not dumped**: out of credit, rate-limited, invalid key, or a general provider problem — never echoing any part of the key.
 
 ### Server API
@@ -191,7 +196,7 @@ The server (`server/`) is a [Hono](https://hono.dev) app served under `/api`:
 | `GET /api/ai/status` | `{ connected, provider }`; clears a revoked key |
 | `POST /api/ai/ask` | Streams `token` / `action` / `usage` / `error` / `done` events as NDJSON |
 
-The agent reads the map from `server/src/generated/cosmos-map.json`, a committed snapshot of the client's map data — run `npm run snapshot` after any data edit; `npm run validate` fails if it is stale.
+The agent reads the same view `GET /api/cosmos` serves (`getCosmosView()`), so its answers and the map can't disagree.
 
 ## Demo tours
 
@@ -277,7 +282,7 @@ An incident is just a scenario frozen in time. Recordings live in `client/src/in
 2. **Copy the relevant steps** and replace the example payloads with the real ones from the logs — redact card/customer/token fields (`"[redacted]"`).
 3. **Add the title, date, and a one- or two-sentence note** describing what went wrong.
 4. **Give it a globally-unique `phaseId`** (incidents use `101+` so they never collide with scenarios) and set every step's `phase` to that same id.
-5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it; `npm run snapshot` makes it known to the AI agent.
+5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it. The AI agent reads the server's copy of the data, so add the same file under `server/src/cosmos/data/incidents/` and register it in `server/src/cosmos/index.ts`.
 
 Every step's `from` / `to` / `via` / `through` must match an existing `SERVICES[].id` or `TOPICS[].id` — incidents reuse the same map you already drew.
 

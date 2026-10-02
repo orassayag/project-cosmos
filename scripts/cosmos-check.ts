@@ -182,6 +182,19 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pattern: 'git diff --exit-code client/src/api/cosmos-api\\.ts',
     pathspecs: ['.github/workflows/validate-on-pr.yml'],
   },
+  {
+    name: 'server reads the view, not cosmos-map.json (parity test excepted)',
+    phase: 6,
+    type: 'grep-absent',
+    pattern: 'generated/cosmos-map\\.json',
+    pathspecs: ['server/src', ':(exclude)server/src/__tests__/cosmosParity.test.ts'],
+  },
+  {
+    name: 'agent eval suite and unknown-action guard exist',
+    phase: 6,
+    type: 'files-exist',
+    paths: ['server/src/__tests__/agentEval.test.ts', 'client/src/__tests__/askUnknownAction.test.ts'],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

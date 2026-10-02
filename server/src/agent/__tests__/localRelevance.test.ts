@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
+import { getMapSnapshot } from '../mapSnapshot.js';
 import { localRelevance } from '../localRelevance.js';
+
+const cosmosMap = getMapSnapshot();
 
 describe('localRelevance', () => {
   it.each([

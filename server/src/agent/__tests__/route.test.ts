@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
+import { getMapSnapshot } from '../mapSnapshot.js';
 import { OFF_TOPIC_ANSWERS } from '../offTopicAnswers.js';
 import { decideRoute, type Classification, type RouteDecision } from '../route.js';
+
+const cosmosMap = getMapSnapshot();
 
 const PLACE_ORDER_ID = 'shopping.place-order';
 const PLACE_ORDER_TITLE = 'Place an order';

@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
+import { getCosmosView } from '../../cosmos/view.js';
 import { buildMapDigest, getMapDigest } from '../context.js';
+import { getMapSnapshot } from '../mapSnapshot.js';
 import { buildSystemPrompt, SYSTEM_PROMPT_INSTRUCTIONS } from '../systemPrompt.js';
 
 function digestLineStartingWith(digest: string, prefix: string): string | undefined {
   return digest.split('\n').find((line) => line.startsWith(prefix));
 }
 
+const view = getCosmosView();
+const cosmosMap = getMapSnapshot(view);
+// cosmos-map.json digest before Phase 6: 7,584 chars (1,942 cl100k tokens). The plan allows at most 50% growth.
+const DIGEST_CHAR_BUDGET = 11_376;
+
 describe('buildMapDigest', () => {
-  const digest = buildMapDigest(cosmosMap);
+  const digest = buildMapDigest(view);
 
   it('lists every service id from the snapshot', () => {
     const missing = cosmosMap.services.filter((service) => !digestLineStartingWith(digest, `- ${service.id}`));
@@ -41,9 +47,32 @@ describe('buildMapDigest', () => {
     expect(digestLineStartingWith(digest, '  cause: ')).toBeDefined();
   });
 
-  it('caches the digest per snapshot object', () => {
-    expect(getMapDigest(cosmosMap)).toBe(getMapDigest(cosmosMap));
-    expect(getMapDigest(cosmosMap)).toBe(digest);
+  it('starts with the as-of date and adds one health/on-call line per service with health data', () => {
+    expect(digest.startsWith(`As of: ${view.derived.asOf}\n`)).toBe(true);
+    const healthLines = digest.split('\n').filter((line) => line.startsWith('  health: '));
+    expect(healthLines).toHaveLength(Object.keys(view.derived.healthStatus.byService).length);
+    const { onCall } = view.derived.healthStatus.byService.payments;
+    expect(digest).toContain(`on call: ${onCall?.handle} until ${onCall?.until}`);
+  });
+
+  it('summarizes the latest drift run, one line per entry', () => {
+    const { date, entries } = view.derived.latestDrift;
+    expect(digest).toContain(`## Latest drift run (${date}, ${entries.length} changes`);
+    for (const entry of entries) {
+      expect(digestLineStartingWith(digest, `- ${entry.id} [${entry.kind}]`), entry.id).toBeDefined();
+    }
+  });
+
+  it('stays within the token budget and leaves payloads to the read tools', () => {
+    expect(digest.length).toBeLessThanOrEqual(DIGEST_CHAR_BUDGET);
+    const payloads = view.data.steps.flatMap((step) => (step.payload ? [step.payload] : []));
+    expect(payloads.length).toBeGreaterThan(0);
+    expect(payloads.filter((payload) => digest.includes(payload))).toEqual([]);
+  });
+
+  it('caches the digest per view object', () => {
+    expect(getMapDigest(view)).toBe(getMapDigest(view));
+    expect(getMapDigest(view)).toBe(digest);
   });
 });
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { buildMapSnapshot } from '../agent/mapSnapshot.js';
 import { getCosmosData } from '../cosmos/index.js';
 import { getCosmosView } from '../cosmos/view.js';
 
@@ -145,4 +146,10 @@ describe('server derived links parity with baseline-cosmos-map.json', () => {
       expect(toJson(derived.topicLinks[topicId])).toStrictEqual({ producers, consumers });
     },
   );
+});
+
+describe('agent snapshot parity with baseline-cosmos-map.json', () => {
+  it('the snapshot the agent builds from the view equals the legacy cosmos-map.json', () => {
+    expect(toJson(buildMapSnapshot(getCosmosView()))).toStrictEqual(baselineCosmosMap);
+  });
 });

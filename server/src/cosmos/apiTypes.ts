@@ -360,6 +360,8 @@ export interface CosmosPlayable {
 }
 
 export interface CosmosDerived {
+  /** ISO date the data describes: the later of `health.asOf` and the latest drift run. Relative times count from it. */
+  asOf: string;
   edges: LogicalEdge[];
   connectedNodeIds: string[];
   serviceLinks: Record<string, ServiceLinks>;

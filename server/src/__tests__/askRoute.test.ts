@@ -4,15 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { createChatModel } from '../agent/chatModelFactory.js';
 import { classifyQuestion } from '../agent/classify.js';
 import { streamAgentAnswer, type AgentStreamEvent } from '../agent/graph.js';
+import { getMapSnapshot } from '../agent/mapSnapshot.js';
 import { ProviderError } from '../agent/providerErrors.js';
 import app from '../app.js';
 import { encryptCookiePayload } from '../cookieCrypto.js';
-import cosmosMap from '../generated/cosmos-map.json' with { type: 'json' };
+import { getCosmosView } from '../cosmos/view.js';
 
 vi.mock('../agent/classify.js', () => ({ classifyQuestion: vi.fn() }));
 vi.mock('../agent/chatModelFactory.js', () => ({ createChatModel: vi.fn() }));
 vi.mock('../agent/graph.js', () => ({ streamAgentAnswer: vi.fn() }));
 
+const cosmosMap = getMapSnapshot();
 const API_KEY = 'sk-ant-secret-test-key';
 const FAKE_MODEL = { fake: 'model' } as unknown as BaseChatModel;
 const classifyQuestionMock = vi.mocked(classifyQuestion);
@@ -154,7 +156,7 @@ describe('POST /api/ai/ask', () => {
     expect(events).toEqual([...relayed, { type: 'done' }]);
     expect(createChatModelMock).toHaveBeenCalledWith({ provider: 'anthropic', apiKey: API_KEY });
     expect(streamAgentAnswerMock).toHaveBeenCalledWith(
-      expect.objectContaining({ model: FAKE_MODEL, question: 'How does checkout work?', snapshot: cosmosMap }),
+      expect.objectContaining({ model: FAKE_MODEL, question: 'How does checkout work?', view: getCosmosView() }),
     );
   });
 

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
+import { getMapSnapshot } from '../mapSnapshot.js';
 import { decideRoute } from '../route.js';
+
+const cosmosMap = getMapSnapshot();
 
 vi.mock('ai', () => ({
   experimental_evaluate: vi.fn(),

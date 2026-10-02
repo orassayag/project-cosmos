@@ -1,5 +1,6 @@
+import type { CosmosView, DriftEntry, ResolvedHealth } from '../cosmos/types.js';
+import { getMapSnapshot } from './mapSnapshot.js';
 import type {
-  CosmosMapSnapshot,
   SnapshotIncident,
   SnapshotScenario,
   SnapshotService,
@@ -17,13 +18,23 @@ function toOneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-function formatService(service: SnapshotService, domainLabels: ReadonlyMap<string, string>): string {
+function formatHealth(health: ResolvedHealth): string {
+  const onCall = health.onCall ? `${health.onCall.handle} until ${health.onCall.until} (${health.onCall.slack})` : NONE;
+  return `  health: ${health.status}, last commit ${health.lastCommit}, ${health.openPrs} open PRs | on call: ${onCall}`;
+}
+
+function formatService(
+  service: SnapshotService,
+  domainLabels: ReadonlyMap<string, string>,
+  health: ResolvedHealth | undefined,
+): string {
   const name = service.name === service.id ? '' : ` "${service.name}"`;
   const domains = service.domains.map((domainId) => domainLabels.get(domainId) ?? domainId);
   return [
     `- ${service.id}${name}: ${toOneLine(service.role)}`,
     `  domains: ${listOrNone(domains)} | owner: ${service.ownerLabel} | tech: ${listOrNone(service.tech)}`,
     `  calls: ${listOrNone(service.calls)} | publishes: ${listOrNone(service.publishes)} | consumes: ${listOrNone(service.consumes)}`,
+    ...(health ? [formatHealth(health)] : []),
   ].join('\n');
 }
 
@@ -54,12 +65,22 @@ function formatIncident(incident: SnapshotIncident): string {
   ].join('\n');
 }
 
-/** Renders the whole map as compact text for the agent's system prompt. */
-export function buildMapDigest(snapshot: CosmosMapSnapshot): string {
+function formatDriftEntry(entry: DriftEntry): string {
+  return `- ${entry.id} [${entry.kind}] ${toOneLine(entry.title)} (${listOrNone(entry.nodeIds)})`;
+}
+
+/** Renders the whole map as compact text for the agent's system prompt. Payloads stay behind the read tools. */
+export function buildMapDigest(view: CosmosView): string {
+  const snapshot = getMapSnapshot(view);
+  const { asOf, healthStatus, latestDrift } = view.derived;
   const domainLabels = new Map(snapshot.domains.map((domain) => [domain.id, domain.label]));
   return [
+    `As of: ${asOf}`,
+    '',
     `## Services (${snapshot.services.length})`,
-    ...snapshot.services.map((service) => formatService(service, domainLabels)),
+    ...snapshot.services.map((service) =>
+      formatService(service, domainLabels, healthStatus.byService[service.id]),
+    ),
     '',
     `## Kafka topics (${snapshot.topics.length})`,
     ...snapshot.topics.map(formatTopic),
@@ -69,17 +90,20 @@ export function buildMapDigest(snapshot: CosmosMapSnapshot): string {
     '',
     `## Incidents (${snapshot.incidents.length})`,
     ...snapshot.incidents.map(formatIncident),
+    '',
+    `## Latest drift run (${latestDrift.date ?? NONE}, ${latestDrift.entries.length} changes; older runs via \`drift\`)`,
+    ...latestDrift.entries.map(formatDriftEntry),
   ].join('\n');
 }
 
-const digestCache = new WeakMap<CosmosMapSnapshot, string>();
+const digestCache = new WeakMap<CosmosView, string>();
 
-/** Same as `buildMapDigest`, built once per snapshot object — i.e. once per cold start for the committed map. */
-export function getMapDigest(snapshot: CosmosMapSnapshot): string {
-  let digest = digestCache.get(snapshot);
+/** Same as `buildMapDigest`, built once per view object — i.e. once per cold start. */
+export function getMapDigest(view: CosmosView): string {
+  let digest = digestCache.get(view);
   if (digest === undefined) {
-    digest = buildMapDigest(snapshot);
-    digestCache.set(snapshot, digest);
+    digest = buildMapDigest(view);
+    digestCache.set(view, digest);
   }
   return digest;
 }

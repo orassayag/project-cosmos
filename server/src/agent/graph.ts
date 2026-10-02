@@ -3,12 +3,13 @@ import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from '@langc
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph';
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt';
+import type { CosmosView } from '../cosmos/types.js';
 import { getMapDigest } from './context.js';
 import { createMapActionTools, isMapActionEvent, type MapActionEvent } from './mapActionTools.js';
 import { toProviderError } from './providerErrors.js';
 import type { AgentHints } from './route.js';
+import { createReadTools } from './readTools.js';
 import { buildSystemPrompt } from './systemPrompt.js';
-import type { CosmosMapSnapshot } from './types/cosmosMapSnapshot.js';
 
 export const AGENT_NODE = 'agent';
 export const TOOLS_NODE = 'tools';
@@ -21,7 +22,7 @@ export type AgentStreamEvent = TokenEvent | MapActionEvent | UsageEvent;
 
 export interface AgentGraphInput {
   model: BaseChatModel;
-  snapshot: CosmosMapSnapshot;
+  view: CosmosView;
   hints: AgentHints;
 }
 
@@ -30,13 +31,13 @@ export interface AgentAnswerInput extends AgentGraphInput {
   signal?: AbortSignal;
 }
 
-export function buildAgentGraph({ model, snapshot, hints }: AgentGraphInput) {
+export function buildAgentGraph({ model, view, hints }: AgentGraphInput) {
   if (!model.bindTools) {
     throw new TypeError('The chat model does not support tool calling');
   }
-  const tools = createMapActionTools(snapshot);
+  const tools = [...createMapActionTools(view), ...createReadTools(view)];
   const modelWithTools = model.bindTools(tools);
-  const systemMessage = new SystemMessage(buildSystemPrompt({ digest: getMapDigest(snapshot), hints }));
+  const systemMessage = new SystemMessage(buildSystemPrompt({ digest: getMapDigest(view), hints }));
 
   async function callModel(state: typeof MessagesAnnotation.State, config: RunnableConfig) {
     const response = await modelWithTools.invoke([systemMessage, ...state.messages], config);

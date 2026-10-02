@@ -441,3 +441,87 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
   the agent, LangChain or provider SDKs in `app.ts`; server build calls `print-cosmos-version`.
 - `cosmos:check` phase 5: emitter, its test and the client copy exist; `apiTypes.ts` imports nothing; the
   `satisfies` line exists; the CI diff step exists.
+
+## Phase 6 — Agents read the full model (2026-10-02)
+
+### Where the view enters the agent
+
+- No agent module imported `cosmos-map.json`; `app.ts` imported it and passed it down as `snapshot`. `app.ts` now
+  passes `view: getCosmosView()` to `answerQuestion`.
+- `classify.ts`, `localRelevance.ts` and `route.ts` still take a `CosmosMapSnapshot` and are **unchanged**. The
+  snapshot is now built from the view by `agent/mapSnapshot.ts` (`buildMapSnapshot(view)`, memoized per view by
+  `getMapSnapshot()`). It reproduces the legacy file field for field, and `cosmosParity.test.ts` asserts it deep-equals
+  `baseline-cosmos-map.json` — so triage, routing and the existing digest lines behave exactly as before.
+- `graph.ts`, `context.ts` and `mapActionTools.ts` take the view itself (they need health, drift, payloads, blast
+  radius). `askAnswer.ts` takes the view and derives the snapshot for triage.
+- `agent/types/cosmosMapSnapshot.ts` now lists every field of the snapshot (it listed only the read ones); this lets
+  the parity test compare the whole object.
+
+### Tests that imported the JSON
+
+- The acceptance grep ("no `cosmos-map.json` importer in `server/src/` except the parity test") covers tests too.
+  The classifier, relevance, route, context, graph, ask-route and `cosmosMap` tests swapped the import line for
+  `getMapSnapshot()`; their assertions are unchanged except where the plan changes behavior: the graph test now
+  expects 13 bound tools (7 map actions, then 6 read tools) and passes `view`; the ask-route test expects `view`;
+  the context test passes the view and gains checks for the new digest lines.
+- The cosmos:check phase 6 grep matches `generated/cosmos-map\.json` (an importer path), not the bare file name —
+  two comments still mention the legacy file and `cosmosParity.test.ts` reads the `baseline-cosmos-map.json` fixture.
+
+### asOf
+
+- Added as **`derived.asOf`**, not a new data fact: it is computed (the later of `health.asOf` and the latest drift
+  run date), so storing it in `data` would duplicate two facts. Today it is `2026-08-14`. No data value changed.
+- `apiTypes.ts`, the strict Zod schema and the emitted `client/src/api/cosmos-api.ts` include it. The `/api/cosmos`
+  payload grows by one field and its `version` changes.
+- The digest starts with `As of: <date>`; the system prompt says to treat that date as today and to measure relative
+  times from it. `buildSystemPrompt`'s signature is unchanged.
+
+### Digest size
+
+- Measured with `js-tiktoken` `cl100k_base` (a temporary test, since removed — `js-tiktoken` is only a transitive
+  dependency, so it is not used in the permanent suite):
+
+  | | chars | tokens |
+  |---|---|---|
+  | digest before (from `cosmos-map.json`) | 7,584 | 1,942 |
+  | digest after (from the view) | 9,321 | 2,607 (+34%) |
+  | full system prompt before → after | 8,037 → 10,225 | 2,038 → 2,826 |
+
+- Under the 50% limit, so nothing was trimmed. `context.test.ts` enforces a character budget of 1.5 × 7,584 = 11,376
+  as a dependency-free proxy for the token budget, and asserts no step payload appears in the digest.
+- Additions: the `As of` line; one `health:` line for each service that has a health row (11 of 12 — `object-storage` has no
+  row and gets none) with status, last commit, open PRs and on-call handle/until/Slack; a `Latest drift run` section
+  with one line per entry (id, kind, title, node ids).
+
+### Read tools
+
+- `agent/readTools.ts`: pure functions over the view (`getService`, `getSteps`, `getBlastRadius`, `whoOwns`,
+  `getOnCall`, `findDrift`) plus `createReadTools(view)` wrapping them as LangChain tools that return JSON text, or a
+  "no such id" sentence for an unknown id.
+- `blast_radius` returns `derived.blastRadius[nodeId]` as-is (the same result the `B` overlay uses).
+- `who_owns` on a topic resolves to the owners of its producing services (a topic has no team). Owner objects drop
+  `color`/`hex` (presentation).
+- `on_call` for a service with no health row falls back to its team's rotation; a service without a team answers
+  `onCall: null`.
+- `drift(query?, since?)` reuses `searchDrift` (one substring) and keeps entries whose run date is on or after
+  `since` (first 10 chars, so a datetime works too). Each entry carries its PR/commit links.
+
+### Map actions
+
+- New NDJSON action kinds: `showBlastRadius {nodeId}`, `openPassport {nodeId}`, `showHealth`, `showOwnership`,
+  `openChangelogEntry {entryId}`. Node ids are validated against services + topics, entry ids against drift entries;
+  unknown ids emit nothing, like `highlight_services`.
+- The client ignores them today: `parseAskStreamLine` returns `null` for any unrecognised action kind, so
+  `AskPanel` never calls `onAction`. `client/src/__tests__/askUnknownAction.test.ts` locks that in until Phase 8 adds
+  handlers. No client behavior changed.
+- `AGENT_RECURSION_LIMIT` stays 8 (three tool rounds); a read call followed by a map action fits in two.
+
+### Eval
+
+- `server/src/__tests__/agentEval.test.ts` drives the real graph with a scripted `FakeStreamingChatModel` subclass
+  (the pattern from `graph.test.ts`): the model makes the scripted tool calls, then records the tool results it gets
+  back. The four plan questions pass. "Fulfillment Galaxy" is matched with the query `fulfillment` (the team id in
+  each entry's search text) and `since` = asOf − 1 day = `2026-08-13`, which returns exactly the `shipping.dispatched`
+  and `giftWrap` entries.
+- The eval proves the tools return the right data for the right call; it does not prove a real model picks that
+  call. The plan's live check with a real key (four questions) remains a manual step.

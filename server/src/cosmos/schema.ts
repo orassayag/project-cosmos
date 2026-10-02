@@ -347,6 +347,7 @@ export const CosmosPlayableSchema = z.strictObject({
 }) satisfies z.ZodType<CosmosPlayable>;
 
 export const CosmosDerivedSchema = z.strictObject({
+  asOf: z.string().regex(ISO_DATE),
   edges: z.array(LogicalEdgeSchema),
   connectedNodeIds: idList,
   serviceLinks: z.record(z.string(), ServiceLinksSchema),

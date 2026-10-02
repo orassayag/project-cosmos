@@ -22,7 +22,9 @@ export function buildCosmosDerived(data: CosmosData): CosmosDerived {
   const connectedNodeIds = deriveConnectedNodeIds(data);
   const dependentsOf = deriveDependentsOf(data);
   const { serviceLinks, topicLinks } = deriveLinks(data);
+  const latestDrift = deriveLatestDrift(data.drift.entries);
   return {
+    asOf: latestDrift.date !== null && latestDrift.date > data.health.asOf ? latestDrift.date : data.health.asOf,
     edges: deriveLogicalEdges(data),
     connectedNodeIds,
     serviceLinks,
@@ -32,7 +34,7 @@ export function buildCosmosDerived(data: CosmosData): CosmosDerived {
     ownership: deriveOwnership(data),
     topicGroups: deriveTopicGroups(data, connectedNodeIds),
     healthStatus: deriveHealthStatus(data),
-    latestDrift: deriveLatestDrift(data.drift.entries),
+    latestDrift,
     driftSearchText: deriveDriftSearchText(data),
     driftLinks: deriveDriftLinks(data),
     playable: derivePlayable(data),

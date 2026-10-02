@@ -4,10 +4,30 @@ import { ChatGenerationChunk } from '@langchain/core/outputs';
 import type { StructuredTool } from '@langchain/core/tools';
 import { FakeStreamingChatModel, type ToolSpec } from '@langchain/core/utils/testing';
 import { describe, expect, it } from 'vitest';
-import cosmosMap from '../../generated/cosmos-map.json' with { type: 'json' };
+import { getCosmosView } from '../../cosmos/view.js';
 import { streamAgentAnswer, type AgentStreamEvent } from '../graph.js';
-import { HIGHLIGHT_SERVICES_TOOL_NAME, PLAY_SCENARIO_TOOL_NAME } from '../mapActionTools.js';
+import {
+  HIGHLIGHT_SERVICES_TOOL_NAME,
+  OPEN_CHANGELOG_ENTRY_TOOL_NAME,
+  OPEN_PASSPORT_TOOL_NAME,
+  PLAY_SCENARIO_TOOL_NAME,
+  SHOW_BLAST_RADIUS_TOOL_NAME,
+  SHOW_HEALTH_TOOL_NAME,
+  SHOW_OWNERSHIP_TOOL_NAME,
+} from '../mapActionTools.js';
+import { getMapSnapshot } from '../mapSnapshot.js';
 import { ProviderError } from '../providerErrors.js';
+import {
+  BLAST_RADIUS_TOOL_NAME,
+  DRIFT_TOOL_NAME,
+  GET_SERVICE_TOOL_NAME,
+  GET_STEPS_TOOL_NAME,
+  ON_CALL_TOOL_NAME,
+  WHO_OWNS_TOOL_NAME,
+} from '../readTools.js';
+
+const view = getCosmosView();
+const cosmosMap = getMapSnapshot(view);
 
 const KNOWN_SCENARIO_ID = cosmosMap.scenarios[0].id;
 const KNOWN_INCIDENT_ID = cosmosMap.incidents[0].id;
@@ -59,7 +79,7 @@ class ScriptedToolCallingModel extends FakeStreamingChatModel {
 
 async function collectEvents(model: ScriptedToolCallingModel): Promise<AgentStreamEvent[]> {
   const events: AgentStreamEvent[] = [];
-  for await (const event of streamAgentAnswer({ model, snapshot: cosmosMap, hints: NO_HINTS, question: 'show me' })) {
+  for await (const event of streamAgentAnswer({ model, view, hints: NO_HINTS, question: 'show me' })) {
     events.push(event);
   }
   return events;
@@ -70,12 +90,26 @@ function actionEvents(events: AgentStreamEvent[]) {
 }
 
 describe('streamAgentAnswer', () => {
-  it('binds exactly the two map-action tools', async () => {
+  it('binds the map-action tools, then the read tools', async () => {
     const model = new ScriptedToolCallingModel(null);
 
     await collectEvents(model);
 
-    expect(model.boundToolNames).toEqual([HIGHLIGHT_SERVICES_TOOL_NAME, PLAY_SCENARIO_TOOL_NAME]);
+    expect(model.boundToolNames).toEqual([
+      HIGHLIGHT_SERVICES_TOOL_NAME,
+      PLAY_SCENARIO_TOOL_NAME,
+      SHOW_BLAST_RADIUS_TOOL_NAME,
+      OPEN_PASSPORT_TOOL_NAME,
+      SHOW_HEALTH_TOOL_NAME,
+      SHOW_OWNERSHIP_TOOL_NAME,
+      OPEN_CHANGELOG_ENTRY_TOOL_NAME,
+      GET_SERVICE_TOOL_NAME,
+      GET_STEPS_TOOL_NAME,
+      BLAST_RADIUS_TOOL_NAME,
+      WHO_OWNS_TOOL_NAME,
+      ON_CALL_TOOL_NAME,
+      DRIFT_TOOL_NAME,
+    ]);
   });
 
   describe('play_scenario', () => {
@@ -125,6 +159,34 @@ describe('streamAgentAnswer', () => {
       );
 
       expect(actionEvents(events)).toEqual([]);
+    });
+  });
+
+  describe('view map actions', () => {
+    const [driftEntry] = view.data.drift.entries;
+    const [topic] = view.data.topics;
+
+    it.each([
+      [SHOW_BLAST_RADIUS_TOOL_NAME, { nodeId: topic.id }, { kind: 'showBlastRadius', nodeId: topic.id }],
+      [OPEN_PASSPORT_TOOL_NAME, { nodeId: FIRST_SERVICE_ID }, { kind: 'openPassport', nodeId: FIRST_SERVICE_ID }],
+      [SHOW_HEALTH_TOOL_NAME, {}, { kind: 'showHealth' }],
+      [SHOW_OWNERSHIP_TOOL_NAME, {}, { kind: 'showOwnership' }],
+      [OPEN_CHANGELOG_ENTRY_TOOL_NAME, { entryId: driftEntry.id }, { kind: 'openChangelogEntry', entryId: driftEntry.id }],
+    ])('%s emits its action for a known id', async (name, args, action) => {
+      const events = await collectEvents(new ScriptedToolCallingModel({ name, args }));
+
+      expect(actionEvents(events)).toEqual([{ type: 'action', ...action }]);
+    });
+
+    it.each([
+      [SHOW_BLAST_RADIUS_TOOL_NAME, { nodeId: UNKNOWN_ID }],
+      [OPEN_PASSPORT_TOOL_NAME, { nodeId: UNKNOWN_ID }],
+      [OPEN_CHANGELOG_ENTRY_TOOL_NAME, { entryId: UNKNOWN_ID }],
+    ])('%s drops an unknown id and still finishes the answer', async (name, args) => {
+      const events = await collectEvents(new ScriptedToolCallingModel({ name, args }));
+
+      expect(actionEvents(events)).toEqual([]);
+      expect(events).toContainEqual({ type: 'token', text: FINAL_ANSWER });
     });
   });
 

@@ -10,8 +10,7 @@ import {
   encryptCookiePayload,
   type AiCookiePayload,
 } from './cookieCrypto.js';
-import { getCosmosResponseBody } from './cosmos/view.js';
-import cosmosMap from './generated/cosmos-map.json' with { type: 'json' };
+import { getCosmosResponseBody, getCosmosView } from './cosmos/view.js';
 import { createLogger } from './logger.js';
 import { checkProviderKey } from './providerKeyCheck.js';
 import { AskRequestSchema } from './schemas/askRequestSchema.js';
@@ -192,7 +191,7 @@ app.post('/ai/ask', async (context) => {
       const streamAbort = new AbortController();
       responseStream.onAbort(() => streamAbort.abort());
       const signal = AbortSignal.any([context.req.raw.signal, streamAbort.signal]);
-      for await (const event of answerQuestion({ question, payload, snapshot: cosmosMap, signal })) {
+      for await (const event of answerQuestion({ question, payload, view: getCosmosView(), signal })) {
         await responseStream.write(`${JSON.stringify(event)}\n`);
       }
     },
