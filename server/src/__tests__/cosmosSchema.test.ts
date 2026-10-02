@@ -16,6 +16,18 @@ describe('getCosmosData', () => {
     expect(Object.isFrozen(data.incidents[0].steps[0])).toBe(true);
   });
 
+  it('rejects an unknown palette key', () => {
+    const data = structuredClone(getCosmosData());
+    Object.assign(data.services[0], { palette: 'chartreuse' });
+    expect(CosmosDataSchema.safeParse(data).success).toBe(false);
+  });
+
+  it('rejects a palette table missing a key', () => {
+    const data = structuredClone(getCosmosData());
+    delete (data.palette as Partial<typeof data.palette>).violet;
+    expect(CosmosDataSchema.safeParse(data).success).toBe(false);
+  });
+
   it('rejects an unknown field', () => {
     const data = structuredClone(getCosmosData());
     Object.assign(data.services[0], { unexpectedField: true });

@@ -2,10 +2,8 @@ import { SERVICES_BY_ID, STEPS, TOPICS } from '../scenarios/data';
 import type { Topic } from '../scenarios/types';
 
 /**
- * Topic-to-service attribution. Every connected topic is owned by a service:
- * by name prefix (`orders.created` → orders), via an alias when
- * the namespace doesn't match the service id, else by whichever service
- * first produces into it.
+ * Topic-to-service attribution: every connected topic joins the group of
+ * the service its `groupServiceId` names.
  *
  * Zoomed out, owned topics are invisible — the owner's card shows a count
  * badge. Zoomed in, they fan out on a ring around the service. Collapsing
@@ -40,29 +38,8 @@ export const CONNECTED_NODE_IDS: Set<string> = (() => {
   return ids;
 })();
 
-export function topicPrefix(name: string): string | null {
-  // `production.` is an env namespace, not an owner — strip before grouping.
-  const stripped = name.startsWith('production.') ? name.slice('production.'.length) : name;
-  const dot = stripped.indexOf('.');
-  return dot > 0 ? stripped.slice(0, dot) : null;
-}
-
-/** Topic namespaces whose owning service has a different id. */
-const PREFIX_ALIASES: Record<string, string> = {
-  hub: 'realtime-hub',
-};
-
 function ownerServiceId(t: Topic): string | null {
-  const prefix = topicPrefix(t.name);
-  if (prefix) {
-    const mapped = PREFIX_ALIASES[prefix] ?? prefix;
-    if (SERVICES_BY_ID[mapped]) return mapped;
-  }
-  // Fallback: the first service producing into this topic.
-  for (const s of STEPS) {
-    if (s.via === t.id && SERVICES_BY_ID[s.from]) return s.from;
-  }
-  return null;
+  return SERVICES_BY_ID[t.groupServiceId] ? t.groupServiceId : null;
 }
 
 /**

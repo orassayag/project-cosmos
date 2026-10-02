@@ -17,6 +17,8 @@ import {
 import { FALLBACK_OWNER, TEAM_OWNERS, groupServicesByTeam } from '../client/src/scenarios/owners.js';
 import { HEALTH_AS_OF, HEALTH_BY_SERVICE, SERVICE_HEALTH } from '../client/src/scenarios/health.js';
 import { BRAND } from '../client/src/scenarios/brand.js';
+import { CLUSTERS } from '../client/src/scenarios/clusters.js';
+import { PALETTE } from '../client/src/scenarios/palette.js';
 import { CONNECTED_NODE_IDS, TOPIC_GROUPS } from '../client/src/map/topic-groups.js';
 import { computeBlastRadius } from '../client/src/map/blast-radius.js';
 import { deriveEdges } from '../client/src/map/edge-builder.js';
@@ -54,6 +56,8 @@ const nodeIds = [...SERVICES.map((service) => service.id), ...TOPICS.map((topic)
 
 const baseline = {
   data: {
+    PALETTE,
+    CLUSTERS,
     SERVICES,
     TOPICS,
     SCENARIOS,

@@ -4,6 +4,7 @@ import type { MouseEvent } from 'react';
 import type { Service, SubService } from '../scenarios/types';
 import type { DriftKind } from '../scenarios/drift';
 import { DRIFT_KIND_META } from '../scenarios/drift';
+import { paletteVar } from '../scenarios/palette';
 import { Planet } from './Planet';
 import { planetRadius } from './planetMorphology';
 
@@ -50,7 +51,7 @@ export function ServiceNode({
   onClick,
   onSubServiceClick,
 }: ServiceNodeProps) {
-  const hasEcosystem = !!(n.subServices && n.subServices.length > 0);
+  const hasEcosystem = !!(n.ecosystem?.expandable && n.subServices && n.subServices.length > 0);
   const r = planetRadius(n.id);
   const labelY = r + 30;
   const hitHalfWidth = Math.max(r, (n.name.length * LABEL_FONT_SIZE * LABEL_CHAR_WIDTH) / 2) + HIT_PADDING;
@@ -109,7 +110,7 @@ export function ServiceNode({
                 cy={0}
                 r={r + 4}
                 fill="none"
-                stroke={n.color}
+                stroke={paletteVar(n.palette)}
                 strokeWidth={1.25}
                 strokeOpacity={0.95}
                 pointerEvents="none"
@@ -236,7 +237,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
       <motion.circle
         cx={0} cy={0}
         fill="none"
-        stroke={parent.color}
+        stroke={paletteVar(parent.palette)}
         strokeWidth={1.6}
         initial={{ r: 6, opacity: 0.85, strokeWidth: 2.4 }}
         animate={{ r: radius * 2.2, opacity: 0, strokeWidth: 0.4 }}
@@ -248,7 +249,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
       <motion.circle
         cx={0} cy={0}
         fill="none"
-        stroke={parent.color}
+        stroke={paletteVar(parent.palette)}
         strokeWidth={0.4}
         initial={{ r: radius * 2.2, opacity: 0 }}
         animate={{ r: radius * 2.2, opacity: 0 }}
@@ -263,7 +264,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
         cy={0}
         r={radius}
         fill="none"
-        stroke={parent.color}
+        stroke={paletteVar(parent.palette)}
         strokeOpacity={0.2}
         strokeWidth={0.8}
         strokeDasharray="3 5"
@@ -297,7 +298,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
             <line
               x1={0} y1={0}
               x2={-pos.x} y2={-pos.y}
-              stroke={parent.color}
+              stroke={paletteVar(parent.palette)}
               strokeOpacity={0.16}
               strokeWidth={0.8}
               strokeDasharray="2 4"
@@ -321,7 +322,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
                 height={subH + 6}
                 rx={(subH + 6) / 2}
                 fill="none"
-                stroke={parent.color}
+                stroke={paletteVar(parent.palette)}
                 strokeWidth={1.1}
                 strokeOpacity={0.95}
                 pointerEvents="none"
@@ -337,7 +338,7 @@ function Ecosystem({ parent, subs, selectedSubId, activeSubs, onSubClick }: Ecos
               height={subH}
               rx={subH / 2}
               fill="oklch(from var(--bg-surface) l c h / 0.96)"
-              stroke={parent.color}
+              stroke={paletteVar(parent.palette)}
               strokeOpacity={0.8}
               strokeWidth={1.2}
               pointerEvents="auto"

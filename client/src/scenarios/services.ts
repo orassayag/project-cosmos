@@ -5,14 +5,14 @@ import type { Service } from './types';
 //  AstroMart is a fictional space-gear e-commerce platform
 //  ("outfitting the galaxy since 2199"). Twelve services across
 //  three teams: shopping, fulfillment, engagement.
-//  `color` → CSS token (theme-aware). `hex` → for SVG <radialGradient>.
+//  `palette` → CSS token (theme-aware). `hex` → for SVG <radialGradient>.
 // ══════════════════════════════════════════════════════════
 export const SERVICES: Service[] = [
   // ── Shopping cluster (left / top-left) ────────────────────────────────
   {
     id: 'storefront',
     x: 260, y: 700, width: 230, height: 66,
-    color: 'var(--svc-cyan)', hex: '#22d3ee',
+    palette: 'cyan', hex: '#22d3ee',
     name: 'storefront', sub: 'shop.astromart.dev · React',
     code: 'SF-01', lang: 'TypeScript', team: 'team-shopping' as const,
     role: 'Customer-facing web store',
@@ -23,7 +23,7 @@ export const SERVICES: Service[] = [
   {
     id: 'api-gateway',
     x: 660, y: 560, width: 230, height: 66,
-    color: 'var(--svc-blue)', hex: '#4f8ff7',
+    palette: 'blue', hex: '#4f8ff7',
     name: 'api-gateway', sub: 'Node.js · Koa · edge auth',
     code: 'GW-02', lang: 'TypeScript', team: 'team-shopping' as const,
     role: 'Single HTTP front door',
@@ -34,7 +34,7 @@ export const SERVICES: Service[] = [
   {
     id: 'cart',
     x: 700, y: 280, width: 200, height: 66,
-    color: 'var(--svc-red)', hex: '#f55b5b',
+    palette: 'red', hex: '#f55b5b',
     name: 'cart', sub: 'Node.js · Redis',
     code: 'CRT-03', lang: 'TypeScript', team: 'team-shopping' as const,
     role: 'Session cart store',
@@ -45,7 +45,7 @@ export const SERVICES: Service[] = [
   {
     id: 'search',
     x: 1140, y: 260, width: 210, height: 66,
-    color: 'var(--svc-amber)', hex: '#f5b731',
+    palette: 'amber', hex: '#f5b731',
     name: 'search', sub: 'Node.js · Elasticsearch',
     code: 'SRC-04', lang: 'TypeScript', team: 'team-shopping' as const,
     role: 'Product search & ranking',
@@ -56,7 +56,7 @@ export const SERVICES: Service[] = [
   {
     id: 'catalog',
     x: 1140, y: 540, width: 210, height: 66,
-    color: 'var(--svc-green)', hex: '#34d399',
+    palette: 'green', hex: '#34d399',
     name: 'catalog', sub: 'NestJS · Postgres',
     code: 'CTL-05', lang: 'TypeScript', team: 'team-shopping' as const,
     role: 'Product record owner',
@@ -69,7 +69,7 @@ export const SERVICES: Service[] = [
   {
     id: 'orders',
     x: 1600, y: 720, width: 210, height: 66,
-    color: 'var(--svc-purple)', hex: '#a855f7',
+    palette: 'purple', hex: '#a855f7',
     name: 'orders', sub: 'NestJS · Postgres',
     code: 'ORD-06', lang: 'TypeScript', team: 'team-fulfillment' as const,
     role: 'Order lifecycle owner',
@@ -80,7 +80,7 @@ export const SERVICES: Service[] = [
   {
     id: 'payments',
     x: 1560, y: 1060, width: 220, height: 66,
-    color: 'var(--svc-pink)', hex: '#f472b6',
+    palette: 'pink', hex: '#f472b6',
     name: 'payments', sub: 'NestJS · Postgres · PCI zone',
     code: 'PAY-07', lang: 'TypeScript', team: 'team-fulfillment' as const,
     role: 'Payment capture & refunds',
@@ -91,7 +91,7 @@ export const SERVICES: Service[] = [
   {
     id: 'inventory',
     x: 2060, y: 720, width: 220, height: 66,
-    color: 'var(--svc-teal)', hex: '#38bdf8',
+    palette: 'teal', hex: '#38bdf8',
     name: 'inventory', sub: 'Node.js · DynamoDB',
     code: 'INV-08', lang: 'TypeScript', team: 'team-fulfillment' as const,
     role: 'Stock levels & reservations',
@@ -102,7 +102,7 @@ export const SERVICES: Service[] = [
   {
     id: 'shipping',
     x: 2060, y: 1060, width: 210, height: 66,
-    color: 'var(--svc-orange)', hex: '#fb923c',
+    palette: 'orange', hex: '#fb923c',
     name: 'shipping', sub: 'NestJS · Postgres · courier APIs',
     code: 'SHP-09', lang: 'TypeScript', team: 'team-fulfillment' as const,
     role: 'Packing, labels & couriers',
@@ -115,7 +115,7 @@ export const SERVICES: Service[] = [
   {
     id: 'notifications',
     x: 1180, y: 1250, width: 240, height: 66,
-    color: 'var(--svc-rose)', hex: '#ec4899',
+    palette: 'rose', hex: '#ec4899',
     name: 'notifications', sub: 'Node.js · email + push',
     code: 'NTF-10', lang: 'TypeScript', team: 'team-engagement' as const,
     role: 'Email & push delivery',
@@ -126,7 +126,7 @@ export const SERVICES: Service[] = [
   {
     id: 'realtime-hub',
     x: 840, y: 1020, width: 240, height: 66,
-    color: 'var(--svc-magenta)', hex: '#e879f9',
+    palette: 'magenta', hex: '#e879f9',
     name: 'realtime-hub', sub: 'hub-ingest → hub-push',
     code: 'HUB-11', lang: 'Node.js', team: 'team-engagement' as const,
     role: 'Realtime pub/sub fan-out',
@@ -174,13 +174,24 @@ export const SERVICES: Service[] = [
         repo: 'hub-push',
       },
     ],
+    ecosystem: {
+      expandable: true,
+      intakeTopicId: 'hub-broadcasts',
+      intakeSubServiceId: 'hub-ingest',
+      internalEdges: [
+        { from: 'hub-ingest', to: 'hub-presence', proto: 'http' },
+        { from: 'hub-presence', to: 'hub-ingest', proto: 'http' },
+        { from: 'hub-ingest', to: 'hub-push', proto: 'http' },
+      ],
+      egressSubServiceId: 'hub-push',
+    },
   },
 
   // ── Platform infra ────────────────────────────────────────────────────
   {
     id: 'object-storage',
     x: 2360, y: 360, width: 220, height: 66,
-    color: 'var(--svc-emerald)', hex: '#34a853',
+    palette: 'emerald', hex: '#34a853',
     name: 'object-storage', sub: 'S3-compatible · astromart-assets',
     code: 'OBJ-12', lang: 'Infra',
     role: 'Object store · images & labels',

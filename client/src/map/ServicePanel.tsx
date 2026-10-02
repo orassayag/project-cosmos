@@ -1,6 +1,7 @@
 import type { Service } from '../scenarios/types';
 import { TechChip } from '../components/TechIcon';
 import { BRAND } from '../scenarios/brand';
+import { paletteVar } from '../scenarios/palette';
 import { resolveOwner } from '../scenarios/owners';
 
 interface ServicePanelProps {
@@ -21,11 +22,11 @@ export function ServicePanel({ service }: ServicePanelProps) {
   return (
     <>
       <div className="lc-map-panel-head">
-        <div className="lc-map-panel-eyebrow" style={{ color: service.color }}>
+        <div className="lc-map-panel-eyebrow" style={{ color: paletteVar(service.palette) }}>
           SERVICE<span style={{ opacity: 0.6 }}> · {owner.label}</span>
         </div>
         <div className="lc-map-panel-title-row">
-          <span className="lc-map-panel-dot" style={{ background: service.color, color: service.color }} />
+          <span className="lc-map-panel-dot" style={{ background: paletteVar(service.palette), color: paletteVar(service.palette) }} />
           <h3>{service.name}</h3>
         </div>
         <div className="lc-map-panel-role">{service.role}</div>

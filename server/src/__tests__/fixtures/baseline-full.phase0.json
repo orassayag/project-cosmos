@@ -1,92 +1,5 @@
 {
   "data": {
-    "PALETTE": {
-      "cyan": "#22d3ee",
-      "green": "#34d399",
-      "amber": "#f5b731",
-      "red": "#f55b5b",
-      "violet": "#a78bfa",
-      "blue": "#4f8ff7",
-      "pink": "#f472b6",
-      "magenta": "#e879f9",
-      "orange": "#fb923c",
-      "teal": "#38bdf8",
-      "rose": "#ec4899",
-      "purple": "#a855f7",
-      "emerald": "#34a853"
-    },
-    "CLUSTERS": [
-      {
-        "id": "ui",
-        "label": "UI",
-        "serviceIds": [
-          "storefront"
-        ],
-        "nebula": {
-          "anchorServiceIds": [
-            "storefront"
-          ],
-          "base": "cyan",
-          "hot": "violet"
-        }
-      },
-      {
-        "id": "shopping",
-        "label": "Shopping",
-        "serviceIds": [
-          "api-gateway",
-          "cart",
-          "search",
-          "catalog"
-        ],
-        "nebula": {
-          "anchorServiceIds": [
-            "api-gateway",
-            "cart",
-            "search",
-            "catalog"
-          ],
-          "base": "green",
-          "hot": "cyan"
-        }
-      },
-      {
-        "id": "fulfillment",
-        "label": "Fulfillment",
-        "serviceIds": [
-          "orders",
-          "payments",
-          "inventory",
-          "shipping"
-        ],
-        "nebula": {
-          "anchorServiceIds": [
-            "orders",
-            "payments",
-            "inventory",
-            "shipping"
-          ],
-          "base": "amber",
-          "hot": "orange"
-        }
-      },
-      {
-        "id": "engagement",
-        "label": "Engagement",
-        "serviceIds": [
-          "realtime-hub",
-          "notifications"
-        ],
-        "nebula": {
-          "anchorServiceIds": [
-            "realtime-hub",
-            "notifications"
-          ],
-          "base": "magenta",
-          "hot": "rose"
-        }
-      }
-    ],
     "SERVICES": [
       {
         "id": "storefront",
@@ -94,7 +7,7 @@
         "y": 700,
         "width": 230,
         "height": 66,
-        "palette": "cyan",
+        "color": "var(--svc-cyan)",
         "hex": "#22d3ee",
         "name": "storefront",
         "sub": "shop.astromart.dev · React",
@@ -115,7 +28,7 @@
         "y": 560,
         "width": 230,
         "height": 66,
-        "palette": "blue",
+        "color": "var(--svc-blue)",
         "hex": "#4f8ff7",
         "name": "api-gateway",
         "sub": "Node.js · Koa · edge auth",
@@ -138,7 +51,7 @@
         "y": 280,
         "width": 200,
         "height": 66,
-        "palette": "red",
+        "color": "var(--svc-red)",
         "hex": "#f55b5b",
         "name": "cart",
         "sub": "Node.js · Redis",
@@ -160,7 +73,7 @@
         "y": 260,
         "width": 210,
         "height": 66,
-        "palette": "amber",
+        "color": "var(--svc-amber)",
         "hex": "#f5b731",
         "name": "search",
         "sub": "Node.js · Elasticsearch",
@@ -182,7 +95,7 @@
         "y": 540,
         "width": 210,
         "height": 66,
-        "palette": "green",
+        "color": "var(--svc-green)",
         "hex": "#34d399",
         "name": "catalog",
         "sub": "NestJS · Postgres",
@@ -204,7 +117,7 @@
         "y": 720,
         "width": 210,
         "height": 66,
-        "palette": "purple",
+        "color": "var(--svc-purple)",
         "hex": "#a855f7",
         "name": "orders",
         "sub": "NestJS · Postgres",
@@ -227,7 +140,7 @@
         "y": 1060,
         "width": 220,
         "height": 66,
-        "palette": "pink",
+        "color": "var(--svc-pink)",
         "hex": "#f472b6",
         "name": "payments",
         "sub": "NestJS · Postgres · PCI zone",
@@ -250,7 +163,7 @@
         "y": 720,
         "width": 220,
         "height": 66,
-        "palette": "teal",
+        "color": "var(--svc-teal)",
         "hex": "#38bdf8",
         "name": "inventory",
         "sub": "Node.js · DynamoDB",
@@ -273,7 +186,7 @@
         "y": 1060,
         "width": 210,
         "height": 66,
-        "palette": "orange",
+        "color": "var(--svc-orange)",
         "hex": "#fb923c",
         "name": "shipping",
         "sub": "NestJS · Postgres · courier APIs",
@@ -297,7 +210,7 @@
         "y": 1250,
         "width": 240,
         "height": 66,
-        "palette": "rose",
+        "color": "var(--svc-rose)",
         "hex": "#ec4899",
         "name": "notifications",
         "sub": "Node.js · email + push",
@@ -320,7 +233,7 @@
         "y": 1020,
         "width": 240,
         "height": 66,
-        "palette": "magenta",
+        "color": "var(--svc-magenta)",
         "hex": "#e879f9",
         "name": "realtime-hub",
         "sub": "hub-ingest → hub-push",
@@ -387,30 +300,7 @@
             ],
             "repo": "hub-push"
           }
-        ],
-        "ecosystem": {
-          "expandable": true,
-          "intakeTopicId": "hub-broadcasts",
-          "intakeSubServiceId": "hub-ingest",
-          "internalEdges": [
-            {
-              "from": "hub-ingest",
-              "to": "hub-presence",
-              "proto": "http"
-            },
-            {
-              "from": "hub-presence",
-              "to": "hub-ingest",
-              "proto": "http"
-            },
-            {
-              "from": "hub-ingest",
-              "to": "hub-push",
-              "proto": "http"
-            }
-          ],
-          "egressSubServiceId": "hub-push"
-        }
+        ]
       },
       {
         "id": "object-storage",
@@ -418,7 +308,7 @@
         "y": 360,
         "width": 220,
         "height": 66,
-        "palette": "emerald",
+        "color": "var(--svc-emerald)",
         "hex": "#34a853",
         "name": "object-storage",
         "sub": "S3-compatible · astromart-assets",
@@ -434,7 +324,6 @@
     "TOPICS": [
       {
         "id": "orders.created",
-        "groupServiceId": "orders",
         "x": 1830,
         "y": 810,
         "labelSide": "below",
@@ -445,7 +334,6 @@
       },
       {
         "id": "orders.cancelled",
-        "groupServiceId": "orders",
         "x": 1716,
         "y": 909,
         "labelSide": "below",
@@ -457,7 +345,6 @@
       },
       {
         "id": "payments.captured",
-        "groupServiceId": "payments",
         "x": 1510,
         "y": 918,
         "labelSide": "above",
@@ -469,7 +356,6 @@
       },
       {
         "id": "payments.failed",
-        "groupServiceId": "payments",
         "x": 1400,
         "y": 1180,
         "labelSide": "below",
@@ -480,7 +366,6 @@
       },
       {
         "id": "inventory.reserved",
-        "groupServiceId": "inventory",
         "x": 1830,
         "y": 650,
         "labelSide": "above",
@@ -491,7 +376,6 @@
       },
       {
         "id": "inventory.back-in-stock",
-        "groupServiceId": "inventory",
         "x": 2053,
         "y": 912,
         "labelSide": "above",
@@ -503,7 +387,6 @@
       },
       {
         "id": "shipping.dispatched",
-        "groupServiceId": "shipping",
         "x": 1929,
         "y": 1233,
         "labelSide": "below",
@@ -515,7 +398,6 @@
       },
       {
         "id": "hub-broadcasts",
-        "groupServiceId": "realtime-hub",
         "x": 1056,
         "y": 1022,
         "pinned": true,
@@ -3402,7 +3284,6 @@
         "members": [
           {
             "id": "orders.created",
-            "groupServiceId": "orders",
             "x": 1830,
             "y": 810,
             "labelSide": "below",
@@ -3413,7 +3294,6 @@
           },
           {
             "id": "orders.cancelled",
-            "groupServiceId": "orders",
             "x": 1716,
             "y": 909,
             "labelSide": "below",
@@ -3438,7 +3318,6 @@
         "members": [
           {
             "id": "payments.captured",
-            "groupServiceId": "payments",
             "x": 1510,
             "y": 918,
             "labelSide": "above",
@@ -3462,7 +3341,6 @@
         "members": [
           {
             "id": "inventory.reserved",
-            "groupServiceId": "inventory",
             "x": 1830,
             "y": 650,
             "labelSide": "above",
@@ -3473,7 +3351,6 @@
           },
           {
             "id": "inventory.back-in-stock",
-            "groupServiceId": "inventory",
             "x": 2053,
             "y": 912,
             "labelSide": "above",
@@ -3498,7 +3375,6 @@
         "members": [
           {
             "id": "shipping.dispatched",
-            "groupServiceId": "shipping",
             "x": 1929,
             "y": 1233,
             "labelSide": "below",
@@ -3522,7 +3398,6 @@
         "members": [
           {
             "id": "hub-broadcasts",
-            "groupServiceId": "realtime-hub",
             "x": 1056,
             "y": 1022,
             "pinned": true,

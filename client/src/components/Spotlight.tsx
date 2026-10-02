@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { SERVICES, TOPICS, SCENARIOS } from '../scenarios/data';
 import type { Service, Topic, Scenario } from '../scenarios/types';
+import { paletteVar } from '../scenarios/palette';
 
 type ResultKind = 'service' | 'topic' | 'scenario';
 
@@ -38,7 +39,7 @@ function search(query: string): Result[] {
   const svcResults: (Result & { _score: number })[] = SERVICES
     .map((s: Service) => {
       const sc = Math.max(score(s.name, q), score(s.role, q), score(s.id, q), s.team ? score(s.team, q) : 0);
-      return { kind: 'service' as const, id: s.id, label: s.name, sub: s.role, color: s.color, _score: sc };
+      return { kind: 'service' as const, id: s.id, label: s.name, sub: s.role, color: paletteVar(s.palette), _score: sc };
     })
     .filter(r => r._score > 0)
     .sort((a, b) => b._score - a._score)

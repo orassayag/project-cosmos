@@ -21,7 +21,7 @@ export const SERVICES: Service[] = [
   {
     id: 'web-app',
     x: 500, y: 700, width: 220, height: 66,
-    color: 'var(--svc-cyan)', hex: '#22d3ee',
+    palette: 'cyan', hex: '#22d3ee',
     name: 'web-app', sub: 'Your frontend',
     code: 'WEB-01', lang: 'TypeScript',
     role: 'The browser-facing surface',
@@ -33,7 +33,7 @@ Use the /add-service skill (or copy this shape) to grow the map.\`,
   {
     id: 'api',
     x: 1300, y: 700, width: 220, height: 66,
-    color: 'var(--svc-blue)', hex: '#4f8ff7',
+    palette: 'blue', hex: '#4f8ff7',
     name: 'api', sub: 'Your first backend',
     code: 'API-01', lang: 'TypeScript',
     role: 'First star of your galaxy',

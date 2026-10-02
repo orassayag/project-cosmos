@@ -54,7 +54,7 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 
 - `phaseId` global, unique, never reused; every step's `phase` equals its scenario's `phaseId`.
 - Step `from`/`to`/`via`/`through` must exactly match `SERVICES[].id` / `TOPICS[].id`.
-- Service `hex` must match its `color` CSS token hue (`client/src/styles/tokens.css`); topics always `TOPIC_COLOR`/`TOPIC_HEX`.
+- Service `hex` must equal `PALETTE[service.palette]` (`client/src/scenarios/palette.ts`, server twin in `server/src/cosmos/data/`); every palette key needs a `--svc-<key>` token in `client/src/styles/tokens.css`. Topics always `TOPIC_COLOR`/`TOPIC_HEX`.
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
 

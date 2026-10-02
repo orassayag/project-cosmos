@@ -10,15 +10,38 @@ export type Tech =
   | 'kafka' | 's3' | 'webrtc' | 'gstreamer'
   | 'lua' | 'go' | 'mqtt' | 'docker' | 'githubactions';
 
+/** A named service hue, rendered as `var(--svc-<key>)` (styles/tokens.css); `PALETTE` holds its hex. */
+export type PaletteKey =
+  | 'cyan' | 'green' | 'amber' | 'red' | 'violet' | 'blue' | 'pink'
+  | 'magenta' | 'orange' | 'teal' | 'rose' | 'purple' | 'emerald';
+
+export interface EcosystemEdge {
+  from: string;
+  to: string;
+  proto: Protocol;
+}
+
+/** A service whose sub-services can fan out on the map, and the route a 3-hop broadcast takes through them. */
+export interface ServiceEcosystem {
+  expandable: boolean;
+  /** Topic whose records enter the ecosystem. */
+  intakeTopicId: string;
+  /** Sub-service that consumes the intake topic. */
+  intakeSubServiceId: string;
+  /** Hops between sub-services, in travel order. */
+  internalEdges: EcosystemEdge[];
+  /** Sub-service that delivers to the step's final destination over WebSocket. */
+  egressSubServiceId: string;
+}
+
 export interface Service {
   id: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  /** CSS variable reference, e.g. 'var(--svc-cyan)' */
-  color: string;
-  /** Concrete hex of the same hue — for SVG defs that can't take CSS vars (gradients). */
+  palette: PaletteKey;
+  /** Concrete hex of the same hue (`PALETTE[palette]`) — for SVG defs that can't take CSS vars (gradients). */
   hex: string;
   name: string;
   /** Short stack/tech line shown under the name. */
@@ -37,12 +60,10 @@ export interface Service {
   repo?: string;
   /** Owning team. Omit for external infra (object storage, etc.). */
   team?: 'team-shopping' | 'team-fulfillment' | 'team-engagement';
-  /**
-   * Optional sub-services that make up this service's "ecosystem".
-   * When set, the capsule renders an expand button — clicking it
-   * fans the children out as a small solar system around the parent.
-   */
+  /** Sub-services that make up this service's ecosystem. */
   subServices?: SubService[];
+  /** When `expandable`, the sub-services fan out as a small solar system around the parent. */
+  ecosystem?: ServiceEcosystem;
 }
 
 export interface SubService {
@@ -79,6 +100,24 @@ export interface Topic {
   color: string;
   hex: string;
   desc: string;
+  /** Service whose topic group (badge when zoomed out, ring when zoomed in) holds this topic. */
+  groupServiceId: string;
+}
+
+export interface ClusterNebula {
+  anchorServiceIds: string[];
+  /** Resting hue of the zone's cloud. */
+  base: PaletteKey;
+  /** Hue the cloud shifts toward as activity in the zone rises. */
+  hot: PaletteKey;
+}
+
+/** A labelled zone of services drawn as a backdrop behind them. */
+export interface Cluster {
+  id: string;
+  label: string;
+  serviceIds: string[];
+  nebula: ClusterNebula;
 }
 
 export interface Step {

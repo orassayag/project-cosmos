@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 
+import { CLUSTERS } from '../scenarios/clusters';
 import { SERVICES_BY_ID, TOPICS_BY_ID } from '../scenarios/data';
+import { PALETTE } from '../scenarios/palette';
 
-// A region is a broad zone of the map — one per domain cluster. Its center and
+// A region is a broad zone of the map — one per cluster. Its center and
 // size are derived from the services that anchor it, so the nebula tracks the
 // real layout rather than hand-placed coordinates. `base` is the resting hue;
 // `hot` is the color the cloud shifts toward as activity in the zone rises.
@@ -13,14 +15,14 @@ interface RegionSpec {
   hot: string;
 }
 
-const REGION_SPECS: RegionSpec[] = [
-  { id: 'ui', anchorServiceIds: ['storefront'], base: '#22d3ee', hot: '#a78bfa' },
-  { id: 'shopping', anchorServiceIds: ['api-gateway', 'cart', 'search', 'catalog'], base: '#34d399', hot: '#22d3ee' },
-  { id: 'fulfillment', anchorServiceIds: ['orders', 'payments', 'inventory', 'shipping'], base: '#f5b731', hot: '#fb923c' },
-  { id: 'engagement', anchorServiceIds: ['realtime-hub', 'notifications'], base: '#e879f9', hot: '#ec4899' },
-];
+const REGION_SPECS: RegionSpec[] = CLUSTERS.map((cluster) => ({
+  id: cluster.id,
+  anchorServiceIds: cluster.nebula.anchorServiceIds,
+  base: PALETTE[cluster.nebula.base],
+  hot: PALETTE[cluster.nebula.hot],
+}));
 
-// A single-service zone (UI) collapses to a point without this floor, so give
+// A single-service zone collapses to a point without this floor, so give
 // every cloud a broad minimum reach — nebulae are diffuse, not tight.
 const MIN_RADIUS = 300;
 const REGION_PADDING = 190;

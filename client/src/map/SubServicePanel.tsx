@@ -1,25 +1,23 @@
 import type { Service, SubService } from '../scenarios/types';
 import { TechChip } from '../components/TechIcon';
 import { BRAND } from '../scenarios/brand';
+import { paletteVar } from '../scenarios/palette';
 
 interface SubServicePanelProps {
   sub: SubService;
   parent: Service;
 }
 
-/**
- * Inspector for a sub-service inside an expanded ecosystem (e.g.
- * hub-push inside the realtime-hub capsule's solar system).
- */
+/** Inspector for a sub-service inside an expanded ecosystem. */
 export function SubServicePanel({ sub, parent }: SubServicePanelProps) {
   return (
     <>
       <div className="lc-map-panel-head">
-        <div className="lc-map-panel-eyebrow" style={{ color: parent.color }}>
+        <div className="lc-map-panel-eyebrow" style={{ color: paletteVar(parent.palette) }}>
           {parent.name.toUpperCase()} · ECOSYSTEM
         </div>
         <div className="lc-map-panel-title-row">
-          <span className="lc-map-panel-dot" style={{ background: parent.color, color: parent.color }} />
+          <span className="lc-map-panel-dot" style={{ background: paletteVar(parent.palette), color: paletteVar(parent.palette) }} />
           <h3>{sub.name}</h3>
         </div>
         <div className="lc-map-panel-role">{sub.role}</div>

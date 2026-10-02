@@ -74,6 +74,21 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pattern: `['"](\\.\\./)+(client|drift-sync)/`,
     pathspecs: ['server/src'],
   },
+  {
+    // The plan's Phase 2 grep. Data files, tests and client/src/demo/ (until Phase 9) may still name services.
+    name: 'client rendering code names no AstroMart service, topic or domain',
+    phase: 2,
+    type: 'grep-absent',
+    pattern: `storefront|api-gateway|'cart'|'search'|catalog|inventory|'orders'|payments|shipping|notifications|object-storage|realtime-hub|hub-|orders\\.|payments\\.|shopping\\.|fulfillment\\.|engagement\\.|AstroMart`,
+    pathspecs: [
+      ':(glob)client/src/**/*.ts',
+      ':(glob)client/src/**/*.tsx',
+      ':(exclude)client/src/scenarios',
+      ':(exclude)client/src/incidents',
+      ':(exclude)client/src/demo',
+      ':(exclude,glob)client/src/**/__tests__/**',
+    ],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

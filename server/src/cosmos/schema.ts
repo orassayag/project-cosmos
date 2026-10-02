@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type {
   Brand,
+  Cluster,
   CosmosData,
   CosmosDrift,
   CosmosHealth,
@@ -10,8 +11,11 @@ import type {
   Incident,
   IncidentRef,
   OnCall,
+  PaletteKey,
+  Protocol,
   Scenario,
   Service,
+  ServiceEcosystem,
   ServiceHealthInput,
   Step,
   SubService,
@@ -22,6 +26,14 @@ import type {
 } from './types.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export const ProtocolSchema = z.enum(['http', 'ws', 'kafka', 'internal']) satisfies z.ZodType<Protocol>;
+
+export const PaletteKeySchema = z.enum([
+  'cyan', 'green', 'amber', 'red', 'violet', 'blue', 'pink',
+  'magenta', 'orange', 'teal', 'rose', 'purple', 'emerald',
+]) satisfies z.ZodType<PaletteKey>;
 
 export const TechSchema = z.enum([
   'typescript', 'javascript', 'nodejs', 'cplusplus', 'react',
@@ -43,14 +55,22 @@ export const SubServiceSchema = z.strictObject({
   tech: z.array(TechSchema).optional(),
 }) satisfies z.ZodType<SubService>;
 
+export const ServiceEcosystemSchema = z.strictObject({
+  expandable: z.boolean(),
+  intakeTopicId: z.string().min(1),
+  intakeSubServiceId: z.string().min(1),
+  internalEdges: z.array(z.strictObject({ from: z.string().min(1), to: z.string().min(1), proto: ProtocolSchema })),
+  egressSubServiceId: z.string().min(1),
+}) satisfies z.ZodType<ServiceEcosystem>;
+
 export const ServiceSchema = z.strictObject({
   id: z.string().min(1),
   x: z.number(),
   y: z.number(),
   width: z.number().positive(),
   height: z.number().positive(),
-  color: z.string(),
-  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  palette: PaletteKeySchema,
+  hex: z.string().regex(HEX_COLOR),
   name: z.string(),
   sub: z.string(),
   code: z.string(),
@@ -61,6 +81,7 @@ export const ServiceSchema = z.strictObject({
   repo: z.string().optional(),
   team: TeamIdSchema.optional(),
   subServices: z.array(SubServiceSchema).optional(),
+  ecosystem: ServiceEcosystemSchema.optional(),
 }) satisfies z.ZodType<Service>;
 
 export const TopicSchema = z.strictObject({
@@ -71,9 +92,21 @@ export const TopicSchema = z.strictObject({
   pinned: z.boolean().optional(),
   name: z.string(),
   color: z.string(),
-  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  hex: z.string().regex(HEX_COLOR),
   desc: z.string(),
+  groupServiceId: z.string().min(1),
 }) satisfies z.ZodType<Topic>;
+
+export const ClusterSchema = z.strictObject({
+  id: z.string().min(1),
+  label: z.string(),
+  serviceIds: z.array(z.string().min(1)).min(1),
+  nebula: z.strictObject({
+    anchorServiceIds: z.array(z.string().min(1)).min(1),
+    base: PaletteKeySchema,
+    hot: PaletteKeySchema,
+  }),
+}) satisfies z.ZodType<Cluster>;
 
 export const StepSchema = z.strictObject({
   phase: z.number().int(),
@@ -81,7 +114,7 @@ export const StepSchema = z.strictObject({
   to: z.string().min(1),
   via: z.string().optional(),
   through: z.string().optional(),
-  type: z.enum(['http', 'ws', 'kafka', 'internal']),
+  type: ProtocolSchema,
   label: z.string(),
   title: z.string(),
   plain: z.string(),
@@ -126,7 +159,7 @@ export const IncidentSchema = z.strictObject({
 export const TeamOwnerSchema = z.strictObject({
   label: z.string(),
   color: z.string(),
-  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  hex: z.string().regex(HEX_COLOR),
   githubTeam: z.string(),
   reviewers: z.array(z.string()),
   slack: z.string().optional(),
@@ -188,6 +221,8 @@ export const CosmosHealthSchema = z.strictObject({
 export const CosmosDataSchema = z.strictObject({
   brand: BrandSchema,
   domains: z.array(DomainSchema),
+  palette: z.record(PaletteKeySchema, z.string().regex(HEX_COLOR)),
+  clusters: z.array(ClusterSchema),
   services: z.array(ServiceSchema),
   topics: z.array(TopicSchema),
   scenarios: z.array(ScenarioSchema),

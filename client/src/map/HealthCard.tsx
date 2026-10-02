@@ -40,7 +40,7 @@ function slackUrl(channel: string): string {
 /**
  * On-call card (F17). Opens when a star is clicked in the health overlay:
  * how stale the service is, its PR backlog, and who to page — with a Slack
- * jump. Repo-less infra (object-storage) has no health row, so nothing opens.
+ * jump. Repo-less infra (an object store) has no health row, so nothing opens.
  */
 export function HealthCard({ serviceId, onClose }: HealthCardProps) {
   const health = HEALTH_BY_SERVICE.get(serviceId);

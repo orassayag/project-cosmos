@@ -11,6 +11,7 @@
  * WS hop in a 3-hop broadcast is cyan, etc).
  */
 
+import { SERVICES_BY_ID } from '../scenarios/data';
 import type { Protocol, Step } from '../scenarios/types';
 
 export interface EdgeLeg {
@@ -26,17 +27,25 @@ function edgeKey(from: string, to: string, proto: Protocol): string {
 }
 
 export function legsForStep(step: Step, expanded?: Set<string> | null): EdgeLeg[] {
-  // 3-hop broadcast through realtime-hub, AND the hub's ecosystem is
-  // currently expanded → reroute through ingest → presence → push so the
-  // packet visibly traverses the hub's internals.
-  if (step.via && step.through === 'realtime-hub' && expanded?.has('realtime-hub')) {
+  // 3-hop broadcast through a service whose ecosystem is currently expanded →
+  // reroute through its sub-services so the packet visibly traverses them.
+  const ecosystem = step.through ? SERVICES_BY_ID[step.through]?.ecosystem : undefined;
+  if (step.via && step.through && ecosystem && expanded?.has(step.through)) {
     return [
       { key: edgeKey(step.from, step.via, 'kafka'), proto: 'kafka', from: step.from, to: step.via },
-      { key: edgeKey(step.via, 'hub-ingest', 'kafka'), proto: 'kafka', from: step.via, to: 'hub-ingest' },
-      { key: edgeKey('hub-ingest', 'hub-presence', 'http'), proto: 'http', from: 'hub-ingest', to: 'hub-presence' },
-      { key: edgeKey('hub-presence', 'hub-ingest', 'http'), proto: 'http', from: 'hub-presence', to: 'hub-ingest' },
-      { key: edgeKey('hub-ingest', 'hub-push', 'http'), proto: 'http', from: 'hub-ingest', to: 'hub-push' },
-      { key: edgeKey('hub-push', step.to, 'ws'), proto: 'ws', from: 'hub-push', to: step.to },
+      {
+        key: edgeKey(step.via, ecosystem.intakeSubServiceId, 'kafka'),
+        proto: 'kafka',
+        from: step.via,
+        to: ecosystem.intakeSubServiceId,
+      },
+      ...ecosystem.internalEdges.map((edge) => ({ key: edgeKey(edge.from, edge.to, edge.proto), ...edge })),
+      {
+        key: edgeKey(ecosystem.egressSubServiceId, step.to, 'ws'),
+        proto: 'ws',
+        from: ecosystem.egressSubServiceId,
+        to: step.to,
+      },
     ];
   }
   if (step.via && step.through) {

@@ -211,3 +211,99 @@ Incident steps run through the same step checks, with `incidentId` in the contex
 The `phase 1` check greps `server/src`, not all of `server/`. `server/scripts/snapshot-map.ts` still imports the
 client copy to write `cosmos-map.json`. It is existing tooling that Phase 11 deletes, so changing it now would only
 add risk.
+
+## Phase 2 — Move hardcoded domain knowledge into data (2026-10-02)
+
+### New data fields
+
+Both copies (server `server/src/cosmos/data/`, client `client/src/scenarios/`) got the same change, so both parity
+tests still pass.
+
+| Field | Where | Replaces |
+| --- | --- | --- |
+| `palette: PaletteKey` | `Service` (replaces `color`) | `color: 'var(--svc-…)'` |
+| `palette: Record<PaletteKey, hex>` | `CosmosData` (`data/palette.ts`, client `scenarios/palette.ts`) | — |
+| `clusters: Cluster[]` with `id`, `label`, `serviceIds`, `nebula { anchorServiceIds, base, hot }` | `CosmosData` (`data/clusters.ts`) | the four `*Cluster.tsx` id lists and `REGION_SPECS` in `NebulaField.tsx` |
+| `ecosystem { expandable, intakeTopicId, intakeSubServiceId, internalEdges, egressSubServiceId }` | `Service` (only `realtime-hub`) | `realtime-hub` / `hub-*` special cases in `Map.tsx` and `edge-resolver.ts` |
+| `groupServiceId` (required) | `Topic` | the name-prefix rule, the `hub`→`realtime-hub` alias and the first-producer fallback in `topic-groups.ts` |
+
+### Palette
+
+- **`PaletteKey` has 13 keys, not 14.** `tokens.css` also defines `--svc-yellow`, but no data uses it and there is no
+  existing hex for it. Adding it would mean inventing a hex, so it is left out. A future service that wants yellow adds
+  the key and its hex together.
+- **`violet` (`#a78bfa`) has no service.** It is in the table because the UI nebula's "hot" hue uses it. The hex is
+  the value `NebulaField.tsx` already had.
+- **The palette table is data, not presentation.** It maps a key to the concrete hex that `Service.hex` already
+  records. That lets `validateCosmos()` replace the hex↔color-token check Phase 1 could not port:
+  `service-hex-mismatch` fires when `service.hex !== palette[service.palette]`. `PaletteKeySchema` rejects unknown
+  keys, and the `palette` record must list every key.
+- The client maps a key to CSS with `paletteVar(key)` → `var(--svc-<key>)`. `tokens.css` stays client-owned. A client
+  test checks that every palette key has a `--svc-<key>` token in `tokens.css`.
+- **Only services moved to `palette`.** Topics, scenarios, team owners, drift and health metadata keep their `color`.
+  The plan's table names only `services.ts`; changing the others would change more fixture values than I4 allows.
+
+### Clusters and nebula
+
+- The four `*Cluster.tsx` files were replaced by one `ClusterBackdrop.tsx` that takes a `Cluster` and a service lookup
+  as props (so the component test can pass fixture data with a renamed member).
+- **Geometry and styling stay client-side, keyed by cluster id** (padding, gradient stops, stroke, watermark fill), as
+  the plan's table says ("plus hardcoded geometry/styling"). They are presentation, matching Phase 1's "facts only" rule.
+  The values are not derivable from the palette (for example the UI stroke `rgba(140, 200, 255, 0.18)`). A cluster id
+  with no hand-tuned style gets one built from its nebula hues.
+- `label` is stored in title case (`'Shopping'`) and upper-cased at render, so the watermark text and its size are
+  unchanged.
+- `nebula.anchorServiceIds` equals `serviceIds` for all four clusters today. Both are kept because the plan lists
+  anchor ids on the nebula; validation checks both resolve (`unknown-cluster-service`).
+- Array order is paint order and the nebula's drift-phase order (`i * -6s`), so `CLUSTERS` keeps the old order
+  ui → shopping → fulfillment → engagement.
+
+### Ecosystem
+
+- The plan's two fields (`expandable`, `internalEdges`) are not enough to rebuild the routes without naming ids, so the
+  ecosystem also records `intakeTopicId` (`hub-broadcasts`), `intakeSubServiceId` (`hub-ingest`) and
+  `egressSubServiceId` (`hub-push`). `internalEdges` holds the three sub-service hops in travel order.
+- The sub-services that light up during a scenario (formerly the literal ingest/presence/push set) are derived: intake
+  + every internal-edge endpoint + egress. `hub-router` is still left out.
+- Edge bends inside the ecosystem are geometry, so they are derived client-side (a hop with a return hop bows 1, its
+  return −1, others 0), which reproduces the old hand-written values.
+- `ServiceNode` shows the ecosystem only when `ecosystem.expandable` is true and sub-services exist.
+- **None of this is visible today.** `expandedServiceId` is still the constant `null` (Phase 0 note), so the expanded
+  path cannot be reached in the UI. The refactor was checked by reading, not by a screenshot.
+
+### No `role` field (the `storefront` special case)
+
+- `Service.role` already exists (the panel subtitle, e.g. "Customer-facing web store"), so the plan's example
+  `role: 'entry'` would clash with it.
+- The only `storefront` special case was the ecosystem's outbound WebSocket edge. Its destination is now derived from
+  the steps: the `to` of every step that goes `through` the service (today only `storefront`). With a scenario active
+  it uses that scenario's steps, as before. No new field was needed, so none was added.
+
+### Topic groups
+
+- Each topic's `groupServiceId` is the owner the old rule produced: `orders.*`→orders, `payments.*`→payments,
+  `inventory.*`→inventory, `shipping.*`→shipping, `hub-broadcasts`→realtime-hub.
+- It is required. A new topic must name its group; there is no prefix guess or first-producer fallback any more.
+  `unknown-topic-group` fires when it names an unknown service.
+
+### Fixture changes (I4)
+
+- `baseline-full.phase0.json` is a byte copy of the Phase 0 `baseline-full.json`.
+- `baseline-full.json` was regenerated with `npm run baseline:dump`, which now also writes `PALETTE` and `CLUSTERS`.
+- Diff review (scripted): after removing `PALETTE`, `CLUSTERS`, service `palette`/`ecosystem`, topic `groupServiceId`
+  (in `TOPICS`, `TOPIC_GROUPS` members and everywhere else) and the old service `color`, the two fixtures are
+  deep-equal. Every derived value (`EDGES`, `BLAST_RADIUS`, `DEPENDENTS_OF`, `TOPIC_GROUPS`, `CONNECTED_NODE_IDS`,
+  `TEAM_GROUPS`, `HEALTH_BY_SERVICE`) is unchanged apart from that. `baseline-cosmos-map.json` is unchanged.
+
+### A3 check scope
+
+The `phase 2` check runs the plan's grep pattern with `git grep` over `client/src/**/*.ts(x)`, excluding
+`client/src/scenarios`, `client/src/incidents`, `client/src/demo` and every `__tests__` folder. Comments count too, so
+two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were reworded.
+
+### Docs touched because they became wrong
+
+- `.claude/skills/add-service/SKILL.md`: `palette` instead of `color`, clusters instead of `UICluster.tsx`, the
+  `ecosystem` field, and `groupServiceId` on topics. It still does not mention the server copy (a Phase 1 gap).
+- `CLAUDE.md`: the hex invariant now reads `hex === PALETTE[palette]`.
+- `scripts/fresh-start.mjs`: its two template services use `palette`.

@@ -10,16 +10,15 @@ import {
   stepsForScenario,
   INCIDENT_COMET_HEX,
 } from '../scenarios/data';
-import type { Protocol, Service, Step, Topic } from '../scenarios/types';
+import type { Service, Step, Topic } from '../scenarios/types';
 import type { Shot } from '../scenarios/runner';
 import { useMapView } from '../hooks/useMapView';
 import type { BBox, FitPadding } from '../hooks/useMapView';
 import { useViewport } from '../hooks/useViewport';
-import { buildPathBetween, deriveEdges, activeNodeSet, shotNodeSet, subPosition } from './edge-builder';
+import { deriveEdges, activeNodeSet, shotNodeSet } from './edge-builder';
 import type { EdgeRecord, PosOverrides } from './edge-builder';
 
 import { Edge } from './Edge';
-import { edgeKey } from './edge-resolver';
 import { ServiceNode } from './ServiceNode';
 import { StarExplosion } from './StarExplosion';
 import { TopicNode } from './TopicNode';
@@ -44,10 +43,10 @@ import { CometPackets } from './CometPackets';
 import { AmbientPackets } from './AmbientPackets';
 import { NebulaField } from './NebulaField';
 import { MapStepper } from './MapStepper';
-import { UICluster } from './UICluster';
-import { ShoppingCluster } from './ShoppingCluster';
-import { FulfillmentCluster } from './FulfillmentCluster';
-import { EngagementCluster } from './EngagementCluster';
+import { ClusterBackdrop } from './ClusterBackdrop';
+import { CLUSTERS } from '../scenarios/clusters';
+import { paletteVar } from '../scenarios/palette';
+import { buildEcosystemEdges, ecosystemDestinationIds, ecosystemPathSubIds } from './ecosystem';
 import { EdgeRegistryContext, createEdgeRegistry } from './edge-registry';
 import { publishParallaxPan } from './parallaxPan';
 import { useOverlay, OVERLAY } from '../overlays/OverlayManager';
@@ -172,6 +171,8 @@ export function ProjectCosmosMap({
   const overlay = useOverlay();
   const [selection, setSelection] = useState<Selection>(null);
   const expandedServiceId: string | null = null;
+  const expandedEcosystemService: Service | null =
+    expandedServiceId && SERVICES_BY_ID[expandedServiceId]?.ecosystem?.expandable ? SERVICES_BY_ID[expandedServiceId] : null;
 
   // Service currently under the cursor — the gravity well's source star.
   const [gravitySourceId, setGravitySourceId] = useState<string | null>(null);
@@ -313,29 +314,35 @@ export function ProjectCosmosMap({
     return () => warp.cancel();
   }, [activeDomain]);
 
-  // For realtime-hub's expanded ecosystem: which destinations does the
-  // active scenario actually broadcast to via the hub? (Currently only
-  // the storefront.) Only render the corresponding outbound edges when
-  // a scenario is active; show all when none is.
-  const hubDestinations = useMemo<Set<string> | null>(() => {
+  // Per ecosystem service: which destinations does the active scenario
+  // broadcast to through it? Null when no scenario is active — then every
+  // destination's outbound edge is shown.
+  const ecosystemDestinations = useMemo<Map<string, Set<string>> | null>(() => {
     if (!activeScenarioId) return null;
     const scenario = PLAYABLE_BY_ID[activeScenarioId];
     if (!scenario || scenario.status !== 'ready') return null;
-    const dests = new Set<string>();
+    const dests = new Map<string, Set<string>>();
     for (const step of stepsForScenario(scenario)) {
-      if (step.through === 'realtime-hub') dests.add(step.to);
+      if (!step.through) continue;
+      const throughDests = dests.get(step.through) ?? new Set<string>();
+      throughDests.add(step.to);
+      dests.set(step.through, throughDests);
     }
     return dests;
   }, [activeScenarioId]);
 
-  // Which hub sub-services participate in the active scenario's path?
-  // Ingest / presence / push are always on the path when the hub is used;
-  // router is consulted out-of-band so it stays dimmed during a scenario.
-  const hubActiveSubs = useMemo<Set<string> | null>(() => {
+  // Which sub-services of each ecosystem participate in the active
+  // scenario's path? Out-of-band ones stay dimmed during a scenario.
+  const ecosystemActiveSubs = useMemo<Map<string, Set<string>> | null>(() => {
     if (!activeScenarioId) return null;
-    if (!hubDestinations || hubDestinations.size === 0) return new Set();
-    return new Set(['hub-ingest', 'hub-presence', 'hub-push']);
-  }, [activeScenarioId, hubDestinations]);
+    const activeSubs = new Map<string, Set<string>>();
+    for (const service of SERVICES) {
+      if (!service.ecosystem) continue;
+      const isUsed = (ecosystemDestinations?.get(service.id)?.size ?? 0) > 0;
+      activeSubs.set(service.id, isUsed ? ecosystemPathSubIds(service.ecosystem) : new Set());
+    }
+    return activeSubs;
+  }, [activeScenarioId, ecosystemDestinations]);
 
   // Stable for the lifetime of this component — paths are mounted
   // by Edge children and read by CometPackets.
@@ -917,20 +924,19 @@ export function ProjectCosmosMap({
             />
 
             {/* Cluster backdrops — sit behind everything. */}
-            <UICluster activeNodes={scenarioActiveSet} />
-            <ShoppingCluster activeNodes={scenarioActiveSet} />
-            <FulfillmentCluster activeNodes={scenarioActiveSet} />
-            <EngagementCluster activeNodes={scenarioActiveSet} />
+            {CLUSTERS.map((cluster) => (
+              <ClusterBackdrop key={cluster.id} cluster={cluster} servicesById={SERVICES_BY_ID} activeNodes={scenarioActiveSet} />
+            ))}
 
-            {/* Edges — when realtime-hub's ecosystem is expanded, hide the
-                direct edges into/out of `realtime-hub` itself; they're
-                replaced by the internal sub-paths below (broadcasts →
-                ingest → presence → push → client). */}
+            {/* Edges — when a service's ecosystem is expanded, hide the
+                direct edges into/out of the service itself; they're
+                replaced by the internal sub-paths below (intake topic →
+                sub-services → destination). */}
             <g>
               {edges
                 .filter((e) =>
-                  expandedServiceId === 'realtime-hub'
-                    ? e.from !== 'realtime-hub' && e.to !== 'realtime-hub'
+                  expandedEcosystemService
+                    ? e.from !== expandedEcosystemService.id && e.to !== expandedEcosystemService.id
                     : true,
                 )
                 .map((e) => (
@@ -938,47 +944,21 @@ export function ProjectCosmosMap({
                 ))}
             </g>
 
-            {/* Internal hub edges — only when realtime-hub's ecosystem is
-                expanded. These are the routes packets take when traversing
-                the hub:
-                  hub-broadcasts → hub-ingest → hub-presence → hub-push → consumer */}
-            {expandedServiceId === 'realtime-hub' && (() => {
-              const ingest = subPosition('realtime-hub', 'hub-ingest', overrides);
-              const presence = subPosition('realtime-hub', 'hub-presence', overrides);
-              const push = subPosition('realtime-hub', 'hub-push', overrides);
-              const hubBroadcasts = displayTopics.find(t => t.id === 'hub-broadcasts');
-              if (!ingest || !presence || !push || !hubBroadcasts) return null;
-              const storefront = displayServices.find(s => s.id === 'storefront');
-              const internalEdges: { key: string; d: string; type: Protocol }[] = [
-                {
-                  key: edgeKey('hub-broadcasts', 'hub-ingest', 'kafka'),
-                  d: buildPathBetween(hubBroadcasts.x, hubBroadcasts.y, ingest.x, ingest.y, 0),
-                  type: 'kafka',
-                },
-                {
-                  key: edgeKey('hub-ingest', 'hub-presence', 'http'),
-                  d: buildPathBetween(ingest.x, ingest.y, presence.x, presence.y, 1),
-                  type: 'http',
-                },
-                {
-                  key: edgeKey('hub-presence', 'hub-ingest', 'http'),
-                  d: buildPathBetween(presence.x, presence.y, ingest.x, ingest.y, -1),
-                  type: 'http',
-                },
-                {
-                  key: edgeKey('hub-ingest', 'hub-push', 'http'),
-                  d: buildPathBetween(ingest.x, ingest.y, push.x, push.y, 0),
-                  type: 'http',
-                },
-              ];
-              const showStorefront = !hubDestinations || hubDestinations.has('storefront');
-              if (storefront && showStorefront) {
-                internalEdges.push({
-                  key: edgeKey('hub-push', 'storefront', 'ws'),
-                  d: buildPathBetween(push.x, push.y, storefront.x, storefront.y, 1),
-                  type: 'ws',
-                });
-              }
+            {/* Internal ecosystem edges — only while an ecosystem is expanded.
+                These are the routes packets take when traversing it. */}
+            {expandedEcosystemService?.ecosystem && (() => {
+              const ecosystem = expandedEcosystemService.ecosystem;
+              const destinationIds =
+                ecosystemDestinations?.get(expandedEcosystemService.id) ??
+                (ecosystemDestinations ? new Set<string>() : ecosystemDestinationIds(expandedEcosystemService.id));
+              const internalEdges = buildEcosystemEdges(
+                expandedEcosystemService,
+                ecosystem,
+                overrides,
+                displayTopics.find((t) => t.id === ecosystem.intakeTopicId),
+                displayServices.filter((service) => destinationIds.has(service.id)),
+              );
+              if (!internalEdges) return null;
               return (
                 <g>
                   {internalEdges.map((e) => (
@@ -1017,7 +997,7 @@ export function ProjectCosmosMap({
                     selectedSubId={
                       selection?.kind === 'sub-service' && selection.serviceId === s.id ? selection.subId : null
                     }
-                    activeSubs={s.id === 'realtime-hub' ? hubActiveSubs : null}
+                    activeSubs={ecosystemActiveSubs?.get(s.id) ?? null}
                     topicCount={collapsedCountByService.get(s.id) ?? null}
                     onClick={(id) => {
                       if (layoutMode) return;
@@ -1050,7 +1030,7 @@ export function ProjectCosmosMap({
                 debris; the capsule itself is already omitted above. */}
             {explodeNodeId && (() => {
               const dead = displayServices.find((s) => s.id === explodeNodeId);
-              return dead ? <StarExplosion x={dead.x} y={dead.y} color={dead.color} /> : null;
+              return dead ? <StarExplosion x={dead.x} y={dead.y} color={paletteVar(dead.palette)} /> : null;
             })()}
 
             {/* Topics */}

@@ -59,6 +59,15 @@ describe('validateCosmos', () => {
     }],
     ['unknown-drift-node', (data) => { data.drift.entries[0].nodeIds.push('no-such-node'); }],
     ['unknown-health-service', (data) => { data.health.services[0].serviceId = 'no-such-service'; }],
+    ['duplicate-cluster-id', (data) => { data.clusters[1].id = data.clusters[0].id; }],
+    ['service-hex-mismatch', (data) => { data.services[0].hex = '#000000'; }],
+    ['unknown-cluster-service', (data) => { data.clusters[0].serviceIds.push('no-such-service'); }],
+    ['unknown-topic-group', (data) => { data.topics[0].groupServiceId = 'no-such-service'; }],
+    ['unknown-ecosystem-node', (data) => {
+      const service = data.services.find((candidate) => candidate.ecosystem);
+      if (!service?.ecosystem) throw new Error('fixture has no service ecosystem');
+      service.ecosystem.internalEdges[0].to = 'no-such-sub-service';
+    }],
   ])('reports %s on a deliberately broken clone', (expectedCode, breakData) => {
     expect(errorCodes(brokenClone(breakData))).toContain(expectedCode);
   });
@@ -83,5 +92,15 @@ describe('validateCosmos', () => {
   it('warns when a repo-backed service has no team', () => {
     const data = brokenClone((clone) => { delete findService(clone, 'cart').team; });
     expect(validateCosmos(data).warnings.map((issue) => issue.code)).toEqual(['service-no-owner']);
+  });
+
+  it('reports an ecosystem egress that is not one of the service sub-services, with its id', () => {
+    const data = brokenClone((clone) => {
+      const service = clone.services.find((candidate) => candidate.ecosystem);
+      if (!service?.ecosystem) throw new Error('fixture has no service ecosystem');
+      service.ecosystem.egressSubServiceId = 'no-such-sub-service';
+    });
+    const issue = validateCosmos(data).errors.find((candidate) => candidate.code === 'unknown-ecosystem-node');
+    expect(issue?.context).toMatchObject({ nodeId: 'no-such-sub-service' });
   });
 });

@@ -13,6 +13,11 @@ export type Tech =
 
 export type TeamId = 'team-shopping' | 'team-fulfillment' | 'team-engagement';
 
+/** A named service hue. The client renders it as `var(--svc-<key>)`; `CosmosData.palette` holds its hex. */
+export type PaletteKey =
+  | 'cyan' | 'green' | 'amber' | 'red' | 'violet' | 'blue' | 'pink'
+  | 'magenta' | 'orange' | 'teal' | 'rose' | 'purple' | 'emerald';
+
 export interface SubService {
   id: string;
   name: string;
@@ -23,15 +28,33 @@ export interface SubService {
   tech?: Tech[];
 }
 
+export interface EcosystemEdge {
+  from: string;
+  to: string;
+  proto: Protocol;
+}
+
+/** A service whose sub-services can fan out on the map, and the route a 3-hop broadcast takes through them. */
+export interface ServiceEcosystem {
+  expandable: boolean;
+  /** Topic whose records enter the ecosystem. */
+  intakeTopicId: string;
+  /** Sub-service that consumes the intake topic. */
+  intakeSubServiceId: string;
+  /** Hops between sub-services, in travel order. */
+  internalEdges: EcosystemEdge[];
+  /** Sub-service that delivers to the step's final destination over WebSocket. */
+  egressSubServiceId: string;
+}
+
 export interface Service {
   id: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  /** CSS variable reference, e.g. 'var(--svc-cyan)'. */
-  color: string;
-  /** Concrete hex of the same hue as `color`. */
+  palette: PaletteKey;
+  /** Equals `CosmosData.palette[palette]`. */
   hex: string;
   name: string;
   sub: string;
@@ -45,6 +68,7 @@ export interface Service {
   /** Omitted for external infra. */
   team?: TeamId;
   subServices?: SubService[];
+  ecosystem?: ServiceEcosystem;
 }
 
 export interface Topic {
@@ -58,6 +82,24 @@ export interface Topic {
   color: string;
   hex: string;
   desc: string;
+  /** Service whose topic group (badge when zoomed out, ring when zoomed in) holds this topic. */
+  groupServiceId: string;
+}
+
+export interface ClusterNebula {
+  anchorServiceIds: string[];
+  /** Resting hue of the zone's cloud. */
+  base: PaletteKey;
+  /** Hue the cloud shifts toward as activity in the zone rises. */
+  hot: PaletteKey;
+}
+
+/** A labelled zone of services drawn as a backdrop behind them. */
+export interface Cluster {
+  id: string;
+  label: string;
+  serviceIds: string[];
+  nebula: ClusterNebula;
 }
 
 export interface Step {
@@ -196,6 +238,8 @@ export interface CosmosHealth {
 export interface CosmosData {
   brand: Brand;
   domains: Domain[];
+  palette: Record<PaletteKey, string>;
+  clusters: Cluster[];
   services: Service[];
   topics: Topic[];
   scenarios: Scenario[];

@@ -35,6 +35,7 @@ function checkUniqueIds(data: CosmosData): CosmosValidationIssue[] {
     ...data.services.flatMap((service) => (service.subServices ?? []).map((subService) => subService.id)),
     ...data.topics.map((topic) => topic.id),
   ];
+  const clusterIds = data.clusters.map((cluster) => cluster.id);
   const playableIds = [...data.scenarios.map((scenario) => scenario.id), ...data.incidents.map((incident) => incident.id)];
   const phaseIds = [...data.scenarios, ...data.incidents]
     .map((playable) => playable.phaseId)
@@ -45,6 +46,9 @@ function checkUniqueIds(data: CosmosData): CosmosValidationIssue[] {
     ),
     ...findDuplicates(playableIds).map((id) =>
       error('duplicate-playable-id', `playable id "${id}" is used by more than one scenario or incident`, { id }),
+    ),
+    ...findDuplicates(clusterIds).map((id) =>
+      error('duplicate-cluster-id', `cluster id "${id}" is used by more than one cluster`, { id }),
     ),
     ...findDuplicates(phaseIds).map((phaseId) =>
       error('duplicate-phase-id', `phaseId ${phaseId} is used by more than one scenario or incident`, { phaseId }),
@@ -180,13 +184,82 @@ function checkReferences(data: CosmosData, nodes: NodeIndex): CosmosValidationIs
   return issues;
 }
 
+function checkPalette(data: CosmosData): CosmosValidationIssue[] {
+  return data.services
+    .filter((service) => service.hex.toLowerCase() !== data.palette[service.palette].toLowerCase())
+    .map((service) =>
+      error(
+        'service-hex-mismatch',
+        `service "${service.id}" has hex ${service.hex} but palette "${service.palette}" is ${data.palette[service.palette]}`,
+        { service: service.id, palette: service.palette, hex: service.hex, expected: data.palette[service.palette] },
+      ),
+    );
+}
+
+function checkGroupings(data: CosmosData, nodes: NodeIndex): CosmosValidationIssue[] {
+  const issues: CosmosValidationIssue[] = [];
+  const topLevelServiceIds = new Set(data.services.map((service) => service.id));
+
+  for (const cluster of data.clusters) {
+    for (const serviceId of [...cluster.serviceIds, ...cluster.nebula.anchorServiceIds]) {
+      if (!topLevelServiceIds.has(serviceId)) {
+        issues.push(
+          error('unknown-cluster-service', `cluster "${cluster.id}" names unknown service "${serviceId}"`, {
+            cluster: cluster.id,
+            serviceId,
+          }),
+        );
+      }
+    }
+  }
+  for (const topic of data.topics) {
+    if (!topLevelServiceIds.has(topic.groupServiceId)) {
+      issues.push(
+        error('unknown-topic-group', `topic "${topic.id}" names unknown group service "${topic.groupServiceId}"`, {
+          topic: topic.id,
+          groupServiceId: topic.groupServiceId,
+        }),
+      );
+    }
+  }
+  for (const service of data.services) {
+    const ecosystem = service.ecosystem;
+    if (!ecosystem) continue;
+    const subServiceIds = new Set((service.subServices ?? []).map((subService) => subService.id));
+    const unknownNodes = [
+      ...(nodes.topicIds.has(ecosystem.intakeTopicId) ? [] : [ecosystem.intakeTopicId]),
+      ...[
+        ecosystem.intakeSubServiceId,
+        ecosystem.egressSubServiceId,
+        ...ecosystem.internalEdges.flatMap((edge) => [edge.from, edge.to]),
+      ].filter((id) => !subServiceIds.has(id)),
+    ];
+    for (const nodeId of new Set(unknownNodes)) {
+      issues.push(
+        error('unknown-ecosystem-node', `service "${service.id}" ecosystem names "${nodeId}", which is not its intake topic or one of its sub-services`, {
+          service: service.id,
+          nodeId,
+        }),
+      );
+    }
+  }
+  return issues;
+}
+
 /** Returns every invariant violation; an empty `errors` list means the data is safe to serve. */
 export function validateCosmos(data: CosmosData): { errors: CosmosValidationIssue[]; warnings: CosmosValidationIssue[] } {
   const nodes: NodeIndex = {
     serviceIds: new Set(data.services.flatMap((service) => [service.id, ...(service.subServices ?? []).map((sub) => sub.id)])),
     topicIds: new Set(data.topics.map((topic) => topic.id)),
   };
-  const issues = [...checkUniqueIds(data), ...checkSteps(data, nodes), ...checkGeometry(data), ...checkReferences(data, nodes)];
+  const issues = [
+    ...checkUniqueIds(data),
+    ...checkSteps(data, nodes),
+    ...checkGeometry(data),
+    ...checkReferences(data, nodes),
+    ...checkPalette(data),
+    ...checkGroupings(data, nodes),
+  ];
   return {
     errors: issues.filter((issue) => issue.severity === 'error'),
     warnings: issues.filter((issue) => issue.severity === 'warn'),
