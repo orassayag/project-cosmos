@@ -307,3 +307,58 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
   `ecosystem` field, and `groupServiceId` on topics. It still does not mention the server copy (a Phase 1 gap).
 - `CLAUDE.md`: the hex invariant now reads `hex === PALETTE[palette]`.
 - `scripts/fresh-start.mjs`: its two template services use `palette`.
+
+## Phase 3 — Move derived logic to the server (2026-10-02)
+
+### Shape
+
+- Each `server/src/cosmos/derive/*.ts` module exports pure functions that take the data (or the slice they need) as an
+  argument. None imports `data/` or `index.ts`; only `view.ts` wires them to `getCosmosData()`. A `phase 3`
+  cosmos:check entry enforces this.
+- `getCosmosView()` returns `{ data, derived }`. `data` is the same frozen object `getCosmosData()` returns; `derived`
+  is built once and deep-frozen (`deepFreeze` is now exported from `index.ts`).
+- Every derived type (`CosmosDerived`, `CosmosView` and the types they reference) lives in `apiTypes.ts`, which stays
+  import-free, so Phase 5 can copy it as is.
+- `derived` keys: `edges`, `connectedNodeIds`, `serviceLinks`, `topicLinks`, `dependentsOf`, `blastRadius`,
+  `ownership { byService, teamGroups }`, `topicGroups`, `healthStatus { byService, counts }`,
+  `latestDrift { date, entries, byNode }`, `driftSearchText`, `driftLinks`, `playable { items, stepsById }`.
+  This is the plan's Phase 4 `derived` list plus `serviceLinks`/`topicLinks` (the snapshot's `calls`/`publishes`/
+  `consumes`/`producers`/`consumers`, which the plan puts in `graph.ts`), `dependentsOf` and `driftLinks`.
+- Maps and sets became plain records and arrays, so the view serializes as JSON without conversion.
+
+### Split rule applied
+
+- **Edges are logical only:** `{ key, type, from, to }`. The SVG path `d` is geometry and stays in `edge-builder.ts`.
+  Order and the rule that drops a hop to a non-service, non-topic id (a sub-service) match `deriveEdges()`.
+- **Topic groups are `{ id, serviceId, memberIds }`.** `cx`/`cy` repeat the service position and `ringRadius` is ring
+  geometry, so both stay client-side; `members` are recoverable from `topics` by id.
+- `BLAST_LEVEL_META`, `HEALTH_STATUS_META` and `DRIFT_KIND_META` stay on the client (presentation, as in Phase 1).
+- Not ported (presentation or client-only): `driftRunDateTime` (locale formatting), `driftEntriesByRun`,
+  `radialMemberPosition`, `activeNodeSet`/`shotNodeSet`, `scenariosForDomain`. Phase 8 decides if any is needed.
+
+### Behavior notes
+
+- **Drift search uses the kind id, not its label.** The client haystack includes `DRIFT_KIND_META[kind].label`
+  (`Added`, `Changed`, `Risk`, `Removed`). Lower-cased, each label equals its kind id, and the haystack is lower-cased,
+  so using `entry.kind` keeps matching identical without moving presentation metadata to the server. A cross-check
+  script against the client's `driftEntryMatches` could not be run in this session (ad-hoc `tsx` was not allowed);
+  the equivalence rests on that argument plus the facet-by-facet unit tests.
+- **Graph sources differ on purpose, as on the client:** edges read scenario + incident steps (`ALL_STEPS`);
+  `connectedNodeIds`, the dependency graph and `serviceLinks` read scenario steps only.
+- `resolveHealth` for a service id that is not in `services` uses `owners.fallback.label`; the client hard-coded the
+  same string.
+- `stepsFor(id)` returns `[]` for an unknown id (the runner treats it as no scenario).
+- `playable.stepsById` repeats steps already in `data.steps` / `data.incidents`. Phase 4 measures gzip size (I7);
+  if it is tight, drop `stepsById` from the payload and keep `stepsFor` as a function.
+
+### Tests
+
+- There were no client unit tests for these helpers to port (the client has only the parity twin for this data).
+  New unit tests in `server/src/cosmos/derive/__tests__/` run against a small fixture (`cosmosFixture.ts`) built on
+  a clone of the real data with services, topics, steps and incidents replaced.
+- `cosmosParity.test.ts` now also checks, against `baseline-full.json`: blast radius and 1-hop dependents for every
+  service and topic (dependents compared as sets — the baseline lists them in blast-radius order), edges without `d`,
+  `CONNECTED_NODE_IDS`, `TOPIC_GROUPS` without geometry, `TEAM_GROUPS`, `HEALTH_BY_SERVICE` per service plus status
+  counts, `LATEST_DRIFT_*`, `STEPS_BY_SCENARIO` and incident steps. Against `baseline-cosmos-map.json`: per-service
+  `calls`/`publishes`/`consumes`/`domains`/`ownerLabel` and per-topic `producers`/`consumers`.
+- No fixture was regenerated and no data value changed.

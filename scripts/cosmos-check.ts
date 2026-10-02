@@ -89,6 +89,36 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
       ':(exclude,glob)client/src/**/__tests__/**',
     ],
   },
+  {
+    name: 'server derive modules and getCosmosView() exist',
+    phase: 3,
+    type: 'files-exist',
+    paths: [
+      'server/src/cosmos/view.ts',
+      'server/src/cosmos/derive/graph.ts',
+      'server/src/cosmos/derive/blastRadius.ts',
+      'server/src/cosmos/derive/ownership.ts',
+      'server/src/cosmos/derive/health.ts',
+      'server/src/cosmos/derive/topicGroups.ts',
+      'server/src/cosmos/derive/drift.ts',
+      'server/src/cosmos/derive/playable.ts',
+    ],
+  },
+  {
+    // Derive functions take the data as an argument; only view.ts wires them to getCosmosData().
+    name: 'derive modules are pure: no data or index imports',
+    phase: 3,
+    type: 'grep-absent',
+    pattern: `from ['"]\\.\\./(data/|index\\.js)`,
+    pathspecs: [':(glob)server/src/cosmos/derive/*.ts'],
+  },
+  {
+    name: 'derived parity covers blast radius, edges, topic groups, team groups, health, drift and steps',
+    phase: 3,
+    type: 'grep-present',
+    pattern: 'derived values parity with baseline-full\\.json',
+    pathspecs: ['server/src/__tests__/cosmosParity.test.ts'],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

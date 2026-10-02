@@ -18,7 +18,7 @@ import type { CosmosData } from './types.js';
 
 let cosmosData: CosmosData | undefined;
 
-function deepFreeze<T>(value: T): T {
+export function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const entry of Object.values(value)) deepFreeze(entry);

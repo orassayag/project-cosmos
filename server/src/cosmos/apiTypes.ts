@@ -249,3 +249,134 @@ export interface CosmosData {
   drift: CosmosDrift;
   health: CosmosHealth;
 }
+
+/** A drawable hop between two map nodes. Path geometry stays client-side. */
+export interface LogicalEdge {
+  /** `<from>→<to>|<type>` — the client's edge key. */
+  key: string;
+  type: Protocol;
+  from: string;
+  to: string;
+}
+
+export interface ServiceLinks {
+  calls: string[];
+  publishes: string[];
+  consumes: string[];
+  /** Domains whose scenarios touch the service. */
+  domains: string[];
+}
+
+export interface TopicLinks {
+  producers: string[];
+  consumers: string[];
+}
+
+export type BlastLevel = 'source' | 'high' | 'med' | 'low';
+
+export interface BlastNode {
+  id: string;
+  name: string;
+  level: Exclude<BlastLevel, 'source'>;
+  /** Breadth-first depth from the source; 1 for direct dependents. */
+  hops: number;
+}
+
+export interface BlastResult {
+  sourceId: string;
+  levels: Record<string, BlastLevel>;
+  /** Sorted by severity, then name. */
+  dependents: BlastNode[];
+}
+
+export interface ResolvedOwner {
+  /** Omitted for unowned platform infra. */
+  teamId?: TeamId;
+  label: string;
+  color: string;
+  hex: string;
+  reviewers: string[];
+  githubTeam?: string;
+  slack?: string;
+  source: 'override' | 'team' | 'fallback';
+}
+
+export interface TeamGroup {
+  /** null for the unowned bucket. */
+  teamId: TeamId | null;
+  label: string;
+  color: string;
+  hex: string;
+  githubTeam?: string;
+  slack?: string;
+  serviceIds: string[];
+}
+
+export interface CosmosOwnership {
+  byService: Record<string, ResolvedOwner>;
+  teamGroups: TeamGroup[];
+}
+
+/** Connected topics grouped under the service their `groupServiceId` names. */
+export interface TopicGroup {
+  id: string;
+  serviceId: string;
+  memberIds: string[];
+}
+
+export type HealthStatus = 'fresh' | 'warm' | 'hot';
+
+export interface ResolvedHealth extends ServiceHealthInput {
+  status: HealthStatus;
+  ageDays: number;
+  onCall: OnCall | null;
+  team: TeamId | null;
+  teamLabel: string;
+}
+
+export interface CosmosHealthStatus {
+  byService: Record<string, ResolvedHealth>;
+  counts: Record<HealthStatus, number>;
+}
+
+export interface LatestDrift {
+  date: string | null;
+  entries: DriftEntry[];
+  /** Highest-severity kind per node in the latest run. */
+  byNode: Record<string, DriftKind>;
+}
+
+export interface DriftLinks {
+  prUrl: string | null;
+  commitUrl: string | null;
+}
+
+export type Playable = Scenario | Incident;
+
+export interface CosmosPlayable {
+  /** Scenarios, then incidents. */
+  items: Playable[];
+  stepsById: Record<string, Step[]>;
+}
+
+export interface CosmosDerived {
+  edges: LogicalEdge[];
+  connectedNodeIds: string[];
+  serviceLinks: Record<string, ServiceLinks>;
+  topicLinks: Record<string, TopicLinks>;
+  dependentsOf: Record<string, string[]>;
+  blastRadius: Record<string, BlastResult>;
+  ownership: CosmosOwnership;
+  topicGroups: TopicGroup[];
+  healthStatus: CosmosHealthStatus;
+  latestDrift: LatestDrift;
+  /** Lower-cased text a changelog query is matched against, per drift entry id. */
+  driftSearchText: Record<string, string>;
+  driftLinks: Record<string, DriftLinks>;
+  playable: CosmosPlayable;
+}
+
+export interface CosmosView {
+  data: CosmosData;
+  derived: CosmosDerived;
+}
