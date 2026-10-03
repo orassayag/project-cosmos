@@ -61,7 +61,7 @@ Every architecture diagram starts dying the moment it's born. The wiki page is f
 
 ### AI
 
-- 💬 **Ask the agent** — a natural-language question box over the whole architecture, backed by a real LangChain + LangGraph agent. Connect your own Claude or OpenAI key and the answer streams in word by word, with a token count; the agent can light up every service it mentions and start playing the matching scenario. Without a key you get playful demo answers and a one-tap link to connect. See [Ask the agent (AI)](#ask-the-agent-ai).
+- 💬 **Ask the agent** — a natural-language question box over the whole architecture, backed by a real LangChain + LangGraph agent. Run the project locally with a Claude or OpenAI key in `server/.env` and the bot in the bottom-right corner turns green; the answer streams in word by word, with a token count, and the agent can light up every service it mentions and start playing the matching scenario. No visitor ever types a key: on the live site the bot stays red and explains how to run the agent locally. See [Ask the agent (AI)](#ask-the-agent-ai).
 - 🌙 **Drift Sync** — the nightly honesty robot. Diffs every tracked repo against a baseline SHA, filters noise with cheap regexes, asks an AI agent "does the map still tell the truth?", and opens one tidy PR per team with file:line evidence.
 - 🤖 **Two Claude skills** — `/add-service` and `/add-scenario` teach [Claude Code](https://claude.com/claude-code) to interrogate your repos and grow the map for you: who do you call, what do you produce, to which topic, what database are you hiding.
 
@@ -137,6 +137,7 @@ Everything the map does is reachable without the mouse:
 | `Space` | Play / pause the current scenario |
 | `←` `→` | Previous / next step |
 | `P` | Presentation mode — hide the chrome for a talk |
+| `A` | Open / close the agent (the answer panel when the bot is green, the setup window when it is red) |
 | `B` | Blast radius |
 | `H` | Service health heat map |
 | `O` | Ownership view |
@@ -150,21 +151,29 @@ Mouse equivalents: drag the background to pan, scroll to zoom around the cursor,
 
 ## Ask the agent (AI)
 
-The **Ask** box (the "Explore Project Cosmos" search) answers questions about the architecture — *"What happens when a payment fails?"*, *"Which team owns checkout?"*, *"Play the order flow"*. Empty, it offers those three as one-tap starter chips.
+The agent answers questions about the architecture — *"What happens when a payment fails?"*, *"Which team owns checkout?"*, *"Play the order flow"*. Open it with the bot button in the bottom-right corner (or press `A`), type a question in the answer panel and press Search.
 
 ### Connecting
 
-A small robot icon with a red/green light shows whether an agent is connected. **Connect AI agent** opens a window where the visitor picks **Claude** or **OpenAI** and pastes their own API key; the server checks it with the provider on the spot and reports the result. An optional second field takes a Vercel AI Gateway key for JEV triage. **Disconnect** clears it at any time.
+The bot button's light shows whether the agent is available. The page asks `GET /api/ai/status` once on load:
 
-The key never touches page scripts or storage: it is sealed with AES-256-GCM into an `HttpOnly`, `Secure`, `SameSite=Strict` cookie scoped to `/api/ai`, and the server is stateless — no accounts, no database. The key is re-checked on every page load, so the green light turns red if it stops working, and a key revoked mid-answer disconnects automatically.
+- **Green** — the local dev server has a model key. Clicking the bot (or `A`) opens the answer panel.
+- **Red** — clicking it opens a setup window whose first line says why:
+  - on the live site (or anywhere but the local dev server): *"Live answers are only available when running the project locally."*
+  - locally without a key: *"No AI key is set yet."*
+
+  Then the numbered steps: copy `server/.env.example` to `server/.env`, set `ANTHROPIC_API_KEY` *or* `OPENAI_API_KEY` (optionally `AI_GATEWAY_API_KEY` for JEV), and run `pnpm dev`. Questions are billed to the AI account whose key you set.
+- **Grey** — the status has not answered yet; clicking it shows the same setup window with the live-site wording.
+
+The page never asks for, sends or stores a key. The server reads the keys from its own env, and only when the local dev script started it (bound to `127.0.0.1`); a deployed server never enables the agent. A provider error (for example a refused key) shows in the answer panel and the bot stays green.
 
 ### How a question is answered
 
 ```
-question → JEV triage (site's or visitor's AI Gateway key; free keyword fallback)
-   ├─ off-topic                        → a canned playful reply, 0 tokens on the visitor's key
+question → JEV triage (AI_GATEWAY_API_KEY; free keyword fallback)
+   ├─ off-topic                        → a canned playful reply, 0 model tokens
    ├─ "play X" with a confident target → plays the scenario directly, 0 tokens
-   └─ everything else                  → LangGraph agent on the visitor's Claude / OpenAI key
+   └─ everything else                  → LangGraph agent on the configured Claude / OpenAI key
                                            ├─ streams the answer (NDJSON)
                                            ├─ read tools  → get_service, get_steps (payloads), blast_radius,
                                            │                who_owns, on_call, drift (changelog)
@@ -175,7 +184,7 @@ question → JEV triage (site's or visitor's AI Gateway key; free keyword fallba
                                               which comes back when the view is closed
 ```
 
-- **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the visitor's model.
+- **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the configured model.
 - **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map (services, topics, scenarios, steps, teams, one health/on-call line per service, the latest drift run) plus read tools for the rest — payloads, blast radius, ownership, on-call and drift history. Relative times ("past 24 hours") are measured from the data's `asOf` date, not the real clock. Its map-action tools accept only ids that exist on the map, so it can never point at an invented service. Answers are capped at ~150 words.
 - **Errors are explained, not dumped**: out of credit, rate-limited, invalid key, or a general provider problem — never echoing any part of the key.
 
@@ -186,9 +195,7 @@ The server (`server/`) is a [Hono](https://hono.dev) app served under `/api`:
 | Route | What it does |
 |---|---|
 | `GET /api/cosmos` | The whole map as one JSON — `{ version, data, derived }` — with `ETag: "<version>"` (304 on a matching `If-None-Match`) and a CDN cache that lasts until the next deploy. Does not load the AI stack |
-| `POST /api/ai/connect` | Validates `{ provider, apiKey, gatewayApiKey? }`, checks the key with the provider, sets the encrypted cookie |
-| `POST /api/ai/disconnect` | Clears the cookie (works even when AI is not configured) |
-| `GET /api/ai/status` | `{ connected, provider }`; clears a revoked key |
+| `GET /api/ai/status` | `200 { connected: true, provider }` when the local dev server has a model key; otherwise `503 { errorCode: 'AI_NOT_LOCAL' }` (not the local dev server) or `503 { errorCode: 'AI_NOT_CONFIGURED' }` (local, no key). Never calls the provider |
 | `POST /api/ai/ask` | Streams `token` / `action` / `usage` / `error` / `done` events as NDJSON |
 
 The agent reads the same view `GET /api/cosmos` serves (`getCosmosView()`), so its answers and the map can't disagree.
@@ -197,7 +204,7 @@ The agent reads the same view `GET /api/cosmos` serves (`getCosmosView()`), so i
 
 Open the site with `?demo=ai` (≤60 s) or `?demo=all` (≤120 s) and it plays a scripted tour of itself; add `&speed=2` (up to 8) to fast-forward. Any click or key press stops it.
 
-- **`demo=ai`** opens the Fulfillment domain, connects an AI agent, types a question and shows the answer lighting up the map.
+- **`demo=ai`** opens the Fulfillment domain, opens the (already green) agent, types a question and shows the answer lighting up the map.
 - **`demo=all`** tours the whole app: the intro, domains, playing and stepping a scenario, replaying an incident, the ownership view, and the AI agent.
 
 The tours drive the **real UI**: a human-like pointer glides along curved paths, overshoots and settles, and types with natural rhythm, dispatching the same pointer, mouse and keyboard events a person would. Only the AI connection and the answer are faked, so a tour never contacts a real AI service. On phones the pointer is hidden and the tours open the menu drawer when they need it.
@@ -216,7 +223,7 @@ The recorder uses Playwright and fails if the tour aborts or runs over its time 
 The app is built mobile-first and verified on a ~390px-wide phone first, then on desktop.
 
 - **Phone-class** means `max-width: 768px` **or** `max-height: 480px` (landscape phones); the `useViewport` hook mirrors this onto `<html data-viewport data-touch>` so CSS and JS agree.
-- On phones the topbar collapses into a slide-over **drawer** (domain and incident pickers, Ask, changelog, presentation, help), and every floating panel docks as a **bottom sheet** clear of notches and home indicators.
+- On phones the topbar collapses into a slide-over **drawer** (domain and incident pickers, changelog, presentation, help), and every floating panel docks as a **bottom sheet** clear of notches and home indicators.
 - **One panel at a time** — panels never stack: a detail card (inspector, ask, health card) hides the context panels behind it.
 - **Every panel has a close button** in its top-right corner on phones.
 - Touch gestures: drag to pan, two-finger pinch to zoom.
@@ -353,7 +360,7 @@ Merging the PR bumps the baseline inside the same PR — merge means caught-up, 
 client/                 Vite + React app (the map)
   src/api/              the /api/cosmos client, CosmosProvider, emitted API types
   src/map/              SVG map rendering, edges, planets, insight views
-  src/components/       UI shell: intro, playback, step panel, Ask box, Connect window
+  src/components/       UI shell: intro, playback, step panel, agent button, answer panel, setup window
   src/demo/             self-playing demo tours
   src/hooks/            viewport, deep links, map view, AI connection
   src/overlays/         overlay manager (one panel at a time)
@@ -373,13 +380,13 @@ docs/                   plans and working status
 
 ## Deployment
 
-The app is one [Vercel](https://vercel.com) project using **Vercel Services** (`vercel.json`): `client/` serves the static app and `server/` serves `/api/*` as a function, both on one origin. Git auto-deploys are off — deploy deliberately with `vercel deploy`. Both services are required: the client loads the map from the server's `GET /api/cosmos`. Set `AI_COOKIE_SECRET` (and optionally `AI_GATEWAY_API_KEY`) in the project's environment variables; without them the map still deploys and works, with AI switched off.
+The app is one [Vercel](https://vercel.com) project using **Vercel Services** (`vercel.json`): `client/` serves the static app and `server/` serves `/api/*` as a function, both on one origin. Git auto-deploys are off — deploy deliberately with `vercel deploy`. Both services are required: the client loads the map from the server's `GET /api/cosmos`. No environment variables are needed: the AI agent is always off on a deployed site (`/api/ai/*` answers `503 AI_NOT_LOCAL`), so never put model keys in the Vercel project.
 
 The old GitHub Pages address now serves only a redirect page (`pages-redirect/`) that forwards visitors and their deep links to Vercel.
 
 ## Testing and CI
 
-- **Vitest** in both workspaces (`pnpm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
+- **Vitest** in both workspaces (`pnpm test`): the client suite covers the agent button, the setup window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, the local-only agent config, the loopback dev server, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
 - **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `pnpm test:e2e` (Playwright) loads the map through `/api/cosmos`, and `pnpm parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
 - **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`pnpm types:emit` + `git diff`), build, the drift-sync type-check, `pnpm test`, and `pnpm validate` on every PR and push to `main`.
 
@@ -399,7 +406,7 @@ With Claude Code, `/update` writes the version note, commits, and pushes in one 
 - Comets glide on the **real rendered SVG paths** (GSAP MotionPath + `getPointAtLength()`), not approximations.
 - The hyperspace intro is a plain `<canvas>` and one perspective formula — no 3D library.
 - OKLCH color tokens, themeable (`cosmos`, `light`, `minimal`, `dark`).
-- **Server**: Hono on Vercel Functions (Node). It owns the map: typed data in `server/src/cosmos/data/`, checked by Zod schemas and `validateCosmos()`, served with an `ETag` and CDN caching — no database. Zod-validated requests, structured logging that never records keys, AES-256-GCM cookie sealing.
+- **Server**: Hono on Vercel Functions (Node). It owns the map: typed data in `server/src/cosmos/data/`, checked by Zod schemas and `validateCosmos()`, served with an `ETag` and CDN caching — no database. Zod-validated requests, structured logging that never records keys.
 - **AI**: LangChain (`@langchain/anthropic`, `@langchain/openai`) + LangGraph for the agent; the AI SDK's evaluation API on Vercel AI Gateway for JEV triage; the Anthropic SDK for Drift Sync.
 
 ## Origin & credits
