@@ -1,51 +1,46 @@
-# Stage 6 work brief — §5: AskPanel `scriptedAnswer`
+# Stage 6 work brief — P6: Agents read the full model
 
-Stage line: §5: AskPanel `scriptedAnswer` (fixed thinking/word pace, actions, no fetch, no joke) + AskPanel.test cases
+Plan: docs/plans/server-owned-data-migration-plan.md (Phase 6). Pasted verbatim below.
 
-Scope: `client/src/components/AskPanel.tsx`, its test `client/src/components/__tests__/AskPanel.test.tsx`
-(create if missing). May reuse `DemoScriptedAnswer` from `client/src/demo/types.ts` (stage 1) —
-align the prop type with it (add `actions?: AskAction[]` there if it is missing/mistyped).
-Do NOT write `client/src/demo/scriptedAnswer.ts` or its test — that is stage 7.
+### Ground rules for the executing agent
 
-## Plan text (verbatim, docs/plans/demo-plan.md)
+- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
+- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
+- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
+- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
+- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
+- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
+- The AstroMart map must look and behave identically after every phase.
+- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
 
-### Summary (excerpt)
-The demo is pure theatre on the client. It never calls the AI server, never uses a real key,
-and looks the same in every browser.
+### Phase 6 — Agents read the full model
 
-Out of scope: Changing what normal visitors see. Without `?demo=`, every component behaves as it does today.
+Reading the data:
+- Replace the `cosmos-map.json` import in `server/src/app.ts` and every agent module (`context.ts`, `classify.ts`, `localRelevance.ts`, `mapActionTools.ts`, `graph.ts`) with `getCosmosView()`.
+- Digest stays small: add a short latest-drift summary and one health/on-call line per service; no payloads.
+- Measure digest tokens before/after; record both. Growth >50% → trim; if trimming would remove information → stop and ask.
+- Add `asOf` (latest drift/health date) to the data; the system prompt measures relative times from `asOf`.
 
-Issue I3: The "answer like today" is the joke answer that says there's no AI → Fixed: A fixed
-AstroMart answer through a new `scriptedAnswer` prop, with fixed thinking time and word pace. Design §5.
-Issue I5: The demo breaks, or spends a real key, when the real AI status isn't "disconnected" →
-A local fake connection replaces the real one, and the real hook is disabled. No `/api/ai/*` calls.
+Read tools (LangGraph, pure over the view): `get_service(id)`, `get_steps(playableId)`, `blast_radius(nodeId)` (same result as the `B` overlay), `who_owns(id)`, `on_call(serviceId)`, `drift(query?, since?)`.
 
-### §5 — Question and scripted answer (I3, I4)
+Map actions (`mapActionTools.ts`, ids validated against the view): keep `highlight_services`, `play_scenario`; add `show_blast_radius(nodeId)`, `open_passport(nodeId)`, `show_health()`, `show_ownership()`, `open_changelog_entry(entryId)`. First confirm the current client ignores unknown actions safely — add `client/src/__tests__/askUnknownAction.test.ts` asserting an unknown action is a no-op (protects the gap until Phase 8). Component layer.
 
-- `AskPanel` gets an optional `scriptedAnswer?: { text: string; thinkingMs: number; wordMs:
-  number; actions?: AskAction[] }`. When it is set, the panel plays that text with fixed timing
-  (thinking 1500ms, 90ms per word) and fires `actions` when the answer starts. The joke list and
-  the connect prompt are skipped, and no request is made. The joke list is untouched for normal
-  visitors.
-- Tests:
-  - `AskPanel.test.tsx`: `scriptedAnswer` renders the exact text after `thinkingMs +
-    words × wordMs` with fake timers, `fetch` is never called, and `onAction` gets the highlight.
-    *Protects: I3/I5. The same answer every time, with no joke.*
-  - All at the component/unit layer.
+Evaluation — `server/src/__tests__/agentEval.test.ts`, mocked LLM as existing tests do, asserting tool calls and returned ids:
+- "What changed in the Fulfillment Galaxy over the past 24 hours?" → `drift`, names `shipping.dispatched` and `giftWrap` entries.
+- "What breaks if payments goes down?" → exactly `blastRadius['payments']`.
+- "Who is on call for payments?" → matches health data.
+- "What does the checkout request body look like?" → the step payload.
+Existing classifier and relevance tests pass unchanged.
 
-### §10 — Screens (I10)
-The demo is recorded on desktop (1920×1080) and must not break on phones. Built and checked at
-390px first (mobile-first invariant). The Connect window and the answer panel never show at the
-same time. The overlay manager already stacks them, and closing the Connect window restores the
-answer panel.
+**Acceptance:** four eval questions pass; existing agent tests pass; no `cosmos-map.json` importer in `server/src/` except the parity test. A3 check added: `phase 6`: that grep.
 
-### Final acceptance (relevant)
-Opening the site without `?demo=` behaves as it does today: the intro, a real AI status check,
-and the joke answer when disconnected.
 
-## Notes for this stage
-- Follow the stage 4/5 pattern: demo prop overrides internal behaviour; absent prop = unchanged.
-- Timing values (1500 / 90) come from the `scriptedAnswer` object, not hardcoded in the panel.
-- `actions` fire once, when the answer starts (i.e. after thinkingMs, as the first word appears).
-- Never call `fetch` in the scripted path; test asserts it with a spy.
-- Clean up timers on unmount / when `scriptedAnswer` changes (runner can abort mid-answer).
+## Related plan text
+
+| Digest raises AI cost | Token budget check (Phase 6); payloads via tools |
+
+Stop list (relevant): The digest grows more than 50% and trimming would remove information. A data value must change to make a test pass. Any change seems to need a database, write endpoint, auth or shared package. A phase would change how the map looks or behaves for a visitor.
+
+A3 (cosmos:check): add a `phase 6` entry — grep that no file in server/src/ imports cosmos-map.json except the parity test.
+
+Phase 8 later adds client handlers for the new map actions (Ask panel map actions row) — this stage only adds the server-side actions plus the client unknown-action no-op test.

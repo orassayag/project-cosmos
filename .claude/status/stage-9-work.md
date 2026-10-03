@@ -1,54 +1,75 @@
-# Stage 9 work brief — Fake pointer, caption bar, responsive rules, App mount
+# Stage 9 — work brief: P9 (Drift, health and demo data) + P10 (Retarget every writer)
 
-**Stage line:** A1/A3: DemoPointer.tsx + DemoCaption.tsx + responsive.css (pointer hidden on touch, caption behind detail cards) + App mount
+Plan: docs/plans/server-owned-data-migration-plan.md. Decisions log: docs/plans/server-owned-data-decisions.md (append any ambiguity resolution there).
 
-## Scope for THIS stage
-- New `client/src/components/DemoPointer.tsx` (A1 pointer component only).
-- New `client/src/components/DemoCaption.tsx` (A3 caption bar).
-- CSS for both (pointer + caption base styles in the appropriate existing stylesheet, phone rules in `client/src/styles/responsive.css`: pointer hidden on touch/phone-class, caption above playback controls on phones and hidden while a detail card is open — join the "One card at a time" block).
-- Mount both in `client/src/App.tsx`, driven by `demoRunner.caption`, `demoRunner.target`, `demoRunner.isOverlayVisible`, and `demoSpeed` (see ledger Stage 8).
-- Tests for the two components are welcome (e.g. caption renders text with `aria-live="polite"`; pointer computes position from a `[data-demo-target]` element's rect and does nothing when absent) if they fit the ceilings.
+## Ground rules (plan, verbatim)
+- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
+- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
+- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
+- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
+- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
+- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
+- The AstroMart map must look and behave identically after every phase.
+- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
 
-**Out of scope (later stages):** adding `data-demo-target` attributes to app elements (stage 10 — until then the pointer simply finds no element and must stay put/hidden gracefully); DemoEndCard (stage 11); `demo=all` + `toggleLegend` (stage 12); recorder (stage 13).
+## Plan sections for this stage (verbatim)
 
-## Plan text (verbatim)
+### Phase 9 — Drift, health and demo data
 
-### §1 — Runner (excerpt)
-- `types.ts` defines a typed step union. Every step has `durationMs` and an optional `caption`
-  (A3): … `target` names a `data-demo-target` attribute that the pointer moves to (A1).
-- Abort (I8): `useDemoRunner` owns one `AbortController`. … On abort or on finish it hides the pointer and
-  caption, drops the fake AI connection back to the real one (§3), and sets
-  `<html data-demo-state="aborted" | "done">`, which A4 waits for.
+Fixtures:
+- Add `source: 'fixture'` to drift and health in data and response. UI unchanged.
+- System prompt: drift and health are AstroMart demo data; still answer from them.
+- Record intended future producers (Drift Sync writes a drift entry on merge; health from an external source) in the decisions log. Not built here.
 
-### §8 — Accepted additions (A1, A3, A5)
-- **A1 — Fake pointer.** `DemoPointer.tsx` is one absolutely positioned SVG arrow in a portal.
-  Before each targeted step, it moves over 500ms to the center of
-  `document.querySelector('[data-demo-target="…"]').getBoundingClientRect()`, then shows a 300ms
-  ripple. Add `data-demo-target` to: the Connect button, the provider buttons, the key fields,
-  the Connect submit, Search, domain buttons, play/step controls, the legend toggle, and the
-  intro button. The pointer is hidden on phones (touch has no cursor) and has
-  `pointer-events: none`. Verify: visual, in the A4 recording.
-- **A3 — Captions.** `DemoCaption.tsx` is a one-line bar at the bottom center with
-  `aria-live="polite"`. It shows the current step's `caption` and keeps the last one until a new
-  caption replaces it. It is a caption strip, not a panel. On phones it sits above the playback
-  controls and is hidden while a detail card is open, following the "one card at a time" block
-  in `responsive.css`. Verify: visual at 390px and desktop.
-- **A5 — Speed dial.** `?speed=` is parsed in §1, and the runner divides every duration by it.
-  The pointer and caption animations scale too. Covered by `runDemo.test.ts`.
+Demo tours:
+- Add `demo` to server data: `allTour { scenarioId: 'shopping.place-order', incidentId: <newest incident id, explicit> }`, `aiTour { question, scriptedAnswer, highlightServiceIds }` (from `client/src/demo/scriptedAnswer.ts` and `DEMO_ANSWER_SERVICE_IDS`).
+- Rewrite `client/src/demo/scripts.ts` and `scriptedAnswer.ts` to read `data.demo`; no AstroMart ids remain in `client/src/demo/`. Tours still drive the real UI only.
+- *Tests:* `server/src/__tests__/demoData.test.ts` — every id in `demo` exists; every drift entry the scripted answer cites exists and is within 24h of `asOf`; `highlightServiceIds` are services; shifting a cited drift date by 2 days fails (protects against a silently stale scripted answer). Extend `agentEval.test.ts`: the agent's answer to `aiTour.question` cites the same drift entries as the scripted answer. Unit layer. `scripts.test.ts` keeps its timing limits, running against the response fixture.
+- A3 check updated: `phase 9`: the Phase 2 grep no longer allows `client/src/demo/`.
 
-### §10 — Screens (I10)
-The demo is **recorded on desktop (1920×1080) and must not break on phones.** It is built and
-checked at 390px first, per the mobile-first invariant:
-- The caption hides behind detail cards (A3), and the end card has its close button (A2).
-- The pointer is hidden on touch devices.
-Verify manually at 390×844 portrait and 844×390 landscape with `?demo=ai&speed=4`.
+**Acceptance:** `?demo=all` ≤120s and `?demo=ai` ≤60s (re-record both with `npm run record:demo -- all|ai`); a stale drift date fails a test; `npm run cosmos:check -- --phase 9` green.
 
-## Project invariants (CLAUDE.md) that apply
-- Mobile-first; phone-class = `max-width:768px` **or** `max-height:480px`; JS (`useViewport`) and CSS queries stay in sync.
-- One panel at a time on mobile — see "One card at a time" block in `responsive.css`.
-- The caption is a strip, not a panel, so it does not need a close button; the pointer is not interactive (`pointer-events: none`).
-- Never run `tsc` without `--noEmit`/`-b`. Gate: `npm run build`, `npm run typecheck`, `npm run lint`, client tests.
+### Phase 10 — Retarget every writer
 
-## Notes from the ledger
-- Stage 8: read `demoRunner.caption`, `demoRunner.target`, `demoRunner.isOverlayVisible` in App (the `demoRunner` const), use `demoSpeed` for animation scaling. `target` is sticky until a later step replaces it; `closeConnect` has no target.
-- Stage 10 will add `data-demo-target` attributes; the runner never touches them.
+```
+grep -rn "client/src/scenarios\|client/src/incidents\|scenarios/data\|scenarios/services\|cosmos-map" --include=*.ts --include=*.mjs --include=*.md --include=*.yml --include=*.json . | grep -v node_modules | grep -v docs/plans/
+```
+
+| Writer or reader | Change |
+| --- | --- |
+| `drift-sync/scripts/lib/cosmos-context.ts` | Read `getCosmosData()` from `server/src/cosmos/` (repo tool, so reading server files is allowed) |
+| `drift-sync/scripts/apply-edits.ts` + prompts | Allowed write paths → `server/src/cosmos/data/**`; prompts list `palette`, `clusters`, `groupServiceId`, `ecosystem` |
+| `sync:bootstrap`, `sync.ts investigate-topic` | Read repos/topics from server data |
+| `npm run validate` | Calls `validateCosmos()`; Drift Sync keeps only repo-existence checks |
+| `npm run fresh` (`scripts/fresh-start.mjs`) | Writes the starter cosmos into `server/src/cosmos/data/`, incl. `brand`, `clusters`, `demo`, empty drift/health |
+| Layout edit mode, Copy coords | Output matches `server/src/cosmos/data/services.ts`; help text updated |
+| `.claude/skills/add-service`, `add-scenario`, `update`, and `skills/` plugin copies | New paths, fields, validation command |
+| `scripts/record-demo.mjs`, `scripts/parity-screens.mjs` | Default `BASE_URL` = the `npm run dev` setup (`:5173` with proxy) |
+
+- Apply each change. Run Drift Sync via `workflow_dispatch` on a branch (the `DRIFT_SYNC_ENABLED` gate applies to the scheduled trigger; if it also gates dispatch, temporarily set it to `true` for the dry run and back to `false`); confirm it edits `server/src/cosmos/data/`, passes validation, opens a draft PR.
+- **Re-enable Drift Sync (I5):** `gh variable set DRIFT_SYNC_ENABLED --body true`; record in the decisions log.
+- Run `npm run fresh` in a scratch clone; `npm run dev` renders the starter cosmos.
+- *Tests:* existing Drift Sync tests updated to new paths; add `drift-sync/scripts/__tests__/applyEditsPaths.test.ts` asserting writes outside `server/src/cosmos/data/**` are rejected — protects the write boundary. Unit layer.
+- A3 check added: `phase 10`: the grep above returns nothing outside `docs/plans/`.
+
+**Acceptance:** grep empty; Drift Sync dry run and `npm run fresh` both work; `npm run cosmos:check -- --phase 10` green.
+
+## Stop and ask the owner if (plan, verbatim)
+- A Phase 0 baseline command fails on `main`.
+- A data value must change to make a test pass — **except** the two Phase 2 changes named above (`color`→`palette`, prefix rule→`groupServiceId`), which are proven by equivalence tests instead.
+- Vercel's CDN does not serve a new `version` after a deploy, or cold starts stay slow after lazy imports.
+- The gzip size of `/api/cosmos` is over 100 KB (I7).
+- The production `version` does not match the build's `COSMOS_VERSION` (I6).
+- The digest grows more than 50% and trimming would remove information.
+- Any change seems to need a database, write endpoint, auth or shared package.
+- A phase would change how the map looks or behaves for a visitor.
+
+## Orchestrator notes for this stage
+- Carry-overs from stage 8 (ledger): regenerate the client test fixture with `npm run fixture:cosmos` after adding `data.demo` / `source`; drop the `client/src/demo/` exclusion in cosmos:check (Phase 2 grep and phase 8 check); `demo/scripts.ts` is the last client importer of old data, so the >500 kB bundle should shrink once it reads `data.demo`.
+- Owner decision (stage 8 review, Q1 → A): which Ask map action `demo=ai` shows was deferred to Phase 9. CLAUDE.md requires every AI change be reflected in `demo=ai`. Decide the smallest change that shows one action without covering the typed answer (desktop `openPassport` opens beside the answer), keep ≤60s, record the choice in the decisions log. If no option works without changing how the tour behaves for a visitor beyond adding the action, ask (blocker file).
+- Any API shape change (`source`, `demo`) goes through server `apiTypes.ts` + Zod schema, then `npm run types:emit` (CI diffs the client copy). Re-check the gzip budget test (<100 KB).
+- **Outward-facing steps are NOT yours to run.** Do not run Drift Sync via `workflow_dispatch`, do not `gh variable set DRIFT_SYNC_ENABLED`, do not push. Make the code changes and local tests that make them possible, then list the exact commands as manual follow-ups under `## Open questions` (fenced, one per line). Same for "Run `npm run fresh` in a scratch clone": you may do it in a temp dir outside the repo only if it needs no network beyond npm install; otherwise list it.
+- `npm run record:demo -- all|ai` re-recording: run if the local env supports it (dev ports 5173/5174 may be held by unrelated Vite — use `BASE_URL` as stage 7/8 did); report durations. If it cannot run, say so plainly.
+- Phase 10 grep target: after this stage, `npm run cosmos:check -- --phase 10` must be green. The client data copies themselves (`client/src/scenarios/*`, `client/src/incidents/*`, `cosmos-map.json`, snapshot) are deleted in Phase 11 (stage 10) — not here. If the Phase 10 grep cannot be empty without deleting them, scope the phase-10 check to *writers/readers* (tools, skills, scripts, workflows) and record that in the decisions log.
+- Gates (all must be green, report each): `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run validate`, `npm run cosmos:check -- --phase 10`, `npm run test:e2e`, `npm run parity:screens`.
+- Version ledger / README: do not write the version note or commit. Update README.md if commands, paths or the Drift Sync flow it documents changed.

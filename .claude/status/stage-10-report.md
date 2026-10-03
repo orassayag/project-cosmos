@@ -1,53 +1,100 @@
-# Stage 10 report — `data-demo-target` attributes
+# Stage 10 report — P11 (delete old sources) + P12 (docs, live data in dev, forks)
 
 ## Files
-client/src/components/AskAgent.tsx
-client/src/components/ConnectAgentModal.tsx
-client/src/components/DomainBar.tsx
-client/src/components/PlaybackControls.tsx
-client/src/components/IntroOverlay.tsx
-client/src/demo/__tests__/demoTargets.test.tsx
+CLAUDE.md
+CONTRIBUTING.md
+README.md
+client/src/__tests__/cosmosParity.test.ts
+client/src/__tests__/noDevPollingInProd.test.ts
+client/src/__tests__/paletteTokens.test.ts
+client/src/api/__tests__/devPolling.test.ts
+client/src/api/cosmosClient.ts
+client/src/api/useCosmosLoad.ts
+client/src/incidents/data.ts
+client/src/incidents/hub-silence-2026-07-19.ts
+client/src/incidents/inventory-oversell-2026-05-04.ts
+client/src/incidents/payment-cascade-2026-03-12.ts
+client/src/incidents/types.ts
+client/src/scenarios/brand.ts
+client/src/scenarios/clusters.ts
+client/src/scenarios/data.ts
+client/src/scenarios/drift.ts
+client/src/scenarios/health.ts
+client/src/scenarios/owners.ts
+client/src/scenarios/palette.ts
+client/src/scenarios/scenarios.ts
+client/src/scenarios/services.ts
+client/src/scenarios/steps/core.ts
+client/src/scenarios/steps/engagement.ts
+client/src/scenarios/steps/fulfillment.ts
+client/src/scenarios/steps/shopping.ts
+client/src/scenarios/topics.ts
+client/src/scenarios/types.ts
+docs/plans/server-owned-data-decisions.md
+docs/plans/server-owned-data.md
+docs/plans/single-source-data.plan.md
+drift-sync/README.md
+drift-sync/scripts/__tests__/applyEditsPaths.test.ts
+drift-sync/scripts/validate.ts
+package.json
+scripts/__tests__/cosmosCheck.test.ts
+scripts/cosmos-check.ts
+server/package.json
+server/scripts/snapshot-map.ts
+server/src/__tests__/cosmosMap.test.ts
+server/src/__tests__/cosmosParity.test.ts
+server/src/__tests__/fixtures/baseline-agent-snapshot.json
+server/src/__tests__/fixtures/baseline-cosmos-map.json
+server/src/agent/__tests__/context.test.ts
+server/src/agent/classify.ts
+server/src/agent/context.ts
+server/src/agent/localRelevance.ts
+server/src/agent/mapSnapshot.ts
+server/src/agent/route.ts
+server/src/agent/types/cosmosMapSnapshot.ts
+server/src/generated/cosmos-map.json
 
 ## Summary
-The demo's fake pointer now has real things to point at. The app's buttons and fields now carry a hidden `data-demo-target` label that the pointer looks up. The labelled elements are:
-- the question box, the Search button, and the "Connect AI Agent" button
-- the two provider buttons, the provider key field, the JEV key field, and the Connect submit button
-- the three domain tabs
-- the play, step-back, and step-forward controls
-- the intro's "Jump in" button
+Phase 11: the frozen client data (`client/src/scenarios/`, `client/src/incidents/`), `server/src/generated/cosmos-map.json`, `server/scripts/snapshot-map.ts`, the `snapshot` scripts (root and server), `validate`'s `stale-snapshot` check, and the client parity twin are deleted. The agent snapshot types from `server/src/agent/types/cosmosMapSnapshot.ts` moved unchanged into `server/src/agent/mapSnapshot.ts`, with 4 imports repointed. The frozen fixture `baseline-cosmos-map.json` was renamed `baseline-agent-snapshot.json`, content unchanged. The server parity test stays. The twin's tokens.css palette check survives as `client/src/__tests__/paletteTokens.test.ts`. No client helper had zero importers, so none was deleted. `cosmos:check` gained a `files-absent` check type (unit-tested) and the phase 11 checks.
 
-When `?demo=ai` runs, the pointer now glides to each step's control and ripples on it. Every target the AI demo script uses points at exactly one element.
+Phase 12: dev-only live data. `startDevCosmosPolling` / `fetchCosmosIfChanged` in `client/src/api/cosmosClient.ts` poll `/api/cosmos` every 2s with `If-None-Match` and `cache: 'no-store'`, guarded by `import.meta.env.DEV`. `useCosmosLoad` swaps a new version into the ready state, and so into `CosmosProvider`. New tests: `devPolling.test.ts` (200 with a new version updates the provider, 304 does not, nothing outside dev) and `noDevPollingInProd.test.ts` (an in-process production `vite build` has no `If-None-Match` / `no-store`). `tsx watch` already follows the data files, so the watch list is unchanged. Docs: README (principle #1, quickstart, scripts, fork quickstart, layout, deployment, tech notes, testing), `CLAUDE.md` (merged), `CONTRIBUTING.md`, `drift-sync/README.md`, the new decision record `docs/plans/server-owned-data.md`, the single-source plan marked superseded, and the decisions log. The phase 12 checks were added.
 
-The labels change nothing else: no behaviour, no styling, no layout. Phones are unaffected because the pointer is hidden there anyway. Each label sits on the visible button or input itself, never on a wrapper, so the pointer lands on the control's centre.
+Over the sizing ceilings: 53 paths, against the 10-file limit. 23 of them are deletions, and most edits are small. `scripts/cosmos-check.ts` is 483 lines, against the 400-line limit, because it is an append-only check table.
 
-One item from the A1 list is not done: the ownership legend toggle (`legend-ownership`). That button lives in `client/src/map/Map.tsx`. Adding it would have gone over the 6-file ceiling, and Map.tsx is already far over the 300-line ceiling. Stage 12 has to edit Map.tsx anyway to wire `toggleLegend`, so the label fits there (see Open questions).
-
-A new test renders every demo-facing component together. It checks that each target in the AI demo script resolves to exactly one element, and that every other known target except `legend-ownership` is on a button, input, or textarea. I added one cross-component test instead of extending the AskAgent and ConnectAgentModal tests, because that fit within the file ceiling. The test fails if anyone renames or drops one of these attributes.
-
-Checks:
-- `npm run typecheck`: clean.
-- `npm run lint`: 0 errors. The 1 warning in `client/src/map/Map.tsx` was already there; I did not touch that file.
-- Client tests: 118/118 pass across 17 files; 3 of the tests are new.
-- `npm run build`: succeeds.
-
-**Not looked at in a browser.** The pointer actually landing on each control has not been seen; only the DOM attributes are tested.
+Gates (all on this working tree):
+- `npm run build`: ✅, `COSMOS_VERSION=4834125e5b267bcd` (unchanged: no data change).
+- `npm run typecheck`: ✅.
+- `tsc -p drift-sync --noEmit`: ✅.
+- `npm run lint`: ✅ 0 errors. The 1 warning is the existing one at `Map.tsx:834`.
+- `npm test`: ✅ client 194, server 342, scripts 11. The client count fell from 215 because the parity twin's `it.each` cases went.
+- `npm run validate`: ✅ 0 errors, 0 warnings.
+- `npm run cosmos:check` (all phases): ✅ 43/43.
+- `npm run test:e2e`: ✅ 4/4 with `BASE_URL=http://localhost:5175`, because 5173/5174 are held by an unrelated Vite.
+- `npm run parity:screens`: ✅ 16/16, 0 px.
+- `npm run record:demo` on :5175: ✅ `ai` 27.6s (limit 60s), `all` 117.6s (limit 120s).
+- Live edit acceptance: with the dev stack on :5175/:8787, renaming the `payments` capsule label in `server/src/cosmos/data/services.ts` showed on the open map in 1,884 ms with 0 page errors. The file was restored byte-for-byte afterwards.
+- `npm run fresh` in a scratch copy outside the repo: `fresh` itself succeeds, and the client suite passes 194/194. The server type-check fails in 4 derive test files, and 126 of 290 server tests fail. See Open questions.
 
 ## Commit message
-feat(demo): tag demo-clickable controls with data-demo-target
+feat(cosmos): delete the client data copy and poll live data in dev
 
-The fake pointer finds what each demo step "clicks" by a data attribute.
-Without these labels it had nowhere to go, so it stayed hidden. A test
-locks every AI-demo target to exactly one real element.
+The server now owns the map outright: the frozen client copy, the cosmos-map
+snapshot and its tooling are gone, and docs describe the server-owned model.
+In dev the client polls /api/cosmos so a data edit reaches the open map.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
 ## Key decisions
-- **Provider and domain ids are built from the data:** `connect-provider-${option}` (type-checked with `satisfies DemoTarget`) and `domain-${d.id}`. `DomainBar`'s `d.id` is a plain `string`, so domain ids are guarded only by the test, not by the compiler. No new ids were needed; every A1 item already had one in `DEMO_TARGETS`.
-- **`connect-open` is on the Ask box's "Connect AI Agent" button.** This is the only Connect entry point. It renders only while the Ask box is expanded and disconnected. The AI script keeps `demoExpanded` on through that step, so it is present when the pointer looks for it.
-- **`playback-play` is on the play/pause/restart button** (one element, whose label changes). The step dots and speed pills have no ids.
-- **For stage 12:**
-  - Add `data-demo-target="legend-ownership"` to the Ownership button in `client/src/map/Map.tsx` (the `lc-layout-btn` whose `onClick={toggleOwnershipMode}`, about line 1178). Then remove `'legend-ownership'` from `TARGETS_OUTSIDE_THESE_COMPONENTS` in `demoTargets.test.tsx`, so the test covers every `DEMO_TARGETS` id.
-  - The domain tabs render once, in the topbar on desktop and inside the mobile drawer on phones, so `querySelector` never finds a hidden duplicate.
-  - `intro-start` exists only while the intro is mounted, which is right for `pressIntro`.
-- **For stage 11:** nothing here affects the end card.
+- **The agent snapshot types moved, not deleted.** `CosmosMapSnapshot` / `Snapshot*` are still the agent's working shape, so they moved into `mapSnapshot.ts` and kept their names to keep the diff small.
+- **The fixture rename keeps the "no `cosmos-map` outside `docs/`" rule exception-free.** The `cosmos-map` grep excludes only `docs/`, `versions/` (generated), `.claude/status/` and `cosmos-check.ts`.
+- **The palette-token invariant got its own test.** The deleted twin was its only guard, so `paletteTokens.test.ts` now reads the keys from the response fixture.
+- **The dev polling guard also skips `MODE === 'test'`.** That keeps the existing App tests deterministic; `devPolling.test.ts` opts in by stubbing `DEV` and `MODE`. A failed poll is ignored and retried on the next tick, because the dev server is briefly down after every data edit.
+- **The poll uses `cache: 'no-store'`.** The route's `max-age=60` would otherwise let the browser answer from its cache for up to a minute.
+- **The prod-bundle test sets `NODE_ENV=production` during the in-process build.** Vitest sets it to `test`, which made Vite keep `DEV` true; this was confirmed by a first failing run.
+- **knip could not run** (the package download was denied). A script found no unimported client file except `vitestSetup.ts`, which the Vitest config loads.
+- **Both stage-9 carry-overs were decided conservatively,** and recorded in `docs/plans/server-owned-data-decisions.md`. The parity test is kept, and the docs say how a deliberate data change updates it. The fresh-then-build gap is documented in the README fork quickstart, not fixed.
 
 ## Open questions
-- `legend-ownership` has not been added yet: it lives in the oversized `client/src/map/Map.tsx` and would have been a 7th file. I propose that stage 12 add it, since stage 12 has to edit Map.tsx to wire `toggleLegend` anyway. This does not block anything now, because `AI_DEMO_SCRIPT` never targets it.
+1. **Drift Sync PRs will fail CI.** On any real data edit, two tests fail: `server/src/__tests__/cosmosParity.test.ts`, which compares against the frozen `baseline-full.json`, and the client fixture freshness test. The applier updates neither, and the docs now tell humans to update both in the same PR. Should the applier run `npm run fixture:cosmos` and update `baseline-full.json`, or should the server parity test be retired now that the migration is done?
+2. **After `npm run fresh`, `npm run build` and the server tests fail.** The derive tests' synthetic fixture names AstroMart team ids; parity, agentEval, demoData and others assume AstroMart. That is 126 of 290 server tests. Should `fresh` delete the AstroMart-only server suites, or should those suites be rewritten to read ids from the data? The README currently states the gap.
+3. **Outward-facing steps, unchanged from stage 9 and not done here:** re-enabling `DRIFT_SYNC_ENABLED` and the `workflow_dispatch` dry run.
