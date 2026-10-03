@@ -9,8 +9,8 @@
  * baseline is consistent regardless of in-progress work on disk.
  *
  * Usage:
- *   npm run sync:bootstrap
- *   npm run sync:bootstrap -- --dry-run   # don't write the state file
+ *   pnpm sync:bootstrap
+ *   pnpm sync:bootstrap --dry-run   # don't write the state file
  */
 
 import { execFileSync } from 'node:child_process';

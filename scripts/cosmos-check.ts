@@ -7,10 +7,10 @@ import { fileURLToPath } from 'node:url';
  * cosmos-check — one pass/fail report for the server-owned-data migration
  * (docs/plans/server-owned-data-migration-plan.md, addition A3).
  *
- *   npm run cosmos:check                 # every check
- *   npm run cosmos:check -- --phase 0    # only checks active by phase 0
+ *   pnpm cosmos:check                 # every check
+ *   pnpm cosmos:check --phase 0    # only checks active by phase 0
  *
- * Paths resolve against the working directory (npm runs scripts from the repo root).
+ * Paths resolve against the working directory (pnpm runs scripts from the repo root).
  * Each later phase appends its own entries to COSMOS_CHECKS.
  */
 
@@ -233,7 +233,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     name: 'CI runs the E2E loading test',
     phase: 7,
     type: 'grep-present',
-    pattern: 'npm run test:e2e',
+    pattern: 'pnpm test:e2e',
     pathspecs: ['.github/workflows/validate-on-pr.yml'],
   },
   {
@@ -319,7 +319,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     paths: ['drift-sync/scripts/lib/write-boundary.ts', 'drift-sync/scripts/__tests__/applyEditsPaths.test.ts'],
   },
   {
-    name: 'npm run validate runs validateCosmos()',
+    name: 'pnpm validate runs validateCosmos()',
     phase: 10,
     type: 'grep-present',
     pattern: 'validateCosmos\\(cosmosData\\)',
@@ -374,7 +374,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     name: 'docs and workflows name no cosmos-map file or snapshot step',
     phase: 12,
     type: 'grep-absent',
-    pattern: 'cosmos-map|npm run snapshot',
+    pattern: 'cosmos-map|pnpm snapshot',
     pathspecs: ['README.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'drift-sync/README.md', '.github', '.claude/skills', 'skills'],
   },
   {

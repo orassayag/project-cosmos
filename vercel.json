@@ -9,7 +9,7 @@
       "root": "server",
       "entrypoint": "src/app.ts",
       "functions": {
-        "src/app.ts": { "includeFiles": "node_modules/openai/lib/**" }
+        "src/app.ts": { "includeFiles": "node_modules/.pnpm/openai@*/node_modules/openai/lib/**" }
       }
     }
   },

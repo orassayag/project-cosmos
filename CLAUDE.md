@@ -3,21 +3,21 @@
 ## Commands
 
 ```bash
-npm run dev        # client on :5173 + API dev server on :8787 (Vite proxies /api); a data edit reaches the open map in ~2s
-npm run dev:client # client only (plain Vite; no /api, so the map shows its load error)
-npm run dev:server # API dev server only (tsx watch server/scripts/dev-server.ts)
-npm run test:e2e   # Playwright: boots npm run dev, loads the map via /api/cosmos
-npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
-npm run typecheck  # every workspace, no emit
-npm run lint       # eslint over client/, server/, drift-sync/, scripts/
-npm run validate   # validateCosmos() over server/src/cosmos/data: ids resolve, phaseIds unique, service spacing, palette, clusters, topic groups, ecosystem, demo refs, owners
-npm run fixture:cosmos # regenerate the client test fixture after any data edit
-npm run types:emit # copy server/src/cosmos/apiTypes.ts to client/src/api/cosmos-api.ts (CI fails on a stale copy)
-npm run parity:screens # compare 16 map views with docs/plans/baseline-screens (0.1% threshold)
-npm run cosmos:check   # migration checks (-- --phase N for one phase and earlier)
+pnpm dev        # client on :5173 + API dev server on :8787 (Vite proxies /api); a data edit reaches the open map in ~2s
+pnpm dev:client # client only (plain Vite; no /api, so the map shows its load error)
+pnpm dev:server # API dev server only (tsx watch server/scripts/dev-server.ts)
+pnpm test:e2e   # Playwright: boots pnpm dev, loads the map via /api/cosmos
+pnpm build      # every workspace (client: tsc -b && vite build) — the gate for every change
+pnpm typecheck  # every workspace, no emit
+pnpm lint       # eslint over client/, server/, drift-sync/, scripts/
+pnpm validate   # validateCosmos() over server/src/cosmos/data: ids resolve, phaseIds unique, service spacing, palette, clusters, topic groups, ecosystem, demo refs, owners
+pnpm fixture:cosmos # regenerate the client test fixture after any data edit
+pnpm types:emit # copy server/src/cosmos/apiTypes.ts to client/src/api/cosmos-api.ts (CI fails on a stale copy)
+pnpm parity:screens # compare 16 map views with docs/plans/baseline-screens (0.1% threshold)
+pnpm cosmos:check   # migration checks (--phase N for one phase and earlier)
 ```
 
-Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
+Run from the repo root — it is a pnpm workspace root (`client/`, `server/`).
 
 **Never run `tsc` without `--noEmit`/`-b`** — emitted `.js` files shadow `.tsx` in Vite (`client/`) and the app silently serves stale code.
 
@@ -25,10 +25,10 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 
 - `server/src/cosmos/data/` — the entire universe as typed data, served at `GET /api/cosmos`: `services.ts`, `topics.ts`, `domains.ts`, `scenarios.ts`, `clusters.ts`, `palette.ts`, `owners.ts` (teams), `drift.ts`, `health.ts`, `demo.ts` (tour data), `steps/<domain>.ts` (barrel `steps/index.ts`). **Most changes belong here.** The client holds no domain data.
 - `server/src/cosmos/data/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/index.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
-- `client/src/api/` — the only way client code gets data: `cosmosClient.ts` (fetch `/api/cosmos`; in dev it polls every 2s with `If-None-Match`), `CosmosProvider.tsx` (`useCosmos()`), `cosmos-api.ts` (emitted by `npm run types:emit`, never edit). Presentation tables keyed by data ids live in `client/src/theme/`.
+- `client/src/api/` — the only way client code gets data: `cosmosClient.ts` (fetch `/api/cosmos`; in dev it polls every 2s with `If-None-Match`), `CosmosProvider.tsx` (`useCosmos()`), `cosmos-api.ts` (emitted by `pnpm types:emit`, never edit). Presentation tables keyed by data ids live in `client/src/theme/`.
 - `client/src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
 - `client/src/components/` — UI shell: intro, playback controls, step panel, tech icons.
-- `server/` — Node service workspace: the cosmos data, derivations, `GET /api/cosmos` and the AI agent. After a data edit run `npm run fixture:cosmos` and commit the client test fixture with it. `server/src/__tests__/cosmosParity.test.ts` pins the data to `fixtures/baseline-full.json`, so a deliberate data change updates that fixture too.
+- `server/` — Node service workspace: the cosmos data, derivations, `GET /api/cosmos` and the AI agent. After a data edit run `pnpm fixture:cosmos` and commit the client test fixture with it. `server/src/__tests__/cosmosParity.test.ts` pins the data to `fixtures/baseline-full.json`, so a deliberate data change updates that fixture too.
 - `drift-sync/` — the nightly honesty pipeline (its own README).
 - `.claude/skills/` — `add-service`, `add-scenario` (plus `update`): THE documented procedures for growing the map. Follow them rather than improvising.
 
@@ -67,7 +67,7 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 ## Demo tours (`?demo=ai`, `?demo=all`)
 
 The scripted tours live in `client/src/demo/scripts.ts` (steps), `client/src/demo/scriptedAnswer.ts`
-(the AI question + answer), and are recorded with `npm run record:demo -- ai|all`.
+(the AI question + answer), and are recorded with `pnpm record:demo ai|all`.
 
 - **The tours drive the real UI (invariant).** Every step is a viewer gesture (`click` / `type` / `paste`
   on a `data-demo-target`): `runDemo.ts` glides the pointer there and dispatches the same pointer, mouse,
@@ -82,7 +82,7 @@ The scripted tours live in `client/src/demo/scripts.ts` (steps), `client/src/dem
 - **Every AI change is reflected in `demo=ai` in the same change (invariant).** Any change to the Ask /
   Connect-agent flow, providers, or answer behaviour updates `buildAiDemoScript()` and/or
   `DEMO_SCRIPTED_ANSWER` so the tour shows the current behaviour; it must stay ≤60s.
-- After a demo change, run `npm test` and re-record both modes to confirm they finish under their limits.
+- After a demo change, run `pnpm test` and re-record both modes to confirm they finish under their limits.
 
 ## Responsive / mobile
 

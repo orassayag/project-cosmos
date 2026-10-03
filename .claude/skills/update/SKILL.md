@@ -29,7 +29,7 @@ Read `git diff`, `git diff --cached`, and any untracked files from `git status`.
 files that look like secrets (`.env*`, keys) or debris you didn't create — list them and ask
 before including them.
 
-If the diff touched code, run `npm run build` (and `npm run validate` then `npm run fixture:cosmos` if
+If the diff touched code, run `pnpm build` (and `pnpm validate` then `pnpm fixture:cosmos` if
 `server/src/cosmos/data/` changed; include the regenerated
 `client/src/__tests__/fixtures/cosmos-response.json`). A failure is a stop condition — report the output, don't commit.
 

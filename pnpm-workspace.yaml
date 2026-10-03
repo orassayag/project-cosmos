@@ -1,0 +1,7 @@
+packages:
+  - client
+  - server
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - eslint@10.12.0

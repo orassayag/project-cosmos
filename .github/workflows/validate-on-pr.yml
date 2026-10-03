@@ -1,6 +1,6 @@
 name: Validate Project Cosmos
 
-# Runs lint + typecheck + build + `npm test` + `npm run validate` on every PR
+# Runs lint + typecheck + build + `pnpm test` + `pnpm validate` on every PR
 # (and on push to main) to make sure Project Cosmos internal consistency never
 # regresses. Designed to be marked as a REQUIRED status check in repo branch protection — once
 # you do that in the UI (Settings → Branches → main → Add rule), no
@@ -26,37 +26,40 @@ jobs:
       - name: Checkout cosmos
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install deps
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
 
       - name: Client API types match the server (types:emit)
         run: |
-          npm run types:emit
+          pnpm types:emit
           git diff --exit-code client/src/api/cosmos-api.ts
 
       - name: Build (typecheck + vite)
-        run: npm run build
+        run: pnpm build
 
       - name: Typecheck drift-sync
-        run: npx tsc -p drift-sync --noEmit
+        run: pnpm exec tsc -p drift-sync --noEmit
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       - name: Validate Project Cosmos
-        run: npm run validate
+        run: pnpm validate
 
   e2e:
-    # Boots `npm run dev` (Vite + the API dev server) and loads the map through /api/cosmos in Chromium.
+    # Boots `pnpm dev` (Vite + the API dev server) and loads the map through /api/cosmos in Chromium.
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -64,20 +67,23 @@ jobs:
       - name: Checkout cosmos
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install deps
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: End-to-end loading test
-        run: npm run test:e2e
+        run: pnpm test:e2e
 
       - name: Upload Playwright traces
         if: failure()

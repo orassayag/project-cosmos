@@ -81,14 +81,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install deps
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Configure git identity
         run: |
@@ -103,7 +106,7 @@ jobs:
           REPOS_ROOT: ${{ runner.temp }}/source-repos
         run: |
           mkdir -p "$REPOS_ROOT"
-          npm run sync:clone-repos
+          pnpm sync:clone-repos
 
       - name: Determine flags
         id: flags
@@ -140,7 +143,7 @@ jobs:
           # injected here as SLACK_GROUP_ID_<TEAM> env vars (env wins).
           SLACK_WEBHOOK_COSMOS: ${{ secrets.SLACK_WEBHOOK_COSMOS }}
         run: |
-          npm run sync:nightly -- --concurrency ${{ steps.flags.outputs.concurrency }} ${{ steps.flags.outputs.extra }}
+          pnpm sync:nightly --concurrency ${{ steps.flags.outputs.concurrency }} ${{ steps.flags.outputs.extra }}
 
       - name: Upload dry-run report
         if: always()

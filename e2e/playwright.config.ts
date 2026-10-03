@@ -20,7 +20,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'pnpm dev',
     cwd: fileURLToPath(new URL('..', import.meta.url)),
     // Polled through Vite's proxy, so the run starts only once both the client and the API answer.
     url: `${BASE_URL}/api/cosmos`,

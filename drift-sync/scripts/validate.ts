@@ -13,9 +13,9 @@
  *    and the to-service's repo contains topic.name (consumer)
  *
  * Usage:
- *   npm run validate                      # human-readable
- *   npm run validate -- --json            # machine-readable
- *   npm run validate -- --repos-root /path/to/repos
+ *   pnpm validate                      # human-readable
+ *   pnpm validate --json            # machine-readable
+ *   pnpm validate --repos-root /path/to/repos
  */
 
 import { execFileSync } from 'node:child_process';

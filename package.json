@@ -4,17 +4,14 @@
   "author": "Or Assayag",
   "version": "0.1.0",
   "type": "module",
-  "workspaces": [
-    "client",
-    "server"
-  ],
+  "packageManager": "pnpm@12.4.2",
   "scripts": {
-    "dev": "concurrently -n client,server \"npm run dev --workspace client\" \"npm run dev:server\"",
-    "dev:client": "npm run dev --workspace client",
+    "dev": "concurrently -n client,server \"pnpm --filter @project-cosmos/client dev\" \"pnpm dev:server\"",
+    "dev:client": "pnpm --filter @project-cosmos/client dev",
     "dev:server": "tsx watch server/scripts/dev-server.ts",
-    "build": "npm run build --workspaces",
-    "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces && npm run test:scripts",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test && pnpm test:scripts",
     "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
     "types:emit": "tsx server/scripts/emit-client-types.ts",
@@ -45,7 +42,8 @@
     "playwright": "^1.64.0",
     "pngjs": "^7.0.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1"
   },
   "engines": {

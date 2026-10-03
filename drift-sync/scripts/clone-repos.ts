@@ -9,8 +9,8 @@
  * repos flagged not_in_workspace).
  *
  * Usage:
- *   npm run sync:clone-repos                            # clone to configured root
- *   REPOS_ROOT=/tmp/source-repos npm run sync:clone-repos
+ *   pnpm sync:clone-repos                            # clone to configured root
+ *   REPOS_ROOT=/tmp/source-repos pnpm sync:clone-repos
  *
  * Config (drift-sync/config.json or env — see lib/config.ts):
  *   githubOrg / GITHUB_ORG — org the source repos live under (required)

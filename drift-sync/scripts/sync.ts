@@ -7,9 +7,9 @@
  * verdict, evidence, and proposed Project Cosmos edits.
  *
  * Usage:
- *   npm run sync -- investigate-topic <topic-id>
- *   npm run sync -- investigate-topic cloud-pools.pool-created-event
- *   npm run sync -- investigate-topic cloud-pools.pool-created-event --model claude-opus-4-7
+ *   pnpm sync investigate-topic <topic-id>
+ *   pnpm sync investigate-topic cloud-pools.pool-created-event
+ *   pnpm sync investigate-topic cloud-pools.pool-created-event --model claude-opus-4-7
  *
  * Env:
  *   ANTHROPIC_API_KEY — required
@@ -68,7 +68,7 @@ const maxIterIdx = args.indexOf('--max-iterations');
 const MAX_ITER = maxIterIdx >= 0 ? Number(args[maxIterIdx + 1]) : 30;
 
 function usage(): never {
-  console.error('Usage: npm run sync -- investigate-topic <topic-id> [--model <id>] [--max-iterations N]');
+  console.error('Usage: pnpm sync investigate-topic <topic-id> [--model <id>] [--max-iterations N]');
   console.error('');
   console.error('Available topic ids:');
   for (const t of TOPICS) console.error(`  ${t.id.padEnd(50)} (name: ${t.name})`);

@@ -2,8 +2,8 @@
 /**
  * record-demo — play a scripted demo in a real browser and save the video.
  *
- *   npm run dev                      # in another terminal
- *   npm run record:demo -- ai|all    # writes recordings/demo-<mode>.webm
+ *   pnpm dev                      # in another terminal
+ *   pnpm record:demo ai|all    # writes recordings/demo-<mode>.webm
  *
  * BASE_URL overrides the app origin (default http://localhost:5173).
  * Exits non-zero if the demo aborts, fails (a step's target never showed), never
@@ -32,7 +32,7 @@ function fail(message) {
 const mode = process.argv[2];
 if (!Object.hasOwn(TIME_LIMITS_MS, mode)) {
   fail(`expected a mode of ${Object.keys(TIME_LIMITS_MS).join('|')}, got ${JSON.stringify(mode ?? null)}.\n` +
-    'Usage: npm run record:demo -- ai|all');
+    'Usage: pnpm record:demo ai|all');
 }
 
 const baseUrl = (process.env.BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
@@ -60,7 +60,7 @@ try {
     await page.goto(demoUrl, { waitUntil: 'domcontentloaded' });
   } catch (error) {
     throw new Error(`could not open ${demoUrl} (${error.message.split('\n')[0]}).\n` +
-      'Start the app with `npm run dev`, or set BASE_URL to a running instance.', { cause: error });
+      'Start the app with `pnpm dev`, or set BASE_URL to a running instance.', { cause: error });
   }
 
   let finalState;
