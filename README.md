@@ -85,7 +85,7 @@ pnpm dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
-`pnpm dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. The server is required — the client ships no map data of its own. Edit anything in `server/src/cosmos/data/` while it runs: the server restarts and the open map picks up the new data within about 2 seconds, no reload. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
+`pnpm dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. The server is required — the client ships no map data of its own. Edit anything in `server/src/cosmos/data/` while it runs: the server restarts and the open map picks up the new data within about 2 seconds, no reload. Without AI keys the whole map works; the agent button in the bottom-right corner stays red and explains how to switch the agent on. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
 
 ### Useful commands
 
