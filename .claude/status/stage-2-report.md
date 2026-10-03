@@ -1,67 +1,93 @@
-# Stage 2 report — P1: Move the data into the server
+# Stage 2 report — Client entry point
 
 ## Files
-server/src/cosmos/apiTypes.ts
-server/src/cosmos/types.ts
-server/src/cosmos/schema.ts
-server/src/cosmos/validate.ts
-server/src/cosmos/index.ts
-server/src/cosmos/data/brand.ts
-server/src/cosmos/data/domains.ts
-server/src/cosmos/data/services.ts
-server/src/cosmos/data/topics.ts
-server/src/cosmos/data/scenarios.ts
-server/src/cosmos/data/owners.ts
-server/src/cosmos/data/drift.ts
-server/src/cosmos/data/health.ts
-server/src/cosmos/data/steps/shopping.ts
-server/src/cosmos/data/steps/fulfillment.ts
-server/src/cosmos/data/steps/engagement.ts
-server/src/cosmos/data/incidents/payment-cascade-2026-03-12.ts
-server/src/cosmos/data/incidents/inventory-oversell-2026-05-04.ts
-server/src/cosmos/data/incidents/hub-silence-2026-07-19.ts
-server/src/__tests__/cosmosSchema.test.ts
-server/src/__tests__/validateCosmos.test.ts
-server/src/__tests__/cosmosParity.test.ts
-client/src/__tests__/cosmosParity.test.ts
-scripts/cosmos-check.ts
-docs/plans/server-owned-data-decisions.md
+client/src/hooks/useAiConnection.ts
+client/src/hooks/__tests__/useAiConnection.test.ts
+client/src/components/AskAgent.tsx
+client/src/components/AgentButton.tsx
+client/src/components/__tests__/AskAgent.test.tsx
+client/src/components/__tests__/AgentButton.test.tsx
+client/src/components/AskPanel.tsx
+client/src/components/__tests__/AskPanel.test.tsx
+client/src/components/askStream.ts
+client/src/components/ConnectAgentModal.tsx
+client/src/components/__tests__/ConnectAgentModal.test.tsx
+client/src/App.tsx
+client/src/__tests__/askMapActions.test.tsx
+client/src/styles/app.css
+client/src/styles/responsive.css
+client/src/demo/useDemoAiConnection.ts
+client/src/demo/__tests__/useDemoAiConnection.test.ts
+client/src/demo/types.ts
+client/src/demo/scripts.ts
+client/src/demo/__tests__/scripts.test.ts
+client/src/demo/__tests__/demoTargets.test.tsx
+client/src/demo/__tests__/runDemo.test.ts
+
+(`AskAgent.tsx` and `AskAgent.test.tsx` are deleted. `AgentButton.tsx` and `AgentButton.test.tsx` are new and replace them. Git sees these as delete + add, not a rename.)
 
 ## Summary
-Phase 1 is done. The data now has a server copy under `server/src/cosmos/`, which follows the plan's layout. The client copy is unchanged; the only client addition is the twin parity test.
-- `getCosmosData()` (`index.ts`) builds the data once on first call, deeply freezes it, and returns that same object every time. Its shape is `{ brand, domains, services, topics, scenarios, steps, incidents, owners{teams,fallback,serviceOverrides}, drift{runTimeUtc,entries}, health{asOf,services,onCallByTeam} }`.
-- `apiTypes.ts` has no imports (I3). `types.ts` re-exports it and adds `CosmosValidationIssue`. `schema.ts` defines strict Zod schemas, each ending in `satisfies z.ZodType<T>`.
-- `validateCosmos()` returns `{ errors, warnings }` with 16 named error codes plus the `service-no-owner` warning.
-- Tests:
-  - `cosmosSchema.test.ts` (3): the data parses, is frozen and is memoized; an unknown field is rejected.
-  - `validateCosmos.test.ts` (20): real data is clean; one broken clone per rule; a dangling incident step reports its `incidentId`; capsules 100px apart report their ids and the distance; the warning path.
-  - Parity: the server test and its client twin each deep-equal 12 raw-data keys of `baseline-full.json`.
-- A3: `cosmos:check` has 2 new `phase 1` entries: the module files exist, and nothing under `server/src` imports `client/` or `drift-sync/`. The grep pattern was confirmed to match the real `server/scripts/snapshot-map.ts` import.
-- Gates, all run in this stage on feature/add-ai with the changes uncommitted:
-  - `npm run build`: ✅
-  - `npm run typecheck`: ✅
-  - `npm run lint`: ✅ 0 errors, 1 warning that was already there (Map.tsx:814)
-  - `npm test`: ✅ client 152/152 (140 + 12 new), server 138/138 (103 + 35 new), scripts 5/5
-  - `npm run validate`: ✅ 0 errors, 0 warnings
-  - `npm run cosmos:check -- --phase 1`: ✅ 5/5
-  - `npm run parity:screens`: ✅ 16/16, worst view 63 px (0.0030%)
-- `git diff -- client/` is empty.
-- Not verified: I did not deliberately break a client data value to watch the client twin fail. It is a plain deep-equal, so this is low risk.
+- **Top-bar input removed.** The `AskAgent` field is gone from the desktop header and the phone `.lc-topbar-search` row. A new `AgentButton` replaces it: a round 48px chat-bubble bot with a speech-tail and a status-dot badge, `aria-label="Open the agent chat"`. It is green (`lc-agent-button--on`) when the agent is connected, red (`--off`) for `notLocal`/`notConfigured`, and grey (`--unknown`) while the status check runs. Green opens the answer panel. Red or grey opens the setup window (`OVERLAY.connect`).
+- **Position.** The bot sits bottom-right on every size, set in `responsive.css` as `bottom: calc(var(--playback-h) + 12px + var(--safe-bottom))`.
+  - `--playback-h` didn't exist, so I defined it per layout:
+    - idle desktop: `106px` (above the zoom stepper)
+    - compact desktop while playing: transport clearance + the zoom stepper
+    - phone idle: `112px` (lined up with the zoom column)
+    - phone while playing: `--lc-controls-h + 10px`
+  - Desktop: the bot moves to `right: 388px` when the step panel is open, the same as the zoom stepper.
+  - Phones: the bot hides while any bottom sheet, narration strip, unhidden ask panel or the setup window is showing (the same policy as the steppers). It also hides in presentation mode.
+- **`useAiConnection`.** It now only checks status and has no `connect`/`disconnect`. Status is `unknown | connected | notLocal | notConfigured`. A 503 `AI_NOT_CONFIGURED` gives `notConfigured`. A 200 that reports connected gives `connected`. Anything else, including 503 `AI_NOT_LOCAL`, other errors and network failures, gives `notLocal`. When disabled it reports `notLocal`.
+- **Key-rejected → disconnect path removed (I7).** `DISCONNECTING_ERROR_CODES` and `onKeyRejected` are deleted, so a provider error stays visible and the bot stays green (§1.5).
+  - `INVALID_KEY` now reads "Your AI provider refused the key — check the key in server/.env, then restart pnpm dev."
+  - `NOT_CONNECTED` is replaced by messages for `AI_NOT_LOCAL` and `AI_NOT_CONFIGURED`.
+- **`AskPanel`.**
+  - Removed: the joke answers (`DEMO_ANSWERS`) and the canned word-by-word path, plus the `showConnectPrompt`, `onConnectRequest`, `isAiConnected` and `onKeyRejected` props.
+  - New: a minimal question box (textarea `ask-input` + `Search` button `ask-search`, Enter submits) and a required `onAsk` prop.
+  - With `question === ''` (opened from the bot) only the question box shows and nothing is fetched. Otherwise it streams the live answer, or plays the scripted one in a demo.
+- **`App.tsx`.**
+  - Removed: the random-star fallback, `handleDisconnect`, and the AskAgent wiring.
+  - New: `handleOpenAgentChat`. It brings back a still-mounted answer panel, or opens an empty one. Remounting a panel would call the agent again, which is why it never does that.
+  - `handleAsk` always opens with `[]` focus ids (scripted answer only during a demo).
+- **`ConnectAgentModal`.** The key inputs, provider picker, visitor JEV key field and Connect submit are gone. It is now a static "The agent runs locally" window with its close button, Escape and overlay stacking. It takes no props; the wording by reason is stage 3.
+- **Demo.** `useDemoAiConnection()` takes no arguments and always reports connected (no fake connect; `DEMO_CONNECT_MS` is removed). Both tours now: click the bot (target `connect-open`), click the panel's `ask-input`, type, click `ask-search`, wait for the scripted answer. The fake-key paste steps and their targets are removed.
+- **CSS.** I removed the dead top-bar `.lc-ask*` / starter / `.lc-ask-connect` rules and added `.lc-agent-button*` and `.lc-ask-composer*` (16px font on phones so iOS doesn't zoom on focus).
+- **Checks.**
+  - `pnpm typecheck`: green.
+  - `pnpm lint`: 0 errors. The 1 warning (`Map.tsx:834` exhaustive-deps) was already there; I didn't touch `Map.tsx`.
+  - `pnpm test`: green — server 339/339, client 185/185 (26 files, including every touched test), plus scripts tests.
+  - `pnpm build`: green.
+  - `grep AI_COOKIE_SECRET client/`: no matches.
+- **Manual checks (Playwright, headless Chromium, against my own `pnpm dev:server` + Vite on :5199, both stopped afterwards):**
+  - Red bot, 390×844, 844×390 and 1440×900: the bot doesn't overlap the zoom stepper, and a click opens the setup window with its close button.
+  - Desktop while playing: the bot is clear of the transport, zoom and step panel.
+  - Phone while playing: the bot is hidden while the step panel shows. With the step panel closed it sits above the transport (bottom 690 vs transport top 702).
+  - Green bot (dev server started with a fake `ANTHROPIC_API_KEY`), at all three sizes: a click opens the panel and the bot hides behind it on phones. Asking shows the "refused the key" error and the bot stays green.
+  - `?demo=ai` ran to `data-demo-state=done` on desktop (about 20s) and phone (about 22s), with the scripted answer shown.
+  - I did not re-record the demos with `pnpm record:demo`.
 
 ## Commit message
-feat(server): copy cosmos data into server/src/cosmos with schema and validation
+feat(client): replace top-bar ask field with bottom-right agent bot
 
-Phase 1 of the server-owned data migration: the server gets its own frozen copy of the map
-data, typed by a self-contained apiTypes.ts and checked by Zod schemas plus validateCosmos().
-Parity tests pin both the server and client copies to the Phase 0 baseline so they cannot drift.
+The server now reads AI keys from local env, so the client no longer
+connects or disconnects: a status-only hook drives a red/green bot,
+and provider errors stay visible instead of logging the visitor out.
 
 ## Key decisions
-(All of these are also in `docs/plans/server-owned-data-decisions.md`, in the Phase 1 section.)
-- **The server copy holds facts only.** Presentation metadata stays on the client: `DRIFT_KIND_META`, `HEALTH_STATUS_META` and `INCIDENT_COMET_HEX`. Lookup maps, `LATEST_DRIFT_*` and all helpers are left for Phase 3. `steps/core.ts` was not copied.
-- **Parity compares only the raw-data keys.** `STEPS_BY_SCENARIO` and `LATEST_DRIFT_*` are derived, so they wait for Phase 3. `SERVICE_OVERRIDES`, `ON_CALL_BY_TEAM` and `DRIFT_RUN_TIME_UTC` are not in the fixture, so no test checks them; they were copied by hand.
-- **The capsule ≥150px rule covers services only.** One topic node is 148px from a service today, so checking topics would fail on unchanged data.
-- **Not ported from the old validator:** the hex↔color-token check (it needs the client's `tokens.css`; Phase 2's `palette` replaces it), snapshot freshness, and the source-repo greps.
-- **The A3 import check covers `server/src` only.** `server/scripts/snapshot-map.ts` still imports the client copy. It is existing tooling that Phase 11 deletes, so I left it alone.
-- **Known gap in `satisfies z.ZodType<T>`:** it does not catch an optional type field that the schema leaves out.
-- `zod` was already a server dependency, so no package changed.
-- File count is about 25, as the brief allowed. Every file is under 400 lines; the largest is `steps/shopping.ts` at 195.
+- `AiConnection = { status: AiConnectionStatus; provider: AiProvider | null }`, where `AiConnectionStatus = 'unknown' | 'connected' | 'notLocal' | 'notConfigured'` (`client/src/hooks/useAiConnection.ts`). `ConnectResult`, `ConnectErrorCode`, `connect` and `disconnect` no longer exist.
+- `AgentButton({ status, provider, onOpenChat, onOpenSetup })` in `client/src/components/AgentButton.tsx`.
+  - Classes: `lc-agent-button lc-agent-button--on|off|unknown`. The dot is `lc-status-dot--on|off|unknown` with `data-testid="ai-status-dot"`.
+  - Status text is in `title`. The button carries `data-demo-target="connect-open"`.
+- `AskPanel` props are now `{ question, onAsk, hidden?, onClose, onAnswerStart?, onAction?, scriptedAnswer? }`. `question === ''` means the panel was opened empty from the bot. Its question box is a textarea labelled "Your question" (`data-demo-target="ask-input"`) plus a `Search` button (`ask-search`).
+- `ConnectAgentModal()` takes no props. Stage 3 will likely add a `reason`/`status` prop for wording by `notLocal` vs `notConfigured`.
+- `useDemoAiConnection()` takes no arguments and returns a constant `{ status: 'connected', provider: 'anthropic' }`.
+- `DEMO_TARGETS` dropped `connect-provider-anthropic|openai`, `connect-provider-key`, `connect-jev-key` and `connect-submit`. It keeps `connect-open` (now on the bot), `ask-input` and `ask-search`.
+- The `--playback-h` CSS custom property is defined on `.lc-stage` in `responsive.css`. The bot's phone hide list is next to the stepper hide rule there; any new bottom sheet should be added to both.
+- `ASK_ERROR_MESSAGES` (`client/src/components/askStream.ts`) has no `NOT_CONNECTED` and adds `AI_NOT_LOCAL`.
+
+## Open questions
+- **File ceiling exceeded (22 paths vs 10).** The stage needs the hook, the component rename, the panel, the modal, App, CSS and their tests. Removing `connect`/`disconnect` and the Connect form also forced edits to the demo layer (types, scripts and four demo/App tests) to keep `pnpm test` green. Every demo/test edit is the smallest one that compiles and passes. `App.tsx` (945 lines), `app.css` and `responsive.css` were already over the 400-line ceiling before this stage.
+- **The demo target name `connect-open` is kept on purpose.** It now marks the bot, so `runDemo.test.ts`, `useDemoRunner.test.ts` and `DemoPointer.test.tsx` didn't need changes. Plan §2.8 renames it to `agent-button`, and stage 7 should do that rename. The tour change here is interim: no connect steps, the bot is already green, and the steps are click bot → type → Search. Demos were not re-recorded.
+- The bot's grey `unknown` state opens the setup window. Stage 3 may prefer to ignore clicks until the status settles.
+- On a desktop with the panel still open, clicking the green bot only brings the panel to the front. Once the panel has been closed (removed from the overlay stack), the next click opens an empty panel. The old answer is not restored, because restoring it would call the agent again.
+- On 844×390 landscape, the question box sits below the fold of the 50%-height bottom sheet until you scroll it. The sheet scrolls, but the chat in stage 5/6 should pin its composer.
+- The connect-form CSS (`.lc-connect-form`, `-provider`, `-input`, `-submit`, …) in `app.css` is now dead. I left it for stage 3, which rewrites the setup window. The `README.md` "Connecting" / Ask section also still describes the old top-bar field and cookie flow; that is a stage 3 item.

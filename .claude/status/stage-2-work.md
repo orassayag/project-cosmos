@@ -1,71 +1,95 @@
-# Stage 2 work brief — P1: Move the data into the server
+# Stage 2 work brief — Client entry point
 
-Plan: docs/plans/server-owned-data-migration-plan.md (pasted verbatim below). No spec for this run.
-Scope: Phase 1 ONLY. Do not start Phase 2 (palette/groupServiceId/clusters) or Phase 3 (derive modules). Keep `color` unchanged.
+Plan: docs/plans/ai-refactor.md · Branch: feature/ai-refactor
+Stage scope: plan §1.2 (except A5), the **client half** of §1.4, and §1.5.
 
-## Ground rules (from the plan)
-### Ground rules for the executing agent
+## Boundaries for this stage
+- Client only. Stage 1 already made the server keyless (see the ledger). The client still calls
+  `/ai/connect` / `/ai/disconnect`, which now 404 — this stage removes those calls.
+- **A5 (the `a`/`A` keyboard toggle, its `HelpModal.tsx` entry, and
+  `client/src/__tests__/agentShortcut.test.tsx`) is stage 3 — do not build it here.**
+- **§1.3 (setup window wording by reason, setup steps, billing note A2, the
+  `ConnectAgentModal.test.tsx` rewrite) is stage 3.** In this stage, touch
+  `ConnectAgentModal.tsx` only as far as removing `connect`/`disconnect` from `useAiConnection`
+  forces it to (e.g. drop the key inputs, the visitor JEV key field, and the Connect/Disconnect
+  submit path) so the build and its existing test stay green; keep its close button. Adjust its
+  test only as far as needed.
+- `.env.example`, `scripts/fresh-start.mjs`, README docs are stage 3. The right-side chat
+  (`useAgentChat`, `AgentChat`) is stage 5/6. Demo scripted turns are stage 7.
+- Until the chat lands (Increment 2), **green must still open the existing single-answer
+  panel and let the user ask a question there** (plan: "A local `.env` turns the bot green
+  with the existing single-answer panel, and a bad key shows a clear error"). If the question
+  input only lived in the top bar `AskAgent`, give the existing `AskPanel` the minimal input it
+  needs to ask — do not build the chat.
+- Demo tours (`client/src/demo/scripts.ts`) target `data-demo-target`s. If removing the top-bar
+  input breaks a demo step or `scripts.test.ts`, make the smallest change that keeps the tours
+  working and `pnpm test` green (e.g. retarget to the bot button / panel input), and note it
+  under `## Open questions` — the full demo rework is stage 7.
+- Mobile-first + one-panel-at-a-time + mobile close-button contract (see CLAUDE.md) apply.
 
-- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
-- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
-- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
-- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
-- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
-- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
-- The AstroMart map must look and behave identically after every phase.
-- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
+## Plan §1.2 (verbatim)
+#### 1.2 Client: remove inputs, bottom-right bot
+- Remove the `AskAgent` input/textarea from the top bar and the mobile drawer
+  (`client/src/App.tsx` header and `secondaryActions`). `AskAgent.tsx` becomes `AgentButton.tsx`:
+  a round bot button with a chat-bubble look (speech-tail badge,
+  `aria-label="Open the agent chat"`), keeping today's red / light-green status colours.
+- **Phone first:** the button sits bottom-right *above* the playback bar and clear of the zoom
+  buttons (`bottom: calc(var(--playback-h) + 12px)`), with a 48px tap target. Desktop uses the
+  same corner and the same offset rule. Position rules live in
+  `client/src/styles/responsive.css`.
+- `useAiConnection` drops `connect`/`disconnect` and the "provider rejected the key →
+  disconnect" branch (I7). Status is `unknown | connected | notLocal | notConfigured`, mapped
+  from the 503 `errorCode` (I8).
+- **A5 — keyboard toggle.** [STAGE 3 — NOT THIS STAGE] The global key handler in `App.tsx`
+  (beside `p` for presentation) toggles the chat on `a`/`A`, but not while focus is in an input
+  or textarea (same guard as `/` in `Spotlight.tsx`). When the bot is red it opens the setup
+  window instead. Listed in `HelpModal.tsx` next to the existing shortcuts.
+- Verify:
+  - `client/src/components/__tests__/AgentButton.test.tsx` (rename of `AskAgent.test.tsx`,
+    unit). Protects: red vs green class from status; clicking opens the right surface for each
+    status.
+  - `client/src/hooks/__tests__/useAiConnection.test.ts` (trim, unit). Protects: 503
+    `AI_NOT_LOCAL` ⇒ `notLocal`, `AI_NOT_CONFIGURED` ⇒ `notConfigured`, 200 ⇒ `connected`;
+    nothing calls a disconnect.
+  - `client/src/__tests__/agentShortcut.test.tsx` [STAGE 3 — NOT THIS STAGE]
+  - Manual: phone viewport 390×844 and 844×390. The button does not cover the play/zoom
+    controls. (Report what you verified; if you cannot drive a browser, say so plainly.)
 
+## Plan §1.4 (verbatim — this stage does the CLIENT items only)
+#### 1.4 Removal of leftovers
+- Delete: `cookieCrypto.ts`, `connectRequestSchema.ts`, `AI_COOKIE_SECRET` everywhere
+  (`.env.example`, `scripts/fresh-start.mjs`, README), the visitor JEV key field, the joke
+  answers in `AskPanel.tsx` and `server/src/agent/offTopicAnswers.ts` (replaced by the fixed
+  reply in 2.2), the random-star fallback in `App.tsx`, and the key-rejected → disconnect
+  handling (I7).
+- `server/.env.example` documents exactly `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `AI_GATEWAY_API_KEY`, with the "local only, billed to this key" note. The `README.md` setup
+  section is updated to match.
+- Verify: `pnpm typecheck` + `pnpm lint` (catches unused imports and routes);
+  `grep -r AI_COOKIE_SECRET` returns nothing outside `versions/`.
 
-## Relevant issue resolution — I3 (shapes apiTypes.ts from day one)
-| I3 | The type-generation step will not produce the single file the plan expects | gpt | Phase 5 runs `tsc --declaration --emitDeclarationOnly` on `apiTypes.ts`. That file is allowed to import `types.ts`. The TypeScript compiler writes one declaration file (`.d.ts`, a types-only copy of a code file) for every source file it reads, and it names each output after its source. So the command writes `apiTypes.d.ts` and `types.d.ts`, not one `client/src/api/cosmos-api.d.ts`. The `--outFile` option can't combine them for this project's module setting (NodeNext). The CI check (`git diff --exit-code client/src/api/`) would then guard files the client does not import. <br><br> **Before Fix:** The step that should keep the browser and the server agreeing on the data's shape writes the wrong files. The safety check then watches files nobody uses. <br><br> **After Fix:** The browser gets one exact copy of the server's data description, and CI fails the moment the two stop matching. | Fixed | `apiTypes.ts` is self-contained (no imports); `types.ts` re-exports it; `schema.ts` uses `satisfies z.ZodType<CosmosResponse>`; `types:emit` copies the file with a header, no compiler. |
+Client items for THIS stage: the visitor JEV key field (client side), the joke answers in
+`AskPanel.tsx`, the random-star fallback in `App.tsx`, and the key-rejected → disconnect
+handling. Server items (cookieCrypto, connect schema, AI_COOKIE_SECRET reads in server/src) are
+done (stage 1). `.env.example` / `fresh-start.mjs` / README are stage 3.
+`server/src/agent/offTopicAnswers.ts` is stage 4 — do not touch it. Also remove any
+`AI_COOKIE_SECRET` mention left in `client/`.
 
-## Phase 1 — verbatim
-### Phase 1 — Move the data into the server
+## Plan §1.5 (verbatim)
+#### 1.5 Errors stay visible (I7, interim)
+- Until Increment 2, the existing single-answer panel keeps rendering `providerErrors.ts` text,
+  now that no disconnect follows it. Covered by `AskPanel.test.tsx` (existing): a provider
+  401 shows the "key was refused" text while the bot stays green.
 
-Layout:
+Increment 1 can be shown on its own: the live site is red and shows the "local only" window. A
+local `.env` turns the bot green with the existing single-answer panel, and a bad key shows a
+clear error.
 
-```
-server/src/cosmos/
-  apiTypes.ts         # self-contained response + entity types (Phase 5 finalizes)
-  types.ts            # re-exports apiTypes.ts; server-only types
-  schema.ts           # Zod schemas, each `satisfies z.ZodType<...>`
-  data/
-    brand.ts domains.ts services.ts topics.ts scenarios.ts
-    owners.ts drift.ts health.ts
-    steps/ shopping.ts fulfillment.ts engagement.ts
-    incidents/ payment-cascade-*.ts inventory-oversell-*.ts hub-silence-*.ts
-  validate.ts         # validateCosmos()
-  index.ts            # getCosmosData(): one frozen object
-```
+## Context from the plan summary
+A bot button sits bottom-right and stays red (not connected) or green (connected). Red opens a
+window that explains how to set up the agent and JEV locally. Green opens (eventually) a
+right-side chat; for now, the existing single-answer panel.
 
-- Copy each client data module into `data/`, server ESM style (`.js` suffixes, as in `server/src/app.ts`). Nothing under `server/` imports from `client/` or `drift-sync/`.
-- Data only; leave `resolveOwner`, `groupServicesByTeam`, `driftEntryMatches`, PR/commit URL builders, `stepsForScenario` and health helpers for Phase 3. Do not copy `steps/core.ts`. Keep `color` unchanged for now.
-- Entity types are written directly in `apiTypes.ts` with **no imports** (see Phase 5/I3), and `types.ts` re-exports them — so there is one definition from the start.
-- `schema.ts`: Zod schemas checked against the types with `satisfies z.ZodType<T>`. `validate.ts` ports the reference checks from `drift-sync/scripts/validate.ts` and adds: unique `phaseId`, capsules ≥150px apart, incident steps resolve, step `from`/`to`/`via`/`through` resolve to a service, sub-service or topic.
-- *Tests:* `server/src/__tests__/cosmosSchema.test.ts` — `getCosmosData()` parses; protects the data shape. `server/src/__tests__/validateCosmos.test.ts` — one case per rule, each with a deliberately broken clone (bad id, duplicate `phaseId`, capsules 100px apart, dangling incident step) asserting a named error; protects every invariant. Unit layer.
-- *Parity:* `server/src/__tests__/cosmosParity.test.ts` deep-equals server data against `baseline-full.json`; a client-side twin (`client/src/__tests__/cosmosParity.test.ts`) deep-equals the client copy against the same fixture — so the two copies cannot drift. Temporary; the client half is deleted in Phase 11.
-- A3 check added: `phase 1`: nothing under `server/` imports `client/` or `drift-sync/`.
-
-**Acceptance:** `getCosmosData()` matches the baseline; validation catches each deliberately broken case; client unchanged; build green.
-
-## A3 extension point
-Add the `phase 1` check to the existing table in `scripts/cosmos-check.ts` (built in stage 1). `npm run cosmos:check -- --phase 1` must be green.
-
-## Stop and ask the owner if (verbatim)
-### Stop and ask the owner if
-
-- A Phase 0 baseline command fails on `main`.
-- A data value must change to make a test pass — **except** the two Phase 2 changes named above (`color`→`palette`, prefix rule→`groupServiceId`), which are proven by equivalence tests instead.
-- Vercel's CDN does not serve a new `version` after a deploy, or cold starts stay slow after lazy imports.
-- The gzip size of `/api/cosmos` is over 100 KB (I7).
-- The production `version` does not match the build's `COSMOS_VERSION` (I6).
-- The digest grows more than 50% and trimming would remove information.
-- Any change seems to need a database, write endpoint, auth or shared package.
-- A phase would change how the map looks or behaves for a visitor.
-
-## Stage acceptance checklist
-- getCosmosData() deep-equals baseline-full.json (server parity test) and the client copy deep-equals it too (client twin parity test).
-- validateCosmos.test.ts: one deliberately broken clone per rule, each asserting a named error.
-- Nothing under server/ imports client/ or drift-sync/ (A3 phase-1 check green).
-- Client source unchanged (only the new client/src/__tests__/cosmosParity.test.ts is added).
-- Gates: npm run build, npm run typecheck, npm run lint, npm test, npm run validate, npm run cosmos:check -- --phase 1, npm run parity:screens (map unchanged).
+## Required checks
+`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` — all green. Never run `tsc` without
+`--noEmit`/`-b`.

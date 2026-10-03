@@ -1,88 +1,43 @@
-# Stage 1 report — P0: Baseline and parity oracle
+# Stage 1 report — Keyless server
 
 ## Files
-.gitignore
-package.json
-package-lock.json
-scripts/dump-baseline.ts
-scripts/parity-screens.mjs
-scripts/cosmos-check.ts
-scripts/__tests__/cosmosCheck.test.ts
-docs/plans/server-owned-data-decisions.md
-server/src/__tests__/fixtures/baseline-full.json
-server/src/__tests__/fixtures/baseline-cosmos-map.json
-docs/plans/baseline-screens/*.png
-
-The PNG glob covers 16 files: default-map, mobile-default-map, 5 `scenario-*`, 3 `incident-*`, blast-payments,
-health-view, ownership-view, drift-overlay, changelog-open and realtime-hub-selected.
+server/src/agentConfig.ts
+server/src/config.ts
+server/src/app.ts
+server/src/agent/askAnswer.ts
+server/src/agent/chatModelFactory.ts
+server/src/agent/classify.ts
+server/scripts/startDevServer.ts
+server/scripts/dev-server.ts
+server/src/cookieCrypto.ts
+server/src/providerKeyCheck.ts
+server/src/schemas/connectRequestSchema.ts
+server/src/__tests__/agentConfig.test.ts
+server/src/__tests__/devServer.test.ts
+server/src/__tests__/statusRoute.test.ts
+server/src/__tests__/askRoute.test.ts
+server/src/__tests__/config.test.ts
+server/src/__tests__/connectRoute.test.ts
+server/src/__tests__/cookieCrypto.test.ts
+server/src/agent/__tests__/classify.test.ts
 
 ## Summary
-
-Phase 0 is complete, and the owner's feedback has been applied. No product code changed:
-`git diff -- client/ server/src drift-sync` is empty apart from the new fixtures.
-
-**Feedback applied**
-
-- **TypeScript pinned to `^6.0.3`.** The root `package.json` is the only one that declares `typescript`.
-  - `package-lock.json` was regenerated with a plain `npm install`, with no `--legacy-peer-deps`.
-  - The lock diff drops the TypeScript 7 packages and adds `pixelmatch` and `pngjs`.
-  - `npm ci` now succeeds with no ERESOLVE.
-  - After `npm ci`, `node_modules/typescript` is 6.0.3, and `npm ls typescript` shows one deduped 6.0.3. The earlier `--no-save` workaround is no longer in play.
-- **Decisions log updated** with:
-  - the TypeScript pin, its reason (typescript-eslint 8.71 supports TypeScript below 6.1; CI on `main` has been red since `a86f10b`), and a note to revisit when typescript-eslint supports TypeScript 7
-  - the owner's acceptance of fallback fonts in the parity baselines
-- **Unverified: the `scripts/*.ts` type-check.** The no-emit `npx tsc --noEmit … scripts/*.ts` check was denied permission again. The new `scripts/*.ts` files are still not type-checked. They do run under `tsx` and pass lint. No tsconfig was added.
-
-**Gates, all run after `npm ci` on the pinned install**
-
-| Gate | Result |
-| --- | --- |
-| `npm ci` | ✅ clean, no `--legacy-peer-deps` |
-| `npm run build` | ✅ |
-| `npm run typecheck` | ✅ |
-| `npm run lint` | ✅ 0 errors, 1 warning that was already there (`client/src/map/Map.tsx:814`) |
-| `npm test` | ✅ client 140/140, server 103/103, scripts 5/5 |
-| `npm run validate` | ✅ 0 errors, 0 warnings |
-| `npm run cosmos:check -- --phase 0` | ✅ 3/3 |
-| `npm run parity:screens` | ✅ 16/16 within 0.1%. The worst view was 29 px (0.0014%). |
-
-The preview server on port 4317 is stopped; nothing is listening.
-
-**Stage work from before this feedback**
-
-- **Baseline gates** ran on `feature/add-ai` at `0dc2b6e`, not on `main`, because this stage cannot switch branches. This is recorded in the decisions log.
-- **Drift Sync:** `DRIFT_SYNC_ENABLED` did not exist before, so the workflow was already off.
-  - It is now set to `false`.
-  - There were no open Drift Sync PRs, and no open PRs at all.
-- **`npm run baseline:dump`** writes `baseline-full.json`, which holds all the data plus the derived values. It also copies the snapshot to `baseline-cosmos-map.json`. Running it again gives the same file.
-- **`npm run parity:screens` (A2):**
-  - It captures 16 deterministic views and writes diffs to `parity-out/`, which is gitignored.
-  - Determinism: two runs after `--update` both passed.
-  - A 20 px nudge to payments `x` failed `default-map` and `health-view`, and the command exited 1. The nudge was reverted.
-- **`npm run cosmos:check` (A3)** passes at `--phase 0`. It has an extensible table of checks with a phase per check. Its unit tests run under `npm run test:scripts`, which is now part of `npm test`.
-- **Bundle and first paint** were recorded in the decisions log: JS 213 KB gzip, median first contentful paint 336 ms.
+The server no longer takes AI keys from visitors: it reads `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `AI_GATEWAY_API_KEY` from the environment through a new `getAgentConfig()`, and only when the local dev server set `COSMOS_LOCAL_AGENT=1` and `VERCEL` is unset. `GET /ai/status` returns `200 { connected: true, provider }` or `503 { errorCode: AI_NOT_LOCAL | AI_NOT_CONFIGURED }` without pinging the provider, `POST /ai/ask` uses the same check, and the cookie routes, cookie crypto, connect schema, provider key check and every `AI_COOKIE_SECRET` read are gone. The dev server now binds `127.0.0.1` via an exported `startDevServer` helper that sets the local flag after loading env files.
+Results: `pnpm typecheck` pass (server + client); `pnpm lint` 0 errors (1 pre-existing warning in `client/src/map/Map.tsx`); server vitest 28 files / 339 tests passed; `pnpm build` pass; `grep -r AI_COOKIE_SECRET server/src` returns nothing.
 
 ## Commit message
-chore(parity): add Phase 0 baseline oracle and pin TypeScript to ^6.0.3
+feat(server): read AI keys from local env instead of a visitor cookie
 
-Every later migration phase needs a frozen record of today's data, derived facts and visuals to prove the map is unchanged; adds baseline:dump, parity:screens and cosmos:check plus the decisions log.
-TypeScript goes back to ^6.0.3 because typescript-eslint 8.71 rejects TS 7, which broke npm ci and lint (CI red since a86f10b); revisit when typescript-eslint supports TS 7.
+The agent now runs only on the local dev server, keyed from server env,
+so no visitor key is collected and no deployed host can turn it on.
+Status and ask report AI_NOT_LOCAL / AI_NOT_CONFIGURED as 503 codes.
 
 ## Key decisions
-- **TypeScript is pinned to `^6.0.3`** (owner decision), with the lockfile regenerated honestly. Revisit when typescript-eslint supports TypeScript 7.
-- **The parity baselines use fallback fonts** (owner decision). Google Fonts are blocked during capture because their load timing raced the first camera fit and made the shots flaky.
-- **Gates ran on the branch, not `main`.** The stage cannot switch branches.
-- **The screenshots are made deterministic** by:
-  - freezing the clock
-  - seeding `Math.random`
-  - turning off CSS transitions and animations
-  - stubbing `/api` with a 404
-  - masking the version badge
-- **Mid-play is reached by pressing Next.** The `?step=N` deep link always lands on step 1. That bug is logged, not fixed.
-- **`realtime-hub` expanded was replaced with `realtime-hub-selected`.** `expandedServiceId` is a hard-coded `null` (`client/src/map/Map.tsx:174`), so the expanded state can't be reached in the UI.
-- **DEPENDENTS_OF is rebuilt from `computeBlastRadius` 1-hop results.** It is module-private, and exporting it would be a product change.
-- **The threshold stays at 0.1%,** confirmed by the repeat runs and the nudge test.
-
-## Open questions
-- **Phase 10:** re-enable Drift Sync by setting `DRIFT_SYNC_ENABLED` to `true`. The variable did not exist before this stage.
-- **Unverified:** a no-emit type-check of `scripts/*.ts` was denied permission. The owner may want a covering tsconfig in a later phase.
+- `AgentConfig` lives in `server/src/agentConfig.ts`: `{ provider: AiProvider; apiKey: string; gatewayApiKey: string | null }`. Also exports `getAgentConfig(): AgentConfigResult`, `AI_NOT_LOCAL`, `AI_NOT_CONFIGURED`, `AgentUnavailableReason`. Log-once INFO codes: `AI_DISABLED_NOT_LOCAL`, `AI_PROVIDER_BOTH_SET`. `AI_NOT_CONFIGURED` is not logged (spec doesn't ask for it).
+- `config.ts` now holds only `getGatewayApiKey()`; `getAgentConfig()` uses it for `gatewayApiKey`.
+- `startDevServer` is in `server/scripts/startDevServer.ts`: `startDevServer({ envFiles: string[]; serveApp?: typeof serve }): Promise<ServerType>`, plus exported `DEV_SERVER_PORT = 8787` and `DEV_SERVER_HOSTNAME = '127.0.0.1'`. `dev-server.ts` just calls it with the two env-file paths. The flag is assigned after `loadEnvFile`, so any file value is overwritten (equivalent to delete-then-set). Its test sits at the plan's path `server/src/__tests__/devServer.test.ts` and imports `../../scripts/startDevServer.js`.
+- `classifyQuestion(question, snapshot, gatewayApiKey: string | null = getGatewayApiKey())`: the "visitor gateway key" concept is gone. `askAnswer` passes `config.gatewayApiKey` explicitly (null ⇒ local keyword fallback). The JEV failure warning no longer names a key source. `classify.test.ts` updated to match.
+- `createChatModel` takes `Pick<AgentConfig, 'provider' | 'apiKey'>`; `answerQuestion` input field renamed `payload` → `config`.
+- Deleted `server/src/providerKeyCheck.ts` (beyond the brief's explicit list): its only callers were `/ai/connect` and the old status check, and the plan says status no longer pings the provider, so it was dead code.
+- No shared API type changed, so `pnpm types:emit` was not needed and no client file was touched. The client still calls `/ai/connect` / `/ai/disconnect`; both now 404 (accepted interim, stage 2). Client code that mentions `AI_NOT_CONFIGURED` is untouched.
+- Left for later stages per brief: `.env.example`, `scripts/fresh-start.mjs`, README `AI_COOKIE_SECRET` mentions (stage 3); `offTopicAnswers.ts` (stage 4).

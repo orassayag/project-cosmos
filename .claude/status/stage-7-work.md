@@ -1,80 +1,109 @@
-# Stage 7 work brief — P7: Local dev loop, client data layer and loading
+# Stage 7 work brief — Scripted demo turns: aiTour.turns data + validator + schema/types/fixtures, scripted answering, demo scripts on new targets (2.8)
 
-Stage plan line: no-account dev loop, cosmosClient (retry-safe), CosmosProvider, loading gate + error/Retry, A1 Playwright E2E + CI job (~850 LOC, flagged large).
-Plan: docs/plans/server-owned-data-migration-plan.md. No spec file. Plan text pasted verbatim below.
+Plan: docs/plans/ai-refactor.md. Stage plan line: Stage 7. No spec file for this run. Paste of the plan sections in scope follows.
 
-## Plan — Issue Resolutions (context)
+## Plan context (Summary + Scope + Issue Resolutions)
+## Summary
+Turn "Ask the Agent" from a single-question panel that asks visitors for API keys into a
+multi-turn chat that needs no keys. The server reads the model keys from its own `server/.env`,
+and only when the owner runs it on their own machine: the dev server listens on loopback only,
+and the agent is switched on only by the local dev script. The ask inputs at the top of the
+page go away. A bot button sits bottom-right and stays red (not connected) or green (connected).
+Red opens a window that explains how to set up the agent and JEV locally, with wording based on
+why it is red. Green opens a right-side chat. The agent can only look at the map and show things
+on it, never change saved state, and its errors and token use appear right in the chat.
+
+Both scripted demos show a connected agent holding a short conversation. They answer from
+scripted turns on the client, so the live site needs no AI key. This plan is a second review
+round. The decisions from the first round are built into `## Design`, and the issue IDs below
+are from this round.
+
+## Scope
+**In scope**
+- Remove the ask input at the top of the page on desktop and in the mobile drawer.
+- Bottom-right bot button, red/green, designed for phones first.
+- Red → setup window with no key fields. Its wording depends on the status reason
+  (`AI_NOT_LOCAL` vs `AI_NOT_CONFIGURED`) (I8).
+- Server reads `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `AI_GATEWAY_API_KEY` from env, and
+  only when the local dev entry point turns the agent on. The dev server listens on
+  `127.0.0.1` (I1).
+- Remove the key cookie, `/ai/connect`, `/ai/disconnect`, `AI_COOKIE_SECRET`, the visitor JEV
+  key, the joke answers, the random-star fallback, and the "key rejected → disconnect" path (I7).
+- Right-side multi-turn chat. History is limited by message count and validated (I4).
+- Follow-ups go straight to the agent. Only the first message is checked for off-topic.
+- Explicit allow-list of agent actions; no writes of any kind.
+- Layout rules so the chat and right-side panels never cover each other. The chat collapses
+  only after an answer finishes (I5).
+- Stop and New-chat buttons. A stopped reply gets a marker so the history stays valid (I3).
+  New chat cancels any answer still running (I6).
+- The chat survives closing the window, including an answer still streaming (I6).
+- Suggested follow-up chips.
+- Provider errors shown as chat messages; token count under each reply (I7).
+- Both demos (`?demo=ai`, `?demo=all`) answer from client-side scripted turns that carry their
+  own map actions, within 60s / 120s (I2).
+- Accepted additions: **A1** Playwright test for the chat and the demo chat · **A2** "billed to
+  your own key" note · **A3** "Thinking…" dots · **A4** character counter · **A5** `A` key toggles
+  the chat.
+
+**Out of scope**
+- Real AI answers on the live site (turned off on purpose).
+- Keeping the chat after a page reload (memory only).
+- New tools that write, layout editing, or any database change made by the agent.
+- Changing the agent's model ids, the JEV classifier model, or the map data (other than the
+  `aiTour` demo data).
+
 ## Issue Resolutions
-
 | ID | Title | Detected by | Description | Resolution | Notes |
 |----|-------|-------------|-------------|------------|-------|
-| I1 | Local development stops working from Phase 7 until Phase 12 | Claude, gpt | Phase 7 makes the app wait for `/api/cosmos` before it draws the map. Locally, nothing answers that request: `npm run dev` starts only Vite (the client dev server), and `client/vite.config.ts` has no `/api` proxy (a rule that forwards API calls to the server). The task "reuse the existing `/api` proxy" points at something that does not exist. Today the AI features run locally only through `vercel dev`, as the README says. So from Phase 7 on, every local run shows the warp for 10 seconds and then the error screen. That blocks the Phase 8 screenshot checks, `npm run record:demo` and the demo-tour timing runs. The proper dev setup only arrives in Phase 12, which also says to "reuse how the server runs today". Today that means `vercel dev`, which needs `vercel link` and a login. That breaks the Phase 12 promise that a fresh fork clone reaches a running map with only `npm run dev`. <br><br> **Before Fix:** Halfway through the migration, opening the app on your own computer shows a loading animation and then an error. You can't check your work or record the demo, and anyone who forks the project needs a Vercel account just to see the map. <br><br> **After Fix:** One command starts the whole app on your computer at every phase, with no account needed, so every check in the plan can actually be run. | Fixed | Dev loop (Node runner on :8787 via `@hono/node-server` + `tsx watch`, Vite `/api` proxy, `concurrently`) moved into Phase 7, first task. Phase 12 keeps only live-data polling and docs. |
-| I2 | Retry repeats the failed request instead of trying again | gpt, z.ai | Phase 7 says `startCosmosFetch()` keeps the request it started and returns that same request on every call. If the first attempt fails or hits the 10-second timeout, the stored request is a failure. Retry then calls `startCosmosFetch()` and gets the same failure back at once. Example: the API is down when the page opens, the error screen appears, the API comes back, and the user presses Retry. The error stays, so the Phase 7 acceptance check ("Retry recovers") cannot pass. <br><br> **Before Fix:** Once loading fails, the Retry button does nothing, and the user has to reload the whole page. <br><br> **After Fix:** Pressing Retry really tries again, and the map opens as soon as the server is back. | Fixed | `cosmosClient.ts` clears its cached promise on rejection and aborts via `AbortController` on timeout; test "fails then succeeds after Retry". |
-| I3 | The type-generation step will not produce the single file the plan expects | gpt | Phase 5 runs `tsc --declaration --emitDeclarationOnly` on `apiTypes.ts`. That file is allowed to import `types.ts`. The TypeScript compiler writes one declaration file (`.d.ts`, a types-only copy of a code file) for every source file it reads, and it names each output after its source. So the command writes `apiTypes.d.ts` and `types.d.ts`, not one `client/src/api/cosmos-api.d.ts`. The `--outFile` option can't combine them for this project's module setting (NodeNext). The CI check (`git diff --exit-code client/src/api/`) would then guard files the client does not import. <br><br> **Before Fix:** The step that should keep the browser and the server agreeing on the data's shape writes the wrong files. The safety check then watches files nobody uses. <br><br> **After Fix:** The browser gets one exact copy of the server's data description, and CI fails the moment the two stop matching. | Fixed | `apiTypes.ts` is self-contained (no imports); `types.ts` re-exports it; `schema.ts` uses `satisfies z.ZodType<CosmosResponse>`; `types:emit` copies the file with a header, no compiler. |
-| I4 | Phase 2 has to change existing values, which the plan forbids | Claude (adversarial) | Phase 2 replaces each service's `color: 'var(--svc-cyan)'` with a `palette: 'cyan'` key. It also replaces topic grouping by name prefix with an explicit `groupServiceId`. Both remove or change values that `baseline-full.json` records. But Phase 2 says "existing values must not change", and the stop list says to stop whenever "a data value must change to make a test pass". If the executing agent follows the plan exactly, it either stops at Phase 2 or keeps `color` forever, and then the coupling to `tokens.css` the phase set out to remove stays. <br><br> **Before Fix:** The plan's own rules contradict each other at Phase 2. The migration either stalls or quietly leaves the old color setup in place. <br><br> **After Fix:** Phase 2 can finish, and tests prove the colors and groupings still look exactly the same. | Fixed | Phase 2 names exactly two allowed fixture changes (`color`→`palette`, prefix rule→`groupServiceId`), each proven by an equivalence test; the stop rule carves out these two. |
-| I5 | Pausing Drift Sync by editing the workflow file does not pause it | Claude, z.ai | Phase 1 pauses Drift Sync by disabling the cron in `cosmos-sync.yml`. Scheduled GitHub workflows run only from the copy of that file on the default branch, so editing it on a phase branch changes nothing until that branch merges. The workflow is actually switched on by the repository variable `DRIFT_SYNC_ENABLED`, not by the cron line. Drift Sync PRs that are already open would also still edit `client/src/scenarios/` if they merge mid-migration. Example: a PR opened the night before Phase 1 merges during Phase 5. Now the client copy has a change the server copy lacks, and the parity test blocks every later phase. <br><br> **Before Fix:** The nightly bot can keep editing the old files while you move them, and the two copies of the data quietly stop matching. <br><br> **After Fix:** The bot is really switched off for the whole move, and nothing it opened earlier can land halfway through. | Fixed | Verified: `cosmos-sync.yml:72` gates on `vars.DRIFT_SYNC_ENABLED == 'true'`. Pause via `gh variable set`, drain open Drift Sync PRs, re-enable in Phase 10. |
-| I6 | Checking a single preview cannot prove that a deploy publishes new data | grok, preplexity | Phase 4 sets a one-year CDN cache (`s-maxage=31536000`). It relies on "each deployment has its own CDN cache" and verifies that on one preview. One preview only proves that the second request is a cache hit. It can't show that the next production deploy serves new data instead of last year's cached copy. Phase 13 also checks only `x-vercel-cache: HIT` on production, and that check stays green even when the data is stale. <br><br> **Before Fix:** A release could keep showing the old map to visitors, and every check would still pass. <br><br> **After Fix:** Each release proves that the live site shows the data that was just deployed. | Fixed | Build prints the computed `version`; Phase 13 compares production `/api/cosmos` `version` against it; mismatch is a stop condition. |
-| I7 | No stated action when the response is over its size target | z.ai | Phase 4 says to record the compressed size of `/api/cosmos` and gives a 100 KB target. It does not say what to do if the response is bigger. Every other target in the plan has a "stop and ask" rule, so the executing agent has to guess here. <br><br> **Before Fix:** If the data comes out too big, whoever is doing the work has to decide alone whether that's acceptable. <br><br> **After Fix:** A response that's too big pauses the work, and the owner decides. | Fixed | Added to the stop list. |
+| I1 | "Local only" isn't actually enforced | preplexity, grok | The local server listens on the whole network, not just this computer. The only off switch is a Vercel setting, so any other copy with keys answers anyone. <br><br> **Before the Fix:** Someone on the same café Wi-Fi, or any other host running the project, can run up the owner's AI bill. <br><br> **After the Fix:** Real answers only ever come from the owner's own machine, for the owner. | Fixed | The dev server listens only on this computer, and only the local dev script can switch the agent on. The Vercel check stays as a backup. |
+| I2 | The demos have scripted answers but no way to show them in the new chat | gpt, Claude | Today the demo swaps in a scripted answer, but the new chat asks the server, which is off on the live site. The plan also dropped the map effects that go with each answer. <br><br> **Before the Fix:** The demo types a question on the live site and gets an error, or a reply with nothing lighting up on the map. <br><br> **After the Fix:** The demo shows a full back-and-forth chat with the map reacting, with no AI key anywhere. | Fixed | During a demo, each answer comes from the scripted turns, with that turn's map effects. A follow-up chip always matches the next scripted question. |
+| I3 | After pressing Stop, the next question is rejected | preplexity, Claude (adversarial) | A stopped reply is sent back as if it were finished. If it is empty, the server rejects every later question. <br><br> **Before the Fix:** You press Stop, ask again, and the chat errors until you start a new chat. <br><br> **After the Fix:** You can stop and ask again freely, and the agent knows its last answer was cut short. | Fixed | A stopped reply is sent with a short "stopped" note, so it is never empty and turns still alternate. |
+| I4 | "Last 10 turns" and "up to 20 messages" don't say the same thing | preplexity | The plan gave two different limits and never said whether long chats are refused or shortened. Shortening could also leave the conversation in a broken order. <br><br> **Before the Fix:** A long chat suddenly fails, or the agent forgets different things depending on who built it. <br><br> **After the Fix:** Long chats keep working, and everyone knows exactly what the agent remembers. | Fixed | The chat sends at most the last 20 messages, always starting with the visitor's. The server refuses anything longer and says which field is wrong. |
+| I5 | The chat hides itself mid-answer when the agent opens a panel | z.ai | The chat folded away as soon as any right-side panel opened, even one the agent opened while still answering. <br><br> **Before the Fix:** You ask for the order flow, it starts playing, and the rest of the answer vanishes into a small tab. <br><br> **After the Fix:** You read the whole answer, then the chat steps aside so you can watch the flow. | Fixed | The chat folds only after the answer finishes. Reopening it closes the panel but keeps the flow playing. |
+| I6 | New chat and closing the panel during an answer aren't handled | z.ai, Claude (adversarial) | New chat did not stop an answer still being written, and closing the window could lose that answer. <br><br> **Before the Fix:** A fresh chat starts with a stray answer to no question, or a closed chat loses the half-written reply. <br><br> **After the Fix:** New chat is always clean, and closing the window mid-answer keeps the full reply. | Fixed | The shared chat memory owns the running answer. New chat stops it first; closing the window does not. |
+| I7 | Error messages and token counts disappear in the new chat | grok, z.ai, Claude | The old panel showed errors and token use; the chat plan did not. A wrong key would show a green bot while every question failed silently. <br><br> **Before the Fix:** With a typo in the key the bot is green, you ask, and nothing happens. <br><br> **After the Fix:** The chat says plainly that the key was refused, and each reply shows its cost. | Fixed | Errors appear as chat messages and token counts under replies. The old "disconnect on a bad key" code is removed. |
+| I8 | The setup window can't tell it is on the live site | grok, preplexity | The window should warn that answers only work locally, but the live site and a local run with no key got the same reply. <br><br> **Before the Fix:** The live site may skip its warning, or a local user sees the wrong hint. <br><br> **After the Fix:** Each visitor sees the right reason the bot is red and the right next step. | Fixed | The status check returns a separate reason for each case, and the window picks its text from it. |
 
 
-### Ground rules for the executing agent
-
-- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
-- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
-- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
-- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
-- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
-- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
-- The AstroMart map must look and behave identically after every phase.
-- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
-
-### Phase 7 — Local dev loop, client data layer and loading
-
-**Dev loop first (I1)** — no Vercel account required at any later phase:
-- `server/scripts/dev-server.ts` serves the existing Hono `app` with `@hono/node-server` on port 8787. Root script `dev:server`: `tsx watch server/scripts/dev-server.ts` (add `@hono/node-server`, `tsx` if missing, and `concurrently` as root dev dependencies; check each for Node-version compatibility).
-- `client/vite.config.ts`: change `server: { port: 5173 }` to `server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } }`.
-- Root `npm run dev`: `concurrently -n client,server "npm run dev --workspace client" "npm run dev:server"`. Keep `dev:client` as the client-only escape hatch.
-- AI routes keep working under this runner given the same env vars `vercel dev` would supply; document required vars in the README's dev section (the map itself needs none).
-- *Verification:* `scripts/__tests__/devLoop.test.mjs` is not worth its flakiness; instead A1's E2E test (below) boots this exact `npm run dev` setup in CI — that is the automated proof. Manual check: fresh shell, `npm run dev`, map loads at `:5173`, `curl -s localhost:5173/api/cosmos | head -c 80` returns JSON.
-
-**Client data layer:**
-- `client/src/api/cosmosClient.ts`: `startCosmosFetch()` returns a cached promise. **Retry-safe (I2):** each attempt creates an `AbortController`; a 10s timer calls `controller.abort()`; the promise is stored as `fetchCosmos(controller.signal).then(guard).catch((error) => { cachedPromise = undefined; throw error; })`, so a failed or timed-out attempt is forgotten and the next call starts a fresh request. A successful promise stays cached.
-- Call `startCosmosFetch()` at the top of `client/src/main.tsx`, before `createRoot`.
-- `client/src/api/CosmosProvider.tsx` with `useCosmos()` returning the loaded response, never `undefined`.
-- Loading gate in `App.tsx`, following `shouldShowIntro()`: intro shown → intro as today; on CTA the warp plays until both its normal duration has passed and data is ready. Intro skipped (returning visitor, deep link, `?demo=ai`) → warp as loading screen until ready.
-- After 10s timeout or failure: error screen with Retry (calls `startCosmosFetch()` again). Mobile-first; it is a full-screen state, not a floating panel, but includes a clear way out (Retry and a link to the repo README).
-- No warp for later requests; the map makes no further data calls.
-- Demo tours start only after data is ready.
-- *Tests:* `client/src/api/__tests__/cosmosClient.test.ts` with a fake fetch and fake timers: success; slow success under 10s; timeout aborts the signal and rejects; **first attempt fails, Retry's second attempt succeeds** (I2); malformed response rejected by the guard; two concurrent calls share one request. Protects the loading contract and Retry. Unit layer. `client/src/__tests__/loadingGate.test.tsx`: intro-shown vs. intro-skipped paths render warp/intro and then the map; error screen shows Retry. Component layer.
-
-**A1 — End-to-end loading test.** `e2e/cosmos-load.spec.ts` with `@playwright/test` (reuse the browser config conventions from `scripts/record-demo.mjs`), config `e2e/playwright.config.ts` whose `webServer` runs `npm run dev` and waits for `:5173`. Scenarios:
-- Load the page with intro skipped (deep link) → map renders, network log shows exactly one `/api/cosmos` request with status 200.
-- Open one service passport by clicking a capsule → passport shows the service label from the response.
-- Play one scenario via the UI → the step panel advances at least one step.
-- Request `/api/cosmos` with the `ETag` from the first response as `If-None-Match` → 304.
-Run with `npm run test:e2e`. Add a CI job to `validate-on-pr.yml` that installs Playwright Chromium and runs it. Protects the browser↔server↔map boundary no unit test covers. E2E layer, intentionally one spec. Note: before Phase 8 the map still renders from static imports, so passport/scenario steps pass regardless; they become meaningful as rows migrate — the spec is kept unchanged and re-run after each Phase 8 row.
-
-**Acceptance:** slow-3G throttling shows intro/warp with no blank frame; API down → error screen, Retry recovers once the API is back; no component migrated yet; `npm run test:e2e` green locally and in CI; `npm run parity:screens` green.
+## In-scope section
+#### 2.8 Demos answer from scripted turns (I2)
+- **Data:** `aiTour` in `server/src/cosmos/data/demo.ts` becomes
+  `aiTour.turns: [{ question, scriptedAnswer, actions: AskAction[], followUps: string[] }]`
+  with 2–3 turns (Fulfillment changes → "Who owns shipping?" → follow-up chip tap).
+  `validate.ts` checks that every `actions` id resolves, and that `turns[i].followUps[0]` equals
+  `turns[i+1].question` exactly. Update the `aiTour` schema in `server/src/cosmos/schema.ts`, run
+  `pnpm types:emit` and `pnpm fixture:cosmos`, and update `fixtures/baseline-full.json`.
+- **Answering:** `useAgentChat` takes an optional `scriptedTurns` source. While a demo runs
+  (`useDemoAiConnection` reports `connected` with the demo flag), `send(question)` does not call
+  the server. It finds the turn whose `question` matches, streams its `scriptedAnswer` with the
+  same chunk timing as `client/src/demo/scriptedAnswer.ts`, runs each of its `actions` through
+  `onAskAction`, and offers its `followUps` as chips. If no turn matches (which the validator
+  rules out), it shows a fixed "This demo only knows its scripted questions" message rather than
+  calling the server. This replaces today's `handleAsk` demo branch in `App.tsx`.
+- **Scripts:** the Connect / paste-key steps are removed. `buildAiDemoScript()` and the AI
+  segment of `buildAllDemoScript()` click the bot, type, send, then tap the first follow-up chip,
+  all as real UI gestures on new `data-demo-target`s (`agent-button`, `agent-composer`,
+  `agent-send`, `agent-followup-0`). The phone variant comes from
+  `buildDemoScript(mode, { isPhone })`.
+- Verify:
+  - `client/src/demo/__tests__/scripts.test.ts`. Protects: ai ≤60s, all ≤120s.
+  - `demoTargets.test.tsx`. Protects: every target exists.
+  - `useAgentChat.test.ts` (scripted mode). Protects: no `fetch` is made; each turn's actions
+    fire; chips equal `followUps`.
+  - `server/src/__tests__/demoData.test.ts` + `validate` tests. Protects: the turns shape; the
+    chip-to-next-question match.
+  - Re-record both modes with `pnpm record:demo ai|all`.
 
 
-### Stop and ask the owner if
+### Known accepted gaps
+- No issue was ignored. The one deliberate limitation: the live site never answers with real AI.
+  Visitors there see the "local only" setup window and the scripted demos.
+- A bad key is found on the first question, not by the status check. The bot stays green until
+  then, but the error is shown plainly in the chat (I7).
 
-- A Phase 0 baseline command fails on `main`.
-- A data value must change to make a test pass — **except** the two Phase 2 changes named above (`color`→`palette`, prefix rule→`groupServiceId`), which are proven by equivalence tests instead.
-- Vercel's CDN does not serve a new `version` after a deploy, or cold starts stay slow after lazy imports.
-- The gzip size of `/api/cosmos` is over 100 KB (I7).
-- The production `version` does not match the build's `COSMOS_VERSION` (I6).
-- The digest grows more than 50% and trimming would remove information.
-- Any change seems to need a database, write endpoint, auth or shared package.
-- A phase would change how the map looks or behaves for a visitor.
 
-## A1 addition (accepted)
-| A1 | Testing | 🔴 High value | C3 | One automated browser test of the real loading path | preplexity, gpt, z.ai, grok | M | 8% | One Playwright test (an automated browser) starts the app with its server and loads the page through `/api/cosmos`. It waits for the map, opens one service passport and plays one scenario. It would also check the 304 response (the "nothing changed" reply) when the ETag (a fingerprint of the data) still matches. It reuses the browser setup in `scripts/record-demo.mjs` and runs in `validate-on-pr.yml`. <br><br> **Before Add:** Each piece passes its own tests, but nobody checks automatically that the browser, the server and the map work together. A broken connection between them shows up only during the manual checks in Phase 13. <br><br> **After Add:** Every change proves automatically that the real app loads the map from the server and that a visitor can use it. |
-
-## Orchestrator notes
-- Extend scripts/cosmos-check.ts with phase 7 checks (pattern established in stages 1–6).
-- Record ambiguities in docs/plans/server-owned-data-decisions.md.
-- Project CLAUDE.md demo invariants: demo tours must still finish; if loading gate changes when tours start, run npm test (scripts.test.ts guards).
-- Mobile-first: error screen verified at ~390px first.
-- README: update dev section (npm run dev now runs client+server; dev:client is client-only; dev:server; test:e2e).
-- Do not migrate any component to useCosmos() — that is stage 8.
+## Stage boundaries
+- Stage 8 (next) owns the Playwright agent-chat spec (2.9, A1) and the final README/acceptance pass. Do not write Playwright specs here.
+- Stage 6 left `useAgentChat.sendScripted(question, answer)` as a stop-gap for the demo; this stage replaces it with `scriptedTurns` and removes the stop-gap and the `handleAsk` demo branch in `App.tsx`.
+- Stage 2 kept `data-demo-target="connect-open"` on the bot on purpose; this stage renames it to `agent-button` and adds `agent-composer`, `agent-send`, `agent-followup-0` (replacing `ask-input` / `ask-search` where the plan calls for it).
+- Project invariants (CLAUDE.md): tours drive the real UI only (no step sets app state); ai tour ≤60s, all tour ≤120s; after a data edit run `pnpm fixture:cosmos`, update `fixtures/baseline-full.json`, and `pnpm types:emit`; demo data stays fictional (AstroMart). Re-record both demo modes with `pnpm record:demo ai|all` if the environment allows; if it cannot run, say so in the report.
