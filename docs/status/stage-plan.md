@@ -15,5 +15,5 @@ Generated: 2026-10-03T08:13:56Z
 - Stage 4: COMMITTED — Chat request contract + client trimming, follow-up-aware routing, fixed off-topic reply, 13-tool allow-list (2.1, 2.2, 2.3)
 - Stage 5: COMMITTED — useAgentChat hook: in-flight ownership, stop marker, new-chat abort, errors + token usage, askStream { messages } (2.4)
 - Stage 6: COMMITTED — AgentChat panel: phone sheet / desktop dock, collapse-after-answer layout, Stop/New chat, thinking dots, counter, follow-up chips ⚠ large (~700 LOC) (2.5, 2.6, 2.7, A3, A4)
-- Stage 7: PLANNED — Scripted demo turns: aiTour.turns data + validator + schema/types/fixtures, scripted answering, demo scripts on new targets (2.8)
+- Stage 7: COMMITTED — Scripted demo turns: aiTour.turns data + validator + schema/types/fixtures, scripted answering, demo scripts on new targets (2.8)
 - Stage 8: PLANNED — Playwright agent-chat spec (demo, chat, phone) + final README/acceptance pass (2.9, A1)

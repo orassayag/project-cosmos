@@ -1,5 +1,3 @@
-import type { AskAction } from '../components/askStream';
-
 /** Every fixed `data-demo-target`; domain, scenario and incident buttons add `domain-<id>` / `scenario-<id>` / `incident-<id>`. */
 export const DEMO_TARGETS = [
   'intro-start',
@@ -7,9 +5,10 @@ export const DEMO_TARGETS = [
   'menu-close',
   'galaxy-reset',
   'incidents-open',
-  'ask-input',
-  'ask-search',
-  'connect-open',
+  'agent-button',
+  'agent-composer',
+  'agent-send',
+  'agent-followup-0',
   'playback-play',
   'playback-step-back',
   'playback-step-forward',
@@ -26,13 +25,6 @@ export type DemoTarget =
 export const DEMO_STEP_KINDS = ['click', 'type', 'paste', 'wait'] as const;
 
 export type DemoStepKind = (typeof DEMO_STEP_KINDS)[number];
-
-export interface DemoScriptedAnswer {
-  text: string;
-  thinkingMs: number;
-  wordMs: number;
-  actions?: AskAction[];
-}
 
 interface DemoStepBase {
   /** The whole step at speed 1, pointer glide and typing included; the rest of it is a pause. */

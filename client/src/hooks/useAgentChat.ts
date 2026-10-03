@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toRequestMessages, type ChatMessage } from '../api/chatHistory';
 import { streamAskMessages, toAskErrorMessage, type AskAction, type AskStreamEvent } from '../components/askStream';
-import type { DemoScriptedAnswer } from '../demo/types';
+import type { DemoAiTurn } from '../api/cosmos-api';
+import { scriptedAnswerWords } from '../demo/scriptedAnswer';
 
 export const STOPPED_REPLY_NOTE = '(reply stopped by the visitor)';
+export const UNSCRIPTED_DEMO_REPLY = 'This demo only knows its scripted questions.';
 
 export interface TokenUsage {
   inputTokens: number;
@@ -26,6 +28,8 @@ export interface AgentReplyMessage {
   usage: TokenUsage | null;
   /** Map actions the reply ran; follow-up chips are built from them. */
   actions: AskAction[];
+  /** Fixed chips from a scripted demo turn; when absent the chat suggests its own. */
+  followUps?: string[];
 }
 
 export interface AgentErrorMessage {
@@ -43,8 +47,6 @@ export interface AgentChat {
   messages: AgentChatMessage[];
   isStreaming: boolean;
   send: (question: string) => void;
-  /** Demo only: plays a fixed answer word by word through the same message flow, so Stop and New chat still apply. */
-  sendScripted: (question: string, answer: DemoScriptedAnswer) => void;
   stop: () => void;
   newChat: () => void;
   retry: (errorMessageId: string) => void;
@@ -52,6 +54,8 @@ export interface AgentChat {
 
 export interface UseAgentChatOptions {
   onAction?: (action: AskAction) => void;
+  /** While set (a demo is running), `send` answers from these turns and never calls the server. */
+  scriptedTurns?: readonly DemoAiTurn[];
 }
 
 interface InFlightRequest {
@@ -77,7 +81,7 @@ export function toChatHistory(messages: readonly AgentChatMessage[]): ChatMessag
 }
 
 /** Owned by App so the in-flight reply outlives the chat window; the window only renders this state. */
-export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat {
+export function useAgentChat({ onAction, scriptedTurns }: UseAgentChatOptions = {}): AgentChat {
   const [messages, setMessages] = useState<AgentChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesRef = useRef<AgentChatMessage[]>([]);
@@ -85,8 +89,10 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
   const lastRequestIdRef = useRef(0);
   const lastMessageIdRef = useRef(0);
   const onActionRef = useRef(onAction);
+  const scriptedTurnsRef = useRef(scriptedTurns);
   useEffect(() => {
     onActionRef.current = onAction;
+    scriptedTurnsRef.current = scriptedTurns;
   });
 
   const updateMessages = useCallback((update: (previous: AgentChatMessage[]) => AgentChatMessage[]) => {
@@ -139,10 +145,47 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
     [nextMessageId, stop, updateMessages],
   );
 
+  const playScripted = useCallback(
+    (question: string, turns: readonly DemoAiTurn[]) => {
+      const { replyId, controller } = startRequest(question);
+      const turn = turns.find((candidate) => candidate.question === question);
+      if (!turn) {
+        updateReply(replyId, (reply) => ({ ...reply, content: UNSCRIPTED_DEMO_REPLY, status: 'done', followUps: [] }));
+        finishRequest();
+        return;
+      }
+      const { thinkingMs, wordMs, text } = turn.scriptedAnswer;
+      const words = scriptedAnswerWords(text);
+      const timeoutIds = [
+        window.setTimeout(() => {
+          updateReply(replyId, (reply) => ({ ...reply, actions: turn.actions }));
+          turn.actions.forEach((action) => onActionRef.current?.(action));
+        }, thinkingMs),
+        ...words.map((_word, index) =>
+          window.setTimeout(
+            () => updateReply(replyId, (reply) => ({ ...reply, content: words.slice(0, index + 1).join(' ') })),
+            thinkingMs + (index + 1) * wordMs,
+          ),
+        ),
+        window.setTimeout(() => {
+          updateReply(replyId, (reply) => ({ ...reply, status: 'done', followUps: turn.followUps }));
+          finishRequest();
+        }, thinkingMs + words.length * wordMs),
+      ];
+      controller.signal.addEventListener('abort', () => timeoutIds.forEach((id) => window.clearTimeout(id)));
+    },
+    [finishRequest, startRequest, updateReply],
+  );
+
   const send = useCallback(
     (question: string) => {
       const trimmedQuestion = question.trim();
       if (trimmedQuestion === '') return;
+      const turns = scriptedTurnsRef.current;
+      if (turns) {
+        playScripted(trimmedQuestion, turns);
+        return;
+      }
       const { requestId, replyId, controller, history } = startRequest(trimmedQuestion);
       const requestMessages = toRequestMessages(history, trimmedQuestion);
 
@@ -186,35 +229,7 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
       };
       void streamAskMessages(requestMessages, controller.signal, handleEvent);
     },
-    [finishRequest, nextMessageId, startRequest, updateMessages, updateReply],
-  );
-
-  const sendScripted = useCallback(
-    (question: string, answer: DemoScriptedAnswer) => {
-      const trimmedQuestion = question.trim();
-      if (trimmedQuestion === '') return;
-      const { replyId, controller } = startRequest(trimmedQuestion);
-      const { thinkingMs, wordMs, actions = [] } = answer;
-      const words = answer.text.split(' ');
-      const timeoutIds = [
-        window.setTimeout(() => {
-          updateReply(replyId, (reply) => ({ ...reply, actions }));
-          actions.forEach((action) => onActionRef.current?.(action));
-        }, thinkingMs),
-        ...words.map((_word, index) =>
-          window.setTimeout(
-            () => updateReply(replyId, (reply) => ({ ...reply, content: words.slice(0, index + 1).join(' ') })),
-            thinkingMs + (index + 1) * wordMs,
-          ),
-        ),
-        window.setTimeout(() => {
-          updateReply(replyId, (reply) => ({ ...reply, status: 'done' }));
-          finishRequest();
-        }, thinkingMs + words.length * wordMs),
-      ];
-      controller.signal.addEventListener('abort', () => timeoutIds.forEach((id) => window.clearTimeout(id)));
-    },
-    [finishRequest, startRequest, updateReply],
+    [finishRequest, nextMessageId, playScripted, startRequest, updateMessages, updateReply],
   );
 
   const newChat = useCallback(() => {
@@ -238,5 +253,5 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
 
   useEffect(() => () => inFlightRef.current?.controller.abort(), []);
 
-  return { messages, isStreaming, send, sendScripted, stop, newChat, retry };
+  return { messages, isStreaming, send, stop, newChat, retry };
 }

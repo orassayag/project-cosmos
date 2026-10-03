@@ -256,16 +256,30 @@ export interface DemoAnswerScript {
   wordMs: number;
 }
 
-/** The `?demo=ai` tour: open a domain, ask a question, play a scripted answer. */
-export interface DemoAiTour {
-  domainId: string;
+/** A map action a scripted demo turn runs, in the same shape the agent streams. */
+export type DemoMapAction =
+  | { type: 'action'; kind: 'highlight'; serviceIds: string[] }
+  | { type: 'action'; kind: 'playScenario'; scenarioId: string }
+  | { type: 'action'; kind: 'showBlastRadius'; nodeId: string }
+  | { type: 'action'; kind: 'openPassport'; nodeId: string }
+  | { type: 'action'; kind: 'showHealth' }
+  | { type: 'action'; kind: 'showOwnership' }
+  | { type: 'action'; kind: 'openChangelogEntry'; entryId: string };
+
+/** One question and its scripted reply in the `?demo=ai` chat. */
+export interface DemoAiTurn {
   question: string;
   scriptedAnswer: DemoAnswerScript;
-  /** The services the answer names, in the order it mentions them. */
-  highlightServiceIds: string[];
-  /** Opened beside the answer on desktop to show an Ask map action. */
-  passportNodeId: string;
-  /** The drift entries the answer reports; they must sit within 24h of `asOf`. */
+  actions: DemoMapAction[];
+  /** Offered as chips under the reply; the first one must equal the next turn's question exactly. */
+  followUps: string[];
+}
+
+/** The `?demo=ai` tour: open a domain, then hold a short scripted chat with the agent. */
+export interface DemoAiTour {
+  domainId: string;
+  turns: DemoAiTurn[];
+  /** The drift entries the first turn's answer reports; they must sit within 24h of `asOf`. */
   citedDriftEntryIds: string[];
 }
 

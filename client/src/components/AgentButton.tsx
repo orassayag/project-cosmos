@@ -29,7 +29,7 @@ export function AgentButton({ status, provider, onOpenChat, onOpenSetup }: Agent
       type="button"
       className={`lc-agent-button lc-agent-button--${modifier}`}
       data-no-pan="true"
-      data-demo-target="connect-open"
+      data-demo-target="agent-button"
       aria-label="Open the agent chat"
       title={statusTitle(status, provider)}
       onClick={status === 'connected' ? onOpenChat : onOpenSetup}

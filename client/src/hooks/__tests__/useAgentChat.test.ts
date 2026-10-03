@@ -4,7 +4,16 @@ import { createElement, useState } from 'react';
 import type { ChatMessage } from '../../api/chatHistory';
 import { ASK_ERROR_MESSAGES } from '../../components/askStream';
 import { useAiConnection } from '../useAiConnection';
-import { STOPPED_REPLY_NOTE, toChatHistory, useAgentChat, type AgentChat, type AgentChatMessage } from '../useAgentChat';
+import type { DemoAiTurn } from '../../api/cosmos-api';
+import { scriptedAnswerDurationMs } from '../../demo/scriptedAnswer';
+import {
+  STOPPED_REPLY_NOTE,
+  toChatHistory,
+  UNSCRIPTED_DEMO_REPLY,
+  useAgentChat,
+  type AgentChat,
+  type AgentChatMessage,
+} from '../useAgentChat';
 
 interface FakeAskRequest {
   messages: ChatMessage[];
@@ -221,5 +230,105 @@ describe('useAgentChat', () => {
       { role: 'assistant', content: 'Answer 0' },
       { role: 'user', content: 'Question 1' },
     ]);
+  });
+});
+
+const SCRIPTED_TURNS: DemoAiTurn[] = [
+  {
+    question: 'What changed in Fulfillment?',
+    scriptedAnswer: { text: 'shipping now publishes shipping.dispatched.', thinkingMs: 1000, wordMs: 50 },
+    actions: [
+      { type: 'action', kind: 'highlight', serviceIds: ['shipping'] },
+      { type: 'action', kind: 'openPassport', nodeId: 'shipping' },
+    ],
+    followUps: ['Who owns shipping?'],
+  },
+  {
+    question: 'Who owns shipping?',
+    scriptedAnswer: { text: 'The Fulfillment team.', thinkingMs: 800, wordMs: 50 },
+    actions: [{ type: 'action', kind: 'showOwnership' }],
+    followUps: [],
+  },
+];
+
+describe('useAgentChat with scripted demo turns', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function renderScriptedChat() {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const onAction = vi.fn();
+    const hook = renderHook(() => useAgentChat({ onAction, scriptedTurns: SCRIPTED_TURNS }));
+    return { ...hook, fetchMock, onAction };
+  }
+
+  function playTurn(chat: { current: AgentChat }, turn: DemoAiTurn) {
+    act(() => chat.current.send(turn.question));
+    act(() => vi.advanceTimersByTime(scriptedAnswerDurationMs(turn.scriptedAnswer)));
+  }
+
+  it('answers each turn from its script, runs its actions and offers its follow-ups, without a fetch', () => {
+    const { result, fetchMock, onAction } = renderScriptedChat();
+
+    for (const turn of SCRIPTED_TURNS) {
+      playTurn(result, turn);
+      const reply = replies(result.current.messages).at(-1);
+      expect(reply).toMatchObject({
+        content: turn.scriptedAnswer.text,
+        status: 'done',
+        usage: null,
+        actions: turn.actions,
+        followUps: turn.followUps,
+      });
+      expect(result.current.isStreaming).toBe(false);
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onAction.mock.calls.map(([action]) => action)).toEqual(SCRIPTED_TURNS.flatMap((turn) => turn.actions));
+    expect(result.current.messages.filter((message) => message.role === 'user').map((message) => message.content)).toEqual(
+      SCRIPTED_TURNS.map((turn) => turn.question),
+    );
+  });
+
+  it('streams the answer word by word after the thinking pause', () => {
+    const { result } = renderScriptedChat();
+    const [turn] = SCRIPTED_TURNS;
+    const { thinkingMs, wordMs } = turn.scriptedAnswer;
+
+    act(() => result.current.send(turn.question));
+    act(() => vi.advanceTimersByTime(thinkingMs + wordMs));
+
+    expect(replies(result.current.messages)[0]).toMatchObject({ content: 'shipping', status: 'streaming' });
+    expect(result.current.isStreaming).toBe(true);
+  });
+
+  it('shows the fixed reply for a question the demo does not know, without a fetch', () => {
+    const { result, fetchMock, onAction } = renderScriptedChat();
+
+    act(() => result.current.send('What is the meaning of life?'));
+
+    expect(replies(result.current.messages)).toEqual([
+      expect.objectContaining({ content: UNSCRIPTED_DEMO_REPLY, status: 'done', followUps: [] }),
+    ]);
+    expect(result.current.isStreaming).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it('stops a scripted reply without running its later words', () => {
+    const { result } = renderScriptedChat();
+    const [turn] = SCRIPTED_TURNS;
+
+    act(() => result.current.send(turn.question));
+    act(() => vi.advanceTimersByTime(turn.scriptedAnswer.thinkingMs + turn.scriptedAnswer.wordMs));
+    act(() => result.current.stop());
+    act(() => vi.advanceTimersByTime(10_000));
+
+    expect(replies(result.current.messages)[0]).toMatchObject({ content: 'shipping', status: 'stopped' });
+    expect(replies(result.current.messages)[0]).not.toHaveProperty('followUps');
   });
 });

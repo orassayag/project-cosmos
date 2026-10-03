@@ -14,6 +14,7 @@ import type {
   CosmosOwnership,
   CosmosPlayable,
   CosmosResponse,
+  DemoMapAction,
   Domain,
   DriftEntry,
   DriftLinks,
@@ -241,6 +242,27 @@ export const CosmosHealthSchema = z.strictObject({
   source: DataSourceSchema,
 }) satisfies z.ZodType<CosmosHealth>;
 
+const DemoMapActionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ type: z.literal('action'), kind: z.literal('highlight'), serviceIds: z.array(z.string().min(1)).min(1) }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('playScenario'), scenarioId: z.string().min(1) }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('showBlastRadius'), nodeId: z.string().min(1) }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('openPassport'), nodeId: z.string().min(1) }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('showHealth') }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('showOwnership') }),
+  z.strictObject({ type: z.literal('action'), kind: z.literal('openChangelogEntry'), entryId: z.string().min(1) }),
+]) satisfies z.ZodType<DemoMapAction>;
+
+const DemoAiTurnSchema = z.strictObject({
+  question: z.string().min(1),
+  scriptedAnswer: z.strictObject({
+    text: z.string().min(1),
+    thinkingMs: z.number().int().nonnegative(),
+    wordMs: z.number().int().positive(),
+  }),
+  actions: z.array(DemoMapActionSchema),
+  followUps: z.array(z.string().min(1)),
+});
+
 export const CosmosDemoSchema = z.strictObject({
   allTour: z.strictObject({
     scenarioId: z.string().min(1),
@@ -249,14 +271,7 @@ export const CosmosDemoSchema = z.strictObject({
   }),
   aiTour: z.strictObject({
     domainId: z.string().min(1),
-    question: z.string().min(1),
-    scriptedAnswer: z.strictObject({
-      text: z.string().min(1),
-      thinkingMs: z.number().int().nonnegative(),
-      wordMs: z.number().int().positive(),
-    }),
-    highlightServiceIds: z.array(z.string().min(1)).min(1),
-    passportNodeId: z.string().min(1),
+    turns: z.array(DemoAiTurnSchema).min(1),
     citedDriftEntryIds: z.array(z.string().min(1)),
   }),
 }) satisfies z.ZodType<CosmosDemo>;

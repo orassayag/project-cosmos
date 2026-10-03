@@ -16,8 +16,8 @@ function fakeInputTarget() {
 
 const SCRIPT: DemoScript = [
   { kind: 'click', target: 'domain-shopping', durationMs: 1000, caption: 'Shopping' },
-  { kind: 'click', target: 'connect-open', durationMs: 1000 },
-  { kind: 'click', target: 'connect-open', durationMs: 1000, caption: 'Again' },
+  { kind: 'click', target: 'agent-button', durationMs: 1000 },
+  { kind: 'click', target: 'agent-button', durationMs: 1000, caption: 'Again' },
   { kind: 'wait', durationMs: 1000 },
 ];
 
@@ -51,7 +51,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   clicks = [];
   addButton('domain-shopping');
-  addButton('connect-open');
+  addButton('agent-button');
 });
 
 afterEach(() => {
@@ -89,7 +89,7 @@ describe('useDemoRunner', () => {
 
     await advance(4000);
 
-    expect(clicks).toEqual(['domain-shopping', 'connect-open', 'connect-open']);
+    expect(clicks).toEqual(['domain-shopping', 'agent-button', 'agent-button']);
     expect(demoState()).toBe('done');
     expect(result.current.status).toBe('done');
     expect(result.current.isOverlayVisible).toBe(false);
@@ -104,10 +104,10 @@ describe('useDemoRunner', () => {
     expect(result.current).toMatchObject({ caption: 'Shopping', pointer: { target: 'domain-shopping', moveId: 1 } });
 
     await advance(1000);
-    expect(result.current).toMatchObject({ caption: 'Shopping', pointer: { target: 'connect-open', moveId: 2 } });
+    expect(result.current).toMatchObject({ caption: 'Shopping', pointer: { target: 'agent-button', moveId: 2 } });
 
     await advance(1000);
-    expect(result.current).toMatchObject({ caption: 'Again', pointer: { target: 'connect-open', moveId: 3 } });
+    expect(result.current).toMatchObject({ caption: 'Again', pointer: { target: 'agent-button', moveId: 3 } });
   });
 
   it('divides every duration by the speed', async () => {

@@ -258,13 +258,47 @@ function checkDemo(data: CosmosData, nodes: NodeIndex): CosmosValidationIssue[] 
       : [{ field: 'allTour.incidentId', id: allTour.incidentId, exists: data.incidents.some((incident) => incident.id === allTour.incidentId) }]),
     { field: 'allTour.browseDomainId', id: allTour.browseDomainId, exists: domainIds.has(allTour.browseDomainId) },
     { field: 'aiTour.domainId', id: aiTour.domainId, exists: domainIds.has(aiTour.domainId) },
-    { field: 'aiTour.passportNodeId', id: aiTour.passportNodeId, exists: topLevelServiceIds.has(aiTour.passportNodeId) || nodes.topicIds.has(aiTour.passportNodeId) },
-    ...aiTour.highlightServiceIds.map((id) => ({ field: 'aiTour.highlightServiceIds', id, exists: topLevelServiceIds.has(id) })),
     ...aiTour.citedDriftEntryIds.map((id) => ({ field: 'aiTour.citedDriftEntryIds', id, exists: driftEntryIds.has(id) })),
+    ...aiTour.turns.flatMap((turn, turnIndex) =>
+      turn.actions.flatMap((action) => {
+        const field = `aiTour.turns.${turnIndex}.actions.${action.kind}`;
+        switch (action.kind) {
+          case 'highlight':
+            return action.serviceIds.map((id) => ({ field, id, exists: topLevelServiceIds.has(id) }));
+          case 'playScenario':
+            return [{ field, id: action.scenarioId, exists: data.scenarios.some((scenario) => scenario.id === action.scenarioId) }];
+          case 'showBlastRadius':
+          case 'openPassport':
+            return [{ field, id: action.nodeId, exists: topLevelServiceIds.has(action.nodeId) || nodes.topicIds.has(action.nodeId) }];
+          case 'openChangelogEntry':
+            return [{ field, id: action.entryId, exists: driftEntryIds.has(action.entryId) }];
+          case 'showHealth':
+          case 'showOwnership':
+            return [];
+        }
+      }),
+    ),
   ];
-  return references
+  const unknownReferences = references
     .filter((reference) => !reference.exists)
     .map(({ field, id }) => error('unknown-demo-reference', `demo ${field} names unknown id "${id}"`, { field, id }));
+  return [...unknownReferences, ...checkDemoFollowUps(aiTour.turns)];
+}
+
+/** The demo taps each reply's first chip, so it must ask exactly the next scripted question. */
+function checkDemoFollowUps(turns: CosmosData['demo']['aiTour']['turns']): CosmosValidationIssue[] {
+  return turns.slice(0, -1).flatMap((turn, turnIndex) => {
+    const nextQuestion = turns[turnIndex + 1].question;
+    const firstFollowUp = turn.followUps[0];
+    if (firstFollowUp === nextQuestion) return [];
+    return [
+      error(
+        'demo-follow-up-mismatch',
+        `demo aiTour.turns.${turnIndex}.followUps.0 is ${firstFollowUp === undefined ? 'missing' : `"${firstFollowUp}"`}, expected the next turn's question "${nextQuestion}"`,
+        { turnIndex, followUp: firstFollowUp ?? null, nextQuestion },
+      ),
+    ];
+  });
 }
 
 /** Returns every invariant violation; an empty `errors` list means the data is safe to serve. */

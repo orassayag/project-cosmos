@@ -165,14 +165,33 @@ export const DEMO: CosmosDemo = {
   },
   aiTour: {
     domainId: 'core',
-    question: 'What does the api service do?',
-    scriptedAnswer: {
-      text: 'The api service is the first backend of this cosmos: web-app calls it over HTTP with GET /hello. Replace both with your own services.',
-      thinkingMs: 1500,
-      wordMs: 90,
-    },
-    highlightServiceIds: ['api', 'web-app'],
-    passportNodeId: 'api',
+    turns: [
+      {
+        question: 'What does the api service do?',
+        scriptedAnswer: {
+          text: 'The api service is the first backend of this cosmos: web-app calls it over HTTP with GET /hello. Replace both with your own services.',
+          thinkingMs: 1500,
+          wordMs: 90,
+        },
+        actions: [
+          { type: 'action', kind: 'highlight', serviceIds: ['api', 'web-app'] },
+          { type: 'action', kind: 'openPassport', nodeId: 'api' },
+        ],
+        followUps: ['Who owns api?'],
+      },
+      {
+        question: 'Who owns api?',
+        scriptedAnswer: {
+          text: 'api belongs to the Core team, together with web-app. Add your own teams in owners.ts.',
+          thinkingMs: 1200,
+          wordMs: 90,
+        },
+        actions: [
+          { type: 'action', kind: 'highlight', serviceIds: ['web-app', 'api'] },
+        ],
+        followUps: [],
+      },
+    ],
     citedDriftEntryIds: [],
   },
 };

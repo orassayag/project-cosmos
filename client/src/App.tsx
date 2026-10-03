@@ -41,7 +41,7 @@ import { useAgentChat } from './hooks/useAgentChat';
 import type { AgentChat as AgentChatState } from './hooks/useAgentChat';
 import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from './demo/demoMode';
 import { buildDemoScript } from './demo/scripts';
-import { buildDemoScriptedAnswer } from './demo/scriptedAnswer';
+import { buildDemoScriptedTurns } from './demo/scriptedAnswer';
 import { useDemoAiConnection } from './demo/useDemoAiConnection';
 import { useDemoRunner } from './demo/useDemoRunner';
 
@@ -75,8 +75,8 @@ export function App() {
     () => (demoMode && cosmosResponse ? buildDemoScript(cosmosResponse, demoMode.mode, demoLayout) : undefined),
     [demoMode, cosmosResponse, demoLayout],
   );
-  const demoScriptedAnswer = useMemo(
-    () => (demoMode && cosmosResponse ? buildDemoScriptedAnswer(cosmosResponse.data.demo.aiTour, demoLayout) : undefined),
+  const demoScriptedTurns = useMemo(
+    () => (demoMode && cosmosResponse ? buildDemoScriptedTurns(cosmosResponse.data.demo.aiTour, demoLayout) : undefined),
     [demoMode, cosmosResponse, demoLayout],
   );
   const defaultDomainId = cosmosResponse?.data.domains[0]?.id ?? null;
@@ -362,14 +362,13 @@ export function App() {
   const realAi = useAiConnection({ enabled: !isDemoActive && isShellShown });
   const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
   // Owned here, not in the shell, so a reply keeps streaming whatever the chat window does.
-  const agentChat = useAgentChat({ onAction: handleAskAction });
-  const { send: sendChat, sendScripted: sendScriptedChat, newChat } = agentChat;
+  // The demo's questions go through the real Send and chips; only the answers are scripted.
+  const agentChat = useAgentChat({ onAction: handleAskAction, scriptedTurns: isDemoActive ? demoScriptedTurns : undefined });
+  const { send: sendChat, newChat } = agentChat;
   const handleAsk = useCallback((question: string) => {
     setAskFocusIds([]);
-    // The demo's question goes through the real Send; only the answer is scripted.
-    if (isDemoActive && demoScriptedAnswer) sendScriptedChat(question, demoScriptedAnswer);
-    else sendChat(question);
-  }, [isDemoActive, demoScriptedAnswer, sendChat, sendScriptedChat]);
+    sendChat(question);
+  }, [sendChat]);
   const handleNewChat = useCallback(() => {
     setAskFocusIds([]);
     newChat();
