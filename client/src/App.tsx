@@ -20,6 +20,7 @@ import { DriftFooter } from './components/DriftFooter';
 import { AgentButton } from './components/AgentButton';
 import { AskPanel } from './components/AskPanel';
 import type { AskAction } from './components/AskPanel';
+import { warnUnknownAskAction } from './components/askStream';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { DemoCaption } from './components/DemoCaption';
 import { DemoPointer } from './components/DemoPointer';
@@ -347,6 +348,8 @@ export function App() {
         setChangelogFocus((previous) => ({ entryId: action.entryId, requestId: (previous?.requestId ?? 0) + 1 }));
         overlay.open(OVERLAY.changelog, { keepBeneath: true });
         return;
+      default:
+        warnUnknownAskAction((action as { kind?: unknown }).kind);
     }
   }, [cosmosIndex, cosmosResponse, handlePlayScenario, overlay]);
 

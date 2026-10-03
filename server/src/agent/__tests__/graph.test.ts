@@ -1,11 +1,11 @@
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
-import { AIMessageChunk, ToolMessage, type BaseMessage } from '@langchain/core/messages';
+import { AIMessage, AIMessageChunk, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
 import { ChatGenerationChunk } from '@langchain/core/outputs';
 import type { StructuredTool } from '@langchain/core/tools';
 import { FakeStreamingChatModel, type ToolSpec } from '@langchain/core/utils/testing';
 import { describe, expect, it } from 'vitest';
 import { getCosmosView } from '../../cosmos/view.js';
-import { streamAgentAnswer, type AgentStreamEvent } from '../graph.js';
+import { AGENT_TOOL_NAMES, streamAgentAnswer, type AgentStreamEvent } from '../graph.js';
 import {
   HIGHLIGHT_SERVICES_TOOL_NAME,
   OPEN_CHANGELOG_ENTRY_TOOL_NAME,
@@ -25,6 +25,7 @@ import {
   ON_CALL_TOOL_NAME,
   WHO_OWNS_TOOL_NAME,
 } from '../readTools.js';
+import type { ChatMessage } from '../../schemas/askRequestSchema.js';
 
 const view = getCosmosView();
 const cosmosMap = getMapSnapshot(view);
@@ -43,6 +44,7 @@ const NO_HINTS = { intent: null, targetScenarioId: null };
  */
 class ScriptedToolCallingModel extends FakeStreamingChatModel {
   boundToolNames: string[] = [];
+  receivedMessages: BaseMessage[][] = [];
   private readonly failure: unknown;
 
   constructor(toolCall: { name: string; args: Record<string, unknown> } | null, failure?: unknown) {
@@ -63,6 +65,7 @@ class ScriptedToolCallingModel extends FakeStreamingChatModel {
     options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
+    this.receivedMessages.push(messages);
     if (this.failure) throw this.failure;
     if (this.chunks.length > 0 && !ToolMessage.isInstance(messages.at(-1))) {
       yield* super._streamResponseChunks(messages, options, runManager);
@@ -77,9 +80,12 @@ class ScriptedToolCallingModel extends FakeStreamingChatModel {
   }
 }
 
-async function collectEvents(model: ScriptedToolCallingModel): Promise<AgentStreamEvent[]> {
+async function collectEvents(
+  model: ScriptedToolCallingModel,
+  messages: ChatMessage[] = [{ role: 'user', content: 'show me' }],
+): Promise<AgentStreamEvent[]> {
   const events: AgentStreamEvent[] = [];
-  for await (const event of streamAgentAnswer({ model, view, hints: NO_HINTS, question: 'show me' })) {
+  for await (const event of streamAgentAnswer({ model, view, hints: NO_HINTS, messages })) {
     events.push(event);
   }
   return events;
@@ -90,12 +96,16 @@ function actionEvents(events: AgentStreamEvent[]) {
 }
 
 describe('streamAgentAnswer', () => {
-  it('binds the map-action tools, then the read tools', async () => {
+  it('binds exactly the reviewed allow-list of tools', async () => {
     const model = new ScriptedToolCallingModel(null);
 
     await collectEvents(model);
 
-    expect(model.boundToolNames).toEqual([
+    expect(model.boundToolNames).toEqual([...AGENT_TOOL_NAMES]);
+  });
+
+  it('keeps the allow-list to the seven map actions, then the six read tools', () => {
+    expect(AGENT_TOOL_NAMES).toEqual([
       HIGHLIGHT_SERVICES_TOOL_NAME,
       PLAY_SCENARIO_TOOL_NAME,
       SHOW_BLAST_RADIUS_TOOL_NAME,
@@ -110,6 +120,27 @@ describe('streamAgentAnswer', () => {
       ON_CALL_TOOL_NAME,
       DRIFT_TOOL_NAME,
     ]);
+  });
+
+  it('hands the whole chat history to the model in order, assistant turns as plain text', async () => {
+    const model = new ScriptedToolCallingModel(null);
+    const history: ChatMessage[] = [
+      { role: 'user', content: 'what does payments do' },
+      { role: 'assistant', content: 'It charges cards.' },
+      { role: 'user', content: 'and who owns it?' },
+    ];
+
+    await collectEvents(model, history);
+
+    const [, ...conversation] = model.receivedMessages[0];
+    expect(conversation.map((message) => [message.constructor, message.text])).toEqual([
+      [HumanMessage, 'what does payments do'],
+      [AIMessage, 'It charges cards.'],
+      [HumanMessage, 'and who owns it?'],
+    ]);
+    expect(conversation.some((message) => AIMessage.isInstance(message) && (message.tool_calls?.length ?? 0) > 0)).toBe(
+      false,
+    );
   });
 
   describe('play_scenario', () => {

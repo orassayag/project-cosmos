@@ -158,6 +158,34 @@ describe('Ask map actions', () => {
     });
   });
 
+  describe('never writes saved state', () => {
+    beforeEach(() => stubViewport(false));
+
+    it.each<AskAction>([
+      { type: 'action', kind: 'highlight', serviceIds: [SERVICE.id] },
+      { type: 'action', kind: 'playScenario', scenarioId: data.scenarios[0].id },
+      { type: 'action', kind: 'showBlastRadius', nodeId: SERVICE.id },
+      { type: 'action', kind: 'openPassport', nodeId: SERVICE.id },
+      { type: 'action', kind: 'showHealth' },
+      { type: 'action', kind: 'showOwnership' },
+      { type: 'action', kind: 'openChangelogEntry', entryId: OLDEST_DRIFT_ENTRY.id },
+    ])('$kind leaves localStorage (and the saved layout) untouched', async (action) => {
+      // jsdom has no SVG geometry; playing a scenario measures the comet paths.
+      Object.defineProperty(SVGElement.prototype, 'getTotalLength', { value: () => 100, configurable: true });
+      Object.defineProperty(SVGElement.prototype, 'getPointAtLength', { value: () => ({ x: 0, y: 0 }), configurable: true });
+      const setItem = vi.spyOn(Storage.prototype, 'setItem');
+      const removeItem = vi.spyOn(Storage.prototype, 'removeItem');
+      const clear = vi.spyOn(Storage.prototype, 'clear');
+
+      await askWithAgentAction(action);
+
+      expect(setItem).not.toHaveBeenCalled();
+      expect(removeItem).not.toHaveBeenCalled();
+      expect(clear).not.toHaveBeenCalled();
+      expect(localStorage.getItem('cosmos-layout')).toBeNull();
+    });
+  });
+
   describe('on desktop', () => {
     beforeEach(() => stubViewport(false));
 
