@@ -45,6 +45,12 @@ export const DEMO_ERROR_ATTRIBUTE = 'data-demo-error';
  */
 export function useDemoRunner({ script, speed, onEnd, inputTarget = window }: UseDemoRunnerOptions): DemoRunner {
   const [status, setStatus] = useState<DemoRunStatus>(script ? 'running' : 'idle');
+  // The script can arrive after mount (App holds it back until the cosmos data loads).
+  const [statusScript, setStatusScript] = useState(script);
+  if (statusScript !== script) {
+    setStatusScript(script);
+    setStatus(script ? 'running' : 'idle');
+  }
   const [caption, setCaption] = useState<string | null>(null);
   const [pointer, setPointer] = useState<DemoPointerMove | null>(null);
 

@@ -98,7 +98,9 @@ export function useMapView({
       bottom: padding.bottom ?? 60,
       left:   padding.left ?? 60,
     };
-    const rect = svg.getBoundingClientRect();
+    // Layout size, not getBoundingClientRect(): the rect includes ancestor transforms (the
+    // `lc-stage-reveal` scale-in), which would make the framing depend on animation progress.
+    const rect = { width: svg.clientWidth, height: svg.clientHeight };
     if (rect.width <= 0 || rect.height <= 0) return null;
     const scaleFit = Math.min(rect.width / worldW, rect.height / worldH);
     const offsetX = (rect.width - worldW * scaleFit) / 2;

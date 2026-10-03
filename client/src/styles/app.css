@@ -2431,6 +2431,73 @@ body:has(.lc-map-stage[data-panning='true']) * {
   display: block;
 }
 
+/* ── Load error (full-screen state when /api/cosmos fails) ─── */
+.lc-load-error {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--bg);
+  color: var(--text);
+  overflow-y: auto;
+}
+.lc-load-error-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 420px;
+  text-align: center;
+}
+.lc-load-error-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--text-dim);
+}
+.lc-load-error-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+}
+.lc-load-error-text {
+  margin: 0;
+  opacity: 0.8;
+}
+.lc-load-error-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  width: 100%;
+}
+.lc-load-error-retry {
+  justify-content: center;
+  min-width: 180px;
+  min-height: 44px;
+}
+.lc-load-error-link {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 10px 4px;
+}
+.lc-load-error-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.45;
+}
+@media (min-width: 769px) and (min-height: 481px) {
+  .lc-load-error-title { font-size: 34px; }
+  .lc-load-error-actions { flex-direction: row; justify-content: center; }
+}
+
 /* ── Spotlight search ───────────────────────────────────────── */
 .lc-spotlight-backdrop {
   position: fixed;

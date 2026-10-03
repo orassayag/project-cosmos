@@ -2,10 +2,15 @@ import { useEffect, useRef } from 'react';
 
 interface WarpTransitionProps {
   /** Fired when the warp animation finishes — App swaps to the cosmos shell. */
-  onDone: () => void;
+  onDone?: () => void;
   /** Total warp duration in ms. */
   duration?: number;
+  /** While true the warp cruises at full speed instead of slowing down and finishing (loading screen). */
+  hold?: boolean;
 }
+
+// The share of the run spent accelerating; a held warp cruises here until released.
+const CRUISE_END = 0.85;
 
 /**
  * Star Wars hyperspace — proper 3D perspective.
@@ -24,10 +29,12 @@ interface WarpTransitionProps {
  * Bg is deep navy. Streaks are white-cored with a soft cyan-blue halo.
  * No flashy colors, no flares — just the tunnel.
  */
-export function WarpTransition({ onDone, duration = 2800 }: WarpTransitionProps) {
+export function WarpTransition({ onDone, duration = 2800, hold = false }: WarpTransitionProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const holdRef = useRef(hold);
+  holdRef.current = hold;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,7 +60,8 @@ export function WarpTransition({ onDone, duration = 2800 }: WarpTransitionProps)
     let cy = 0;
     const stars: Star[] = [];
     let raf = 0;
-    const t0 = performance.now();
+    let lastFrameAt = performance.now();
+    let progressMs = 0;
     let done = false;
 
     const resize = () => {
@@ -108,14 +116,19 @@ export function WarpTransition({ onDone, duration = 2800 }: WarpTransitionProps)
     };
 
     const tick = (now: number) => {
-      const t = Math.min(1, (now - t0) / duration);
+      const frameMs = Math.max(0, now - lastFrameAt);
+      lastFrameAt = now;
+      const isHolding = holdRef.current && progressMs >= duration * CRUISE_END;
+      if (!isHolding) progressMs = Math.min(duration, progressMs + frameMs);
+      const t = progressMs / duration;
 
       // Speed profile: a small startup, then full warp, then decel.
       // `speed` is z-units per second.
       const speed = (() => {
         if (t < 0.15) return 0.3 + (t / 0.15) * 0.6;     // ease into 0.9
-        if (t < 0.85) return 0.9 + (t - 0.15) / 0.7 * 1.7; // ramp 0.9 → 2.6
-        return Math.max(0.4, 2.6 - ((t - 0.85) / 0.15) * 2.2); // settle to 0.4
+        if (t < CRUISE_END) return 0.9 + (t - 0.15) / 0.7 * 1.7; // ramp 0.9 → 2.6
+        if (isHolding) return 2.6;
+        return Math.max(0.4, 2.6 - ((t - CRUISE_END) / 0.15) * 2.2); // settle to 0.4
       })();
 
       // Persistence trail — the lower this alpha, the longer the streaks linger.
@@ -185,7 +198,7 @@ export function WarpTransition({ onDone, duration = 2800 }: WarpTransitionProps)
       }
 
       if (t >= 1) {
-        if (!done) { done = true; onDoneRef.current(); }
+        if (!done) { done = true; onDoneRef.current?.(); }
         return;
       }
       raf = requestAnimationFrame(tick);

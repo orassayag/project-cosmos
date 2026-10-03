@@ -85,7 +85,7 @@ npm run dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
-`npm run dev` starts only the client (Vite): the whole map works, and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
+`npm run dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
 
 ### Useful commands
 
@@ -93,11 +93,14 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Client dev server on `:5173` (no AI) |
+| `npm run dev` | Client on `:5173` + API server on `:8787` (Vite proxies `/api` to it) |
+| `npm run dev:client` | Client only (Vite) — the map shows its error screen, since nothing answers `/api/cosmos` |
+| `npm run dev:server` | API server only, on `:8787` (`tsx watch`, restarts on change) |
 | `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
 | `npm run typecheck` | Type-checks every workspace, no emit |
 | `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
+| `npm run test:e2e` | Playwright: boots `npm run dev` and loads the map through `/api/cosmos` in Chromium (first time: `npx playwright install chromium`; `BASE_URL` reuses an app that is already running) |
 | `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
 | `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
 | `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
@@ -110,7 +113,14 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 
 ### Run with AI locally
 
-The client and the AI server run together on one origin through the [Vercel CLI](https://vercel.com/docs/cli). Link the project and pull its environment variables:
+`npm run dev` already serves the AI routes. They need the variables below; the dev server reads them from `.env.local` at the repo root, then `server/.env` (no Vercel account needed):
+
+```bash
+cp server/.env.example server/.env   # then fill in the keys
+npm run dev
+```
+
+Or run everything on one origin through the [Vercel CLI](https://vercel.com/docs/cli), linking the project and pulling its environment variables:
 
 ```bash
 vercel link

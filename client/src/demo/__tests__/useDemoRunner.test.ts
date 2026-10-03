@@ -62,6 +62,25 @@ afterEach(() => {
 });
 
 describe('useDemoRunner', () => {
+  it('starts when the script arrives after mount (held back until the cosmos data loads)', async () => {
+    const inputTarget = fakeInputTarget();
+    const onEnd = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ script }: { script: DemoScript | undefined }) => useDemoRunner({ script, speed: 1, onEnd, inputTarget }),
+      { initialProps: { script: undefined as DemoScript | undefined } },
+    );
+    expect(result.current.isActive).toBe(false);
+    expect(demoState()).toBeNull();
+
+    rerender({ script: SCRIPT });
+
+    expect(result.current.isActive).toBe(true);
+    expect(demoState()).toBe('running');
+    await advance(10_000);
+    expect(demoState()).toBe('done');
+    expect(onEnd).toHaveBeenCalledWith('done');
+  });
+
   it('clicks through the script and marks the document done', async () => {
     const { result, onEnd, inputTarget } = renderRunner(SCRIPT);
 

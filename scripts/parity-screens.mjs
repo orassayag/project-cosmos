@@ -127,6 +127,30 @@ function prepareBrowser() {
   globalThis.localStorage.setItem('cosmos-intro-seen', '1');
 }
 
+// The app now loads its data from /api/cosmos, which `vite preview` has no backend for, so every
+// shot is served the exact body the server would send (read once from the server module).
+function readCosmosBody() {
+  const result = spawnSync(
+    resolve(root, 'node_modules/.bin/tsx'),
+    [
+      '--eval',
+      "import('./server/src/cosmos/view.ts').then(({ getCosmosResponseBody }) => process.stdout.write(getCosmosResponseBody().json))",
+    ],
+    { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  if (result.status !== 0 || !result.stdout) fail(`could not read the /api/cosmos body: ${result.stderr || 'empty output'}`);
+  return result.stdout;
+}
+
+// The freeze ships inside the served HTML: a style appended from an init script does not survive the
+// parser building the document, and one added after `load` misses the shell's first camera fit.
+async function serveDocumentWithFrozenAnimations(route) {
+  const response = await route.fetch();
+  const html = await response.text();
+  if (!html.includes('</head>')) throw new Error(`no </head> in ${route.request().url()} — cannot inject the animation freeze`);
+  await route.fulfill({ response, body: html.replace('</head>', `<style data-parity-freeze>${FREEZE_CSS}</style></head>`) });
+}
+
 async function waitForServer(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -162,7 +186,7 @@ async function startPreview(skipBuild) {
   return { baseUrl, stop: () => preview.kill('SIGTERM') };
 }
 
-async function captureView(browser, baseUrl, view) {
+async function captureView(browser, baseUrl, view, cosmosBody) {
   const viewport = view.viewport ?? DESKTOP_VIEWPORT;
   const context = await browser.newContext({
     viewport,
@@ -174,18 +198,37 @@ async function captureView(browser, baseUrl, view) {
     await context.addInitScript(prepareBrowser);
     // The AI status probe has no backend under `vite preview`; answer it the same way every run.
     await context.route('**/api/**', (route) => route.fulfill({ status: 404, body: '' }));
+    // Registered later, so it wins over the 404 stub for this one path.
+    await context.route('**/api/cosmos', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json; charset=UTF-8', body: cosmosBody }),
+    );
+    await context.route(
+      (url) => url.href.startsWith(baseUrl),
+      (route) => (route.request().resourceType() === 'document' ? serveDocumentWithFrozenAnimations(route) : route.fallback()),
+    );
     // Web fonts arrive at a racy moment relative to the first camera fit (which measures the
     // layout), so shots always use the fallback fonts; this also keeps the command offline-safe.
     await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
     const page = await context.newPage();
     await page.clock.install({ time: FROZEN_TIME });
+    // Paused, so only runFor moves time: the shell mounts whenever /api/cosmos answers (real time),
+    // and a flowing clock would give the camera a different number of frames to settle in each run.
+    await page.clock.pauseAt(new Date(FROZEN_TIME.getTime() + 1_000));
     await page.goto(`${baseUrl}${view.path}`, { waitUntil: 'load' });
-    await page.addStyleTag({ content: FREEZE_CSS });
+    // The shell mounts only once /api/cosmos answers; settle time is counted from then.
+    await page.locator('.lc-app').waitFor({ state: 'attached', timeout: 15_000 });
     await page.clock.runFor(SETTLE_AFTER_LOAD_MS);
     if (view.act) {
       await view.act(page);
       await page.clock.runFor(SETTLE_AFTER_ACTION_MS);
     }
+    const liveCssAnimations = await page.evaluate(
+      () =>
+        globalThis.document
+          .getAnimations()
+          .filter((animation) => animation instanceof globalThis.CSSAnimation || animation instanceof globalThis.CSSTransition).length,
+    );
+    if (liveCssAnimations > 0) throw new Error(`${view.name}: ${liveCssAnimations} CSS animation(s) still running — the freeze did not apply`);
     return await page.screenshot({
       animations: 'disabled',
       caret: 'hide',
@@ -223,11 +266,12 @@ mkdirSync(outputDir, { recursive: true });
 const server = process.env.BASE_URL
   ? { baseUrl: process.env.BASE_URL.replace(/\/+$/, ''), stop: () => {} }
   : await startPreview(options.skipBuild);
+const cosmosBody = readCosmosBody();
 const browser = await chromium.launch();
 const failures = [];
 try {
   for (const view of views) {
-    const shot = await captureView(browser, server.baseUrl, view);
+    const shot = await captureView(browser, server.baseUrl, view, cosmosBody);
     const baselinePath = resolve(baselineDir, `${view.name}.png`);
     if (options.update) {
       writeFileSync(baselinePath, shot);

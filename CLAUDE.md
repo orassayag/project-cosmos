@@ -3,8 +3,10 @@
 ## Commands
 
 ```bash
-npm run dev        # client dev server on :5173
-npm run dev:client # client dev server on :5173 (plain Vite)
+npm run dev        # client on :5173 + API dev server on :8787 (Vite proxies /api)
+npm run dev:client # client only (plain Vite; no /api, so the map shows its load error)
+npm run dev:server # API dev server only (tsx watch server/scripts/dev-server.ts)
+npm run test:e2e   # Playwright: boots npm run dev, loads the map via /api/cosmos
 npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
 npm run typecheck  # every workspace, no emit
 npm run lint       # eslint over client/, server/, drift-sync/, scripts/

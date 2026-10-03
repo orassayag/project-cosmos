@@ -9,6 +9,9 @@ import { StepPanel } from './components/StepPanel';
 import { ActivityLog } from './components/ActivityLog';
 import { IntroOverlay } from './components/IntroOverlay';
 import { WarpTransition } from './components/WarpTransition';
+import { CosmosLoadError } from './components/CosmosLoadError';
+import { CosmosProvider } from './api/CosmosProvider';
+import { useCosmosLoad } from './api/useCosmosLoad';
 import { HelpButton } from './components/HelpButton';
 import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
@@ -61,14 +64,21 @@ export function App() {
   ));
   // Plays the hyperspace warp between the intro CTA and the cosmos shell.
   const [warping, setWarping] = useState(false);
+  const cosmosLoad = useCosmosLoad();
+  const isCosmosReady = cosmosLoad.state.status === 'ready';
   const [activeDomain, setActiveDomain] = useState(() => initial.domain ?? DOMAINS[0].id);
 
   const runner = useScenarioRunner();
   const { state, steps, scenario, setScenario, jumpTo, completeCurrentShot, onShot } = runner;
 
-  // Hydrate from deep link on first paint. An incident id wins over a
-  // scenario id — both resolve into the same runner slot.
+  // Hydrate from deep link on the shell's first paint (it mounts once the data is ready),
+  // so the map frames the scenario exactly as it did before the loading gate.
+  // An incident id wins over a scenario id — both resolve into the same runner slot.
+  const isShellShown = isCosmosReady && !showIntro && !warping;
+  const hasHydratedDeepLinkRef = useRef(false);
   useEffect(() => {
+    if (!isShellShown || hasHydratedDeepLinkRef.current) return;
+    hasHydratedDeepLinkRef.current = true;
     const deepLinkId = resolvePlayableId(initial.incident) ?? resolvePlayableId(initial.scenario);
     if (deepLinkId) {
       setScenario(deepLinkId);
@@ -78,7 +88,7 @@ export function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isShellShown]);
 
   // The active playable resolved as an incident (null for scenarios / idle).
   const activeIncident: Incident | null =
@@ -307,7 +317,7 @@ export function App() {
 
   const demoAi = useDemoAiConnection(demoSpeed);
   const demoRunner = useDemoRunner({
-    script: demoScript,
+    script: isCosmosReady ? demoScript : undefined,
     speed: demoSpeed,
     // A run cut short can leave the Connect window open with the fake keys in it.
     onEnd: () => overlay.close(OVERLAY.connect),
@@ -321,7 +331,7 @@ export function App() {
   );
 
   // Checked only once the shell shows (as before the demo existed), and never while the demo runs.
-  const realAi = useAiConnection({ enabled: !isDemoActive && !showIntro && !warping });
+  const realAi = useAiConnection({ enabled: !isDemoActive && isShellShown });
   const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
   const isAiConnected = aiConnection.status === 'connected';
   const handleAsk = useCallback((question: string) => {
@@ -342,7 +352,9 @@ export function App() {
   if (showIntro || warping) {
     return (
       <>
-        {warping && <WarpTransition onDone={() => setWarping(false)} />}
+        {warping && (
+          <WarpTransition hold={cosmosLoad.state.status === 'loading'} onDone={() => setWarping(false)} />
+        )}
         {showIntro && (
           <IntroOverlay
             onStart={handleIntroStart}
@@ -354,50 +366,65 @@ export function App() {
     );
   }
 
+  if (cosmosLoad.state.status === 'loading') {
+    return (
+      <>
+        <WarpTransition hold />
+        {demoOverlays}
+      </>
+    );
+  }
+
+  if (cosmosLoad.state.status === 'error') {
+    return <CosmosLoadError errorCode={cosmosLoad.state.errorCode} onRetry={cosmosLoad.retry} />;
+  }
+
   return (
-    <OverlayProvider value={overlay}>
-      <ProjectCosmosShell
-        activeDomain={activeDomain}
-        runner={runner}
-        state={state}
-        steps={steps}
-        scenario={scenario}
-        shot={shot}
-        history={history}
-        panelOpen={panelOpen}
-        setPanelOpen={setPanelOpen}
-        handlePickDomain={handlePickDomain}
-        handlePickScenario={handlePickScenario}
-        handleShotComplete={handleShotComplete}
-        isolate={isolate}
-        setHistory={setHistory}
-        navPlay={navPlay}
-        navPrev={navPrev}
-        navNext={navNext}
-        navJump={navJump}
-        navRestart={navRestart}
-        spotlightTarget={spotlightTarget}
-        setSpotlightTarget={setSpotlightTarget}
-        warping={!!warp}
-        onWarpDone={handleWarpDone}
-        onActivateChangelogItem={handleActivateChangelogItem}
-        onResetGalaxy={handleResetGalaxy}
-        projectCosmosState={projectCosmosState}
-        driftDate={driftDate}
-        onSelectDrift={handleSelectDrift}
-        resetNonce={resetNonce}
-        activeIncident={activeIncident}
-        aiConnection={aiConnection}
-        askQuestion={askQuestion}
-        askNonce={askNonce}
-        askFocusIds={askAnswering ? askFocusIds : []}
-        askScriptedAnswer={askScriptedAnswer}
-        onAsk={handleAsk}
-        onAnswerStart={handleAnswerStart}
-        onAskAction={handleAskAction}
-      />
-      {demoOverlays}
-    </OverlayProvider>
+    <CosmosProvider response={cosmosLoad.state.response}>
+      <OverlayProvider value={overlay}>
+        <ProjectCosmosShell
+          activeDomain={activeDomain}
+          runner={runner}
+          state={state}
+          steps={steps}
+          scenario={scenario}
+          shot={shot}
+          history={history}
+          panelOpen={panelOpen}
+          setPanelOpen={setPanelOpen}
+          handlePickDomain={handlePickDomain}
+          handlePickScenario={handlePickScenario}
+          handleShotComplete={handleShotComplete}
+          isolate={isolate}
+          setHistory={setHistory}
+          navPlay={navPlay}
+          navPrev={navPrev}
+          navNext={navNext}
+          navJump={navJump}
+          navRestart={navRestart}
+          spotlightTarget={spotlightTarget}
+          setSpotlightTarget={setSpotlightTarget}
+          warping={!!warp}
+          onWarpDone={handleWarpDone}
+          onActivateChangelogItem={handleActivateChangelogItem}
+          onResetGalaxy={handleResetGalaxy}
+          projectCosmosState={projectCosmosState}
+          driftDate={driftDate}
+          onSelectDrift={handleSelectDrift}
+          resetNonce={resetNonce}
+          activeIncident={activeIncident}
+          aiConnection={aiConnection}
+          askQuestion={askQuestion}
+          askNonce={askNonce}
+          askFocusIds={askAnswering ? askFocusIds : []}
+          askScriptedAnswer={askScriptedAnswer}
+          onAsk={handleAsk}
+          onAnswerStart={handleAnswerStart}
+          onAskAction={handleAskAction}
+        />
+        {demoOverlays}
+      </OverlayProvider>
+    </CosmosProvider>
   );
 }
 

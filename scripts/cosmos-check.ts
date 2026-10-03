@@ -195,6 +195,48 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     type: 'files-exist',
     paths: ['server/src/__tests__/agentEval.test.ts', 'client/src/__tests__/askUnknownAction.test.ts'],
   },
+  {
+    name: 'dev loop, client data layer, loading gate tests and E2E spec exist',
+    phase: 7,
+    type: 'files-exist',
+    paths: [
+      'server/scripts/dev-server.ts',
+      'client/src/api/cosmosClient.ts',
+      'client/src/api/CosmosProvider.tsx',
+      'client/src/api/__tests__/cosmosClient.test.ts',
+      'client/src/__tests__/loadingGate.test.tsx',
+      'e2e/cosmos-load.spec.ts',
+      'e2e/playwright.config.ts',
+    ],
+  },
+  {
+    name: 'Vite proxies /api to the local dev server (I1)',
+    phase: 7,
+    type: 'grep-present',
+    pattern: "'/api': 'http://localhost:8787'",
+    pathspecs: ['client/vite.config.ts'],
+  },
+  {
+    name: 'the cosmos fetch starts in main.tsx before React renders',
+    phase: 7,
+    type: 'grep-present',
+    pattern: 'startCosmosFetch\\(\\)',
+    pathspecs: ['client/src/main.tsx'],
+  },
+  {
+    name: 'a failed attempt is forgotten so Retry refetches (I2)',
+    phase: 7,
+    type: 'grep-present',
+    pattern: 'cachedPromise = undefined',
+    pathspecs: ['client/src/api/cosmosClient.ts'],
+  },
+  {
+    name: 'CI runs the E2E loading test',
+    phase: 7,
+    type: 'grep-present',
+    pattern: 'npm run test:e2e',
+    pathspecs: ['.github/workflows/validate-on-pr.yml'],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

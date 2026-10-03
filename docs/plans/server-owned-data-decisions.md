@@ -525,3 +525,79 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
   and `giftWrap` entries.
 - The eval proves the tools return the right data for the right call; it does not prove a real model picks that
   call. The plan's live check with a real key (four questions) remains a manual step.
+
+## Phase 7 — Local dev loop, client data layer and loading
+
+### Dev loop (I1)
+
+- `@hono/node-server` 2.1.3 (engines `node >=20`), `concurrently` 10.0.5 (`>=22`) and `@playwright/test` ~1.63.0
+  (`>=20`, pinned to the installed `playwright` 1.63.0) are root dev dependencies; all fit the repo's `node >=22`.
+  `tsx` was already present.
+- `server/scripts/dev-server.ts` loads `.env.local` (root, what `vercel env pull` writes) then `server/.env` with
+  `process.loadEnvFile`, then dynamically imports `src/app.ts` so env is in place first. It is type-checked by the
+  existing `tsc -p scripts`.
+- The Playwright `webServer` waits on `:5173/api/cosmos` (through the proxy) rather than bare `:5173`, so tests start
+  only once both processes answer. `BASE_URL` (same name as `record:demo`) reuses an app already running elsewhere —
+  needed here because an unrelated long-running Vite held 5173/5174 on this machine.
+
+### Client data layer and gate
+
+- The client guard is a shape check (version string, data arrays, derived keys), not the server's Zod schema: the
+  client has no Zod dependency and the server already validates the data. Errors are `CosmosFetchError` with
+  `COSMOS_TIMEOUT` / `COSMOS_HTTP_STATUS` / `COSMOS_NETWORK` / `COSMOS_MALFORMED_RESPONSE`.
+- The load state lives in a small hook `client/src/api/useCosmosLoad.ts` (not named in the plan); `CosmosProvider`
+  only wraps the shell once data is ready, so `useCosmos()` throws `NO_COSMOS_PROVIDER` if called outside it.
+  No component reads `useCosmos()` yet (Phase 8).
+- "Warp plays until both its normal duration has passed and data is ready": `WarpTransition` gained a `hold` prop —
+  while held it cruises at full speed instead of decelerating; on release it finishes its last 15% and calls `onDone`.
+  Intro skipped → a held warp is the loading screen and disappears as soon as data is ready (no extra 2.8 s).
+- Deep-link hydration now runs when the shell first shows (not on App mount), so a scenario is framed in the same
+  render order as before.
+- Demo tours: `useDemoRunner` receives the script only once data is ready; it now starts when its script arrives after
+  mount (render-time state adjustment, covered by a new test). `useAiConnection` also waits for the shell.
+- Error screen: full-screen `CosmosLoadError` (Retry + README link + error code), themed from tokens, phone layout
+  first (column), row layout only above the phone breakpoint. Screenshot-checked at 390×844 and 1440×900.
+
+### Parity screens
+
+- The `/api/**` 404 stub would now block the map (error screen). `parity-screens.mjs` serves `/api/cosmos` with the
+  exact body `getCosmosResponseBody()` produces (read once via `tsx --eval`), registered after the 404 stub so it wins.
+- The shell now mounts whenever `/api/cosmos` answers, which made the old harness racy (flowing fake clock, freeze CSS
+  added after `load`). The harness now: freezes animations from the first paint (init script), pauses the fake clock
+  (only `runFor` moves time) and waits for `.lc-app` before settling. All 16 baselines were retaken with this harness
+  **from the HEAD (pre-Phase-7) App.tsx/main.tsx**, so they record the old app's behaviour; that build reproduces them
+  3/3 runs.
+- Against those baselines the Phase 7 build passes the 8 non-scenario views and differs on the 8 scenario/incident
+  views by 0.10–0.27% (a ~1 px offset of the framed scenario at the same zoom, consistent across runs). Not
+  rebaselined from the new build.
+- Root cause (found on follow-up, no fix applied; owner decision pending in the stage-7 blocker):
+  - `useMapView.fitTarget` measures the SVG with `getBoundingClientRect()`, which includes the `.lc-stage` reveal
+    keyframe's `transform: scale(1.04 → 1)` (`app.css`, `lc-stage-reveal`, 1.4 s). A fit made during the reveal is
+    computed against an inflated rect, so the framing depends on how far the reveal has run when the fit measures.
+  - Pre-Phase-7, the deep-link fit measured one real frame into the reveal (rect 1990 px wide, scale 1.0365); Phase 7
+    measures in the reveal's first frame (1996.8 px, scale 1.04). Hence the ~1 px offset.
+  - The old timing is itself a race: under CPU throttling the pre-Phase-7 build frames the same deep link differently
+    (×4: rect 1977 px, final scale 1.2573; ×8: 1955 px, 1.2523; ×1: 1990 px, 1.2602). The Phase 7 build measures
+    1996.8 px at ×1, ×4 and ×8 (final scale 1.2618 every time). The current baselines record one CPU speed's result.
+  - The harness freeze does not actually apply: the `<style>` the init script appends to `documentElement` is gone
+    once the page has parsed, so CSS animations run on the real clock during every shot.
+  - No client change can match the current baselines deterministically: it would have to measure about 16 ms of
+    real-time reveal progress in. The deterministic fixes (measure the untransformed layout size in `fitTarget`, or
+    make the harness freeze effective) both change the default-map and scenario framing, so they need a rebaseline.
+- **Resolution (owner decision 2026-10-03: "fix both, retake all 16"):**
+  - Client: `useMapView.fitTarget` sizes the fit from `svg.clientWidth`/`clientHeight` (the untransformed layout
+    size; the SVG is absolutely positioned, so it has a block layout box) instead of `getBoundingClientRect()`. The
+    other `getBoundingClientRect()` calls in `useMapView` (`toWorld`, `zoomTarget`, `zoomBy`, pinch) map pointer
+    screen coordinates and do not set framing, so they stay. Unit test `client/src/hooks/__tests__/useMapView.test.ts`
+    fits with a 1.04× rendered rect and expects the layout-size result.
+  - Harness: the freeze `<style data-parity-freeze>` is injected into the served HTML by a document route
+    (`route.fetch()` + insert before `</head>`), so it is part of the parsed document from the first frame. Before
+    every shot the harness counts live `CSSAnimation`/`CSSTransition` objects and fails the view if any remain; all
+    16 views pass that guard.
+  - All 16 baselines retaken from the fixed Phase 7 build (`--update`). Both fixes change framing on every view
+    (camera fit) and appearance (the freeze now really applies), so no subset could stay valid. Visual check against
+    the previous baselines: the same map, same zoom readout (e.g. `scenario-shopping.place-order` 143%); diff images
+    show only sub-pixel outlines of edges and capsules.
+  - Determinism: `npm run parity:screens` green 16/16 on 4 consecutive runs (3 with `--skip-build`, 1 with a fresh
+    build). With live animations (no freeze, no fake clock) and CPU throttling ×1, ×4 and ×8, the world transform is
+    identical for `/?scenario=shopping.place-order` (`scale 1.42787`) and for `/` (`scale 1.27376`).
