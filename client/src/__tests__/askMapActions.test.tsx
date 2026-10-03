@@ -67,10 +67,11 @@ async function askWithAgentAction(action: AskAction) {
   vi.mocked(startCosmosFetch).mockResolvedValue(COSMOS_FIXTURE);
   render(<App />);
   await waitFor(() => expect(document.querySelector('.lc-app')).not.toBeNull());
-  await waitFor(() => expect(screen.getByRole('img', { name: /connected/i })).toBeTruthy());
+  const agentButton = screen.getByRole('button', { name: 'Open the agent chat' });
+  await waitFor(() => expect(agentButton.classList.contains('lc-agent-button--on')).toBe(true));
+  fireEvent.click(agentButton);
 
-  const askInput = document.querySelector<HTMLTextAreaElement>('[data-demo-target="ask-input"]')!;
-  fireEvent.focus(askInput);
+  const askInput = screen.getByRole('textbox', { name: 'Your question' });
   fireEvent.change(askInput, { target: { value: 'Show me' } });
   fireEvent.keyDown(askInput, { key: 'Enter' });
   await waitFor(() => expect(screen.getByText('Here it is on the map.')).toBeTruthy());

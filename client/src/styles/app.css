@@ -834,95 +834,55 @@ body:has(.lc-map-stage[data-panning='true']) * {
   50%      { opacity: 1; }
 }
 
-/* ── Ask the agent field (topbar-right) ────────────────────── */
-.lc-ask {
-  position: relative;
-  width: 224px;
-  height: 30px;
-  flex: none;
-}
-/* The shell is the element that morphs: a pill input collapsed, a card with a
-   Go footer expanded. Absolute so growth never reflows the topbar row. */
-.lc-ask-shell {
+/* ── Agent bot (bottom-right of the stage) ─────────────────── */
+/* Position lives in responsive.css; this is the look: a round chat bubble with a
+   speech tail and the status light as a badge. */
+.lc-agent-button {
   position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 40;
-  width: 224px;
-  height: 30px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  /* Constant radius: reads as a pill at 30px tall, a rounded card when
-     expanded — so nothing morphs mid-animation. */
-  border-radius: 15px;
-  background: var(--bg-surface);
-  overflow: hidden;
-  transition:
-    width var(--dur-slow) var(--ease-out),
-    height var(--dur-slow) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-std),
-    box-shadow var(--dur-fast) var(--ease-std);
-}
-.lc-ask--expanded .lc-ask-shell {
-  width: 320px;
-  height: 150px;
-  border-color: var(--border-strong);
-  box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.8);
-}
-.lc-ask-icon {
-  position: absolute;
-  top: 9px;
-  left: 12px;
-  color: var(--text-2);
-  opacity: 0.75;
-  pointer-events: none;
-}
-.lc-ask--expanded .lc-ask-icon { display: none; }
-.lc-ask-field {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  padding: 6px 36px 6px 32px;
-  border: none;
-  background: transparent;
-  color: var(--text-1);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  letter-spacing: 0.02em;
-  resize: none;
-  overflow: hidden;
-}
-.lc-ask--expanded .lc-ask-field { overflow-y: auto; padding-left: 12px; }
-/* Collapsed it is a one-line pill: never wrap the placeholder or a kept question onto a hidden second line. */
-.lc-ask:not(.lc-ask--expanded) .lc-ask-field { white-space: nowrap; text-overflow: ellipsis; }
-.lc-ask:not(.lc-ask--expanded) .lc-ask-field::placeholder { text-overflow: ellipsis; }
-.lc-ask-bot {
-  position: absolute;
-  top: 7px;
-  right: 10px;
+  z-index: 11;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 12px;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-1) 90%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.85);
+  font-size: 22px;
   line-height: 1;
-  cursor: default;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-std), transform var(--dur-fast) var(--ease-std);
 }
-.lc-ask:not(.lc-ask--expanded) .lc-ask-bot { top: 50%; transform: translateY(-50%); }
-.lc-ask-bot .lc-status-dot { width: 6px; height: 6px; }
-.lc-ask-field::placeholder { color: var(--text-2); opacity: 0.7; }
-.lc-ask-field:focus { outline: none; }
-.lc-ask-footer {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 0 8px 8px;
+.lc-agent-button:hover { border-color: var(--border-strong); }
+.lc-agent-button:active { transform: scale(0.94); }
+.lc-agent-button--on { border-color: color-mix(in srgb, var(--svc-green) 55%, var(--border)); }
+.lc-agent-button--off { border-color: color-mix(in srgb, var(--svc-red) 55%, var(--border)); }
+.lc-agent-button-tail {
+  position: absolute;
+  right: 4px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
 }
+.lc-agent-button .lc-status-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  outline: 2px solid var(--surface-1);
+}
+
 .lc-ask-go {
-  height: 24px;
-  padding: 0 13px;
+  height: 30px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
@@ -932,52 +892,11 @@ body:has(.lc-map-stage[data-panning='true']) * {
   font-weight: 600;
   letter-spacing: 0.06em;
   cursor: pointer;
-  /* Hold the button hidden until the card has finished expanding (0.5s). */
-  opacity: 0;
-  animation: lc-ask-go-in var(--dur-fast) var(--ease-std) 0.5s forwards;
   transition:
     color var(--dur-fast) var(--ease-std),
     border-color var(--dur-fast) var(--ease-std);
-}
-@keyframes lc-ask-go-in {
-  from { opacity: 0; transform: translateY(2px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 .lc-ask-go:hover {
-  color: var(--text-1);
-  border-color: var(--border-strong);
-}
-
-/* Example questions shown while the expanded field is empty. The card grows to
-   make room and shrinks back as soon as the visitor starts typing. */
-.lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 180px; }
-.lc-ask-starters {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 0 8px 8px;
-}
-.lc-ask-starter {
-  min-height: 22px;
-  max-width: 100%;
-  padding: 3px 10px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-2);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.3;
-  text-align: left;
-  cursor: pointer;
-  opacity: 0;
-  animation: lc-ask-go-in var(--dur-fast) var(--ease-std) 0.5s forwards;
-  transition:
-    color var(--dur-fast) var(--ease-std),
-    border-color var(--dur-fast) var(--ease-std);
-}
-.lc-ask-starter:hover {
   color: var(--text-1);
   border-color: var(--border-strong);
 }
@@ -1014,27 +933,27 @@ body:has(.lc-map-stage[data-panning='true']) * {
   line-height: 1.4;
 }
 .lc-ask-panel-body { min-height: 42px; }
+.lc-ask-composer { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.lc-ask-composer-field {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: none;
+}
+.lc-ask-composer-field::placeholder { color: var(--text-2); opacity: 0.7; }
+.lc-ask-composer-field:focus { outline: none; border-color: var(--border-strong); }
 .lc-ask-answer {
   margin: 0;
   color: var(--text-2);
   font-size: 12.5px;
   line-height: 1.65;
 }
-.lc-ask-connect {
-  display: block;
-  margin-top: 12px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text-1);
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: left;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.lc-ask-connect:hover { color: var(--accent); }
 .lc-ask-answer em { color: var(--text-1); font-style: italic; }
 .lc-ask-error {
   margin: 12px 0 0;

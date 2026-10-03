@@ -142,11 +142,11 @@ describe('runDemo', () => {
   });
 
   it('pastes the whole text in one input event', async () => {
-    const field = addElement('input', 'connect-provider-key');
+    const field = addElement('textarea', 'ask-input');
     const inputTypes: string[] = [];
     field.addEventListener('input', (event) => inputTypes.push((event as InputEvent).inputType));
 
-    const result = run([{ kind: 'paste', target: 'connect-provider-key', text: 'sk-demo', durationMs: 1000 }]);
+    const result = run([{ kind: 'paste', target: 'ask-input', text: 'sk-demo', durationMs: 1000 }]);
     await vi.runAllTimersAsync();
 
     await expect(result).resolves.toBe('done');

@@ -58,15 +58,14 @@ describe('demo scripts', () => {
     }
   });
 
-  it.each(VARIANTS)('connects with fake keys, types the question and searches in the %s demo (%s)', (_mode, layout, script) => {
-    const connectAt = targetsOf(script).indexOf('connect-submit');
+  it.each(VARIANTS)('opens the agent bot, types the question and searches in the %s demo (%s)', (_mode, layout, script) => {
+    const targets = targetsOf(script);
     const typeStep = script.find((step) => step.kind === 'type');
     const searchIndex = script.findIndex((step) => step.kind === 'click' && step.target === 'ask-search');
 
-    expect(connectAt).toBeGreaterThan(-1);
-    for (const step of script) {
-      if (step.kind === 'paste') expect(step.text).toContain('demo');
-    }
+    expect(targets.indexOf('connect-open')).toBeGreaterThan(-1);
+    expect(targets.indexOf('connect-open')).toBeLessThan(targets.indexOf('ask-input'));
+    expect(script.some((step) => step.kind === 'paste')).toBe(false);
     expect(typeStep).toMatchObject({ target: 'ask-input', text: aiTour.question });
     expect(script[searchIndex + 1]).toMatchObject({ kind: 'wait' });
     const answer = buildDemoScriptedAnswer(aiTour, { isPhone: layout === 'phone' });

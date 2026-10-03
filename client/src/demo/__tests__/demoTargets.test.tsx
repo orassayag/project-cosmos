@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
-import { AskAgent } from '../../components/AskAgent';
-import { ConnectAgentModal } from '../../components/ConnectAgentModal';
+import { fireEvent } from '@testing-library/react';
+import { AgentButton } from '../../components/AgentButton';
+import { AskPanel } from '../../components/AskPanel';
 import { DomainBar } from '../../components/DomainBar';
 import { IncidentBar } from '../../components/IncidentBar';
 import { IntroOverlay } from '../../components/IntroOverlay';
 import { MobileMenu } from '../../components/MobileMenu';
 import { PlaybackControls } from '../../components/PlaybackControls';
 import { ProjectCosmosMap } from '../../map/Map';
-import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
+import { OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { RunnerApi } from '../../player/runner';
 import type { Scenario, Step } from '../../api/cosmos-api';
 import { COSMOS_FIXTURE, renderWithCosmos } from '../../__tests__/renderWithCosmos';
@@ -29,7 +29,6 @@ function DemoSurfaces() {
   const overlay = useOverlayManager();
   return (
     <OverlayProvider value={overlay}>
-      <button type="button" onClick={() => overlay.open(OVERLAY.connect)}>Open connect</button>
       <IntroOverlay onStart={vi.fn()} onExitComplete={vi.fn()} />
       {/* Stand-ins for App's own buttons: the brand reset and the phone menu toggle. */}
       <button type="button" data-demo-target="galaxy-reset">Project Cosmos</button>
@@ -37,14 +36,9 @@ function DemoSurfaces() {
       <MobileMenu open onClose={vi.fn()}>menu</MobileMenu>
       <DomainBar active="shopping" activeScenarioId={null} onPickDomain={vi.fn()} onPickScenario={vi.fn()} />
       <IncidentBar activeScenarioId={null} onPickIncident={vi.fn()} />
-      <AskAgent
-        onAsk={vi.fn()}
-        aiStatus="disconnected"
-        aiProvider={null}
-        onConnectRequest={vi.fn()}
-        onDisconnect={vi.fn()}
-      />
-      <ConnectAgentModal currentProvider={null} onConnect={vi.fn()} />
+      <AgentButton status="connected" provider="anthropic" onOpenChat={vi.fn()} onOpenSetup={vi.fn()} />
+      {/* The panel the green bot opens, before anything is asked. */}
+      <AskPanel question="" onAsk={vi.fn()} onClose={vi.fn()} />
       <PlaybackControls
         runner={STUB_RUNNER}
         steps={STUB_STEPS}
@@ -62,11 +56,9 @@ function DemoSurfaces() {
 function renderDemoSurfaces() {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   renderWithCosmos(<DemoSurfaces />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
-  // The menus and the Ask footer only render once opened, as they do for the demo's own clicks.
+  // The menus only render once opened, as they do for the demo's own clicks.
   fireEvent.click(findTargets('domain-shopping')[0]);
   fireEvent.click(findTargets('incidents-open')[0]);
-  fireEvent.focus(findTargets('ask-input')[0]);
 }
 
 function findTargets(target: string) {
@@ -103,14 +95,12 @@ describe('data-demo-target attributes', () => {
     for (const domain of COSMOS_FIXTURE.data.domains) expect(findTargets(`domain-${domain.id}`), domain.id).toHaveLength(1);
   });
 
-  it('gives each provider and domain button its own id', () => {
+  it('gives the agent bot and each domain button its own id', () => {
     renderDemoSurfaces();
 
-    expect(findTargets('connect-provider-anthropic')[0].textContent).toBe('Claude');
-    expect(findTargets('connect-provider-openai')[0].getAttribute('role')).toBe('radio');
+    expect(findTargets('connect-open')[0].getAttribute('aria-label')).toBe('Open the agent chat');
     expect(findTargets('domain-fulfillment')[0].textContent).toContain('Fulfillment');
     expect(findTargets('ask-search')[0].textContent).toBe('Search');
-    expect(findTargets('connect-submit')[0].getAttribute('type')).toBe('submit');
     expect(findTargets('legend-ownership')[0].textContent).toBe('Ownership');
   });
 });
