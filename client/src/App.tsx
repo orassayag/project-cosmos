@@ -17,7 +17,7 @@ import type { DriftEntry, Incident, Step } from './api/cosmos-api';
 import { HelpButton } from './components/HelpButton';
 import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
-import { AskAgent } from './components/AskAgent';
+import { AgentButton } from './components/AgentButton';
 import { AskPanel } from './components/AskPanel';
 import type { AskAction } from './components/AskPanel';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
@@ -296,10 +296,9 @@ export function App() {
   // The ask state lives here, not in the shell, because the demo runner asks questions too.
   const [askQuestion, setAskQuestion] = useState<string | null>(null);
   const [askNonce, setAskNonce] = useState(0);
-  // The nodes the map "focuses" on while the answer shows. Disconnected, the
-  // canned demo picks one random node per question; connected, the list starts
-  // empty and the agent's highlight actions fill it. The focus only engages
-  // once the answer starts (not during "thinking").
+  // The nodes the map "focuses" on while the answer shows: the list starts empty
+  // and the agent's highlight actions fill it. The focus only engages once the
+  // answer starts (not during "thinking").
   const [askFocusIds, setAskFocusIds] = useState<string[]>([]);
   const [askAnswering, setAskAnswering] = useState(false);
   const [askScriptedAnswer, setAskScriptedAnswer] = useState<DemoScriptedAnswer | undefined>(undefined);
@@ -356,11 +355,10 @@ export function App() {
     setWarping(true);
   }, [demoMode]);
 
-  const demoAi = useDemoAiConnection(demoSpeed);
+  const demoAi = useDemoAiConnection();
   const demoRunner = useDemoRunner({
     script: demoScript,
     speed: demoSpeed,
-    // A run cut short can leave the Connect window open with the fake keys in it.
     onEnd: () => overlay.close(OVERLAY.connect),
   });
   const isDemoActive = demoRunner.isActive;
@@ -374,16 +372,15 @@ export function App() {
   // Checked only once the shell shows (as before the demo existed), and never while the demo runs.
   const realAi = useAiConnection({ enabled: !isDemoActive && isShellShown });
   const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
-  const isAiConnected = aiConnection.status === 'connected';
   const handleAsk = useCallback((question: string) => {
     // The demo's question goes through the real Search; only the answer is scripted.
-    if (isDemoActive) openAskPanel(question, [], demoScriptedAnswer);
-    else if (isAiConnected || !cosmosResponse) openAskPanel(question, []);
-    else {
-      const { services } = cosmosResponse.data;
-      openAskPanel(question, [services[Math.floor(Math.random() * services.length)].id]);
-    }
-  }, [openAskPanel, isAiConnected, isDemoActive, demoScriptedAnswer, cosmosResponse]);
+    openAskPanel(question, [], isDemoActive ? demoScriptedAnswer : undefined);
+  }, [openAskPanel, isDemoActive, demoScriptedAnswer]);
+  const handleOpenAgentChat = useCallback(() => {
+    // A mounted answer is only re-surfaced: remounting it would ask the agent again.
+    if (askQuestion !== null && overlay.isStacked(OVERLAY.ask)) overlay.open(OVERLAY.ask);
+    else openAskPanel('', []);
+  }, [askQuestion, overlay, openAskPanel]);
 
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow
@@ -468,6 +465,7 @@ export function App() {
           askFocusIds={askAnswering ? askFocusIds : []}
           askScriptedAnswer={askScriptedAnswer}
           onAsk={handleAsk}
+          onOpenAgentChat={handleOpenAgentChat}
           onAnswerStart={handleAnswerStart}
           onAskAction={handleAskAction}
         />
@@ -517,6 +515,7 @@ interface ProjectCosmosShellProps {
   askFocusIds: string[];
   askScriptedAnswer: DemoScriptedAnswer | undefined;
   onAsk: (question: string) => void;
+  onOpenAgentChat: () => void;
   onAnswerStart: () => void;
   onAskAction: (action: AskAction) => void;
 }
@@ -538,7 +537,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     driftDate, onSelectDrift,
     activeIncident,
     aiConnection, askQuestion, askNonce, askFocusIds, askScriptedAnswer,
-    onAsk, onAnswerStart, onAskAction,
+    onAsk, onOpenAgentChat, onAnswerStart, onAskAction,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
@@ -558,14 +557,9 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
   // The answer panel is a managed overlay so it can never stack with the star
   // inspector or any other surface — opening one closes the rest.
-  const isAiConnected = aiConnection.status === 'connected';
-  const { disconnect: disconnectAi } = aiConnection;
   const { servicesById } = useCosmosIndex();
   const { runTimeUtc: driftRunTimeUtc } = useCosmos().data.drift;
-  const handleConnectRequest = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
-  const handleDisconnect = useCallback(() => {
-    void disconnectAi();
-  }, [disconnectAi]);
+  const handleOpenAgentSetup = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
   const closeHelp = useCallback(() => overlay.close(OVERLAY.help), [overlay]);
 
   // The current step, exposed to the incident panel so its body tracks playback.
@@ -715,20 +709,8 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           </>
         );
 
-        const askAgent = (
-          <AskAgent
-            onAsk={onAsk}
-            resetNonce={resetNonce}
-            aiStatus={aiConnection.status}
-            aiProvider={aiConnection.provider}
-            onConnectRequest={handleConnectRequest}
-            onDisconnect={handleDisconnect}
-          />
-        );
-
         const secondaryActions = (
           <>
-            {!isMobile && askAgent}
             <DriftFooter />
             <button
               type="button"
@@ -769,7 +751,6 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
                   </button>
                 </div>
               </div>
-              <div className="lc-topbar-search">{askAgent}</div>
               <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
                 <div className="lc-mobile-menu-section">
                   <div className="lc-mobile-menu-label">Explore</div>
@@ -854,17 +835,21 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           <AskPanel
             key={askNonce}
             question={askQuestion}
+            onAsk={onAsk}
             hidden={!overlay.isOpen(OVERLAY.ask)}
             onClose={() => overlay.close(OVERLAY.ask)}
             onAnswerStart={onAnswerStart}
-            showConnectPrompt={aiConnection.status === 'disconnected'}
-            onConnectRequest={handleConnectRequest}
-            isAiConnected={isAiConnected}
             onAction={onAskAction}
-            onKeyRejected={handleDisconnect}
             scriptedAnswer={askScriptedAnswer}
           />
         )}
+
+        <AgentButton
+          status={aiConnection.status}
+          provider={aiConnection.provider}
+          onOpenChat={onOpenAgentChat}
+          onOpenSetup={handleOpenAgentSetup}
+        />
 
         <PlaybackControls
           runner={runner}
@@ -900,10 +885,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
       <HelpModal open={overlay.isOpen(OVERLAY.help)} onClose={closeHelp} />
 
-      <ConnectAgentModal
-        currentProvider={aiConnection.provider}
-        onConnect={aiConnection.connect}
-      />
+      <ConnectAgentModal />
 
       <ChangelogPanel
         open={overlay.isOpen(OVERLAY.changelog) && !warping}

@@ -10,16 +10,13 @@ export type AskStreamEvent =
 export const ASK_ERROR_MESSAGES: Record<string, string> = {
   OUT_OF_CREDIT: 'Your AI account is out of credit — top it up with your provider, then ask again.',
   RATE_LIMITED: 'Too many questions at once — try again in a moment.',
-  INVALID_KEY: 'Your key no longer works.',
+  INVALID_KEY: 'Your AI provider refused the key — check the key in server/.env, then restart pnpm dev.',
   PROVIDER_ERROR: 'The AI agent hit a problem — please try again.',
-  NOT_CONNECTED: 'Your AI agent is no longer connected — connect it again to ask.',
-  AI_NOT_CONFIGURED: "AI answers aren't available on this site right now.",
+  AI_NOT_LOCAL: 'AI answers only work when you run Project Cosmos locally.',
+  AI_NOT_CONFIGURED: 'No AI key is set — add one to server/.env, then restart pnpm dev.',
   INVALID_REQUEST: "That question couldn't be sent — try a shorter one.",
   NETWORK_ERROR: "Couldn't reach the AI agent — check your connection and try again.",
 };
-
-/** Error codes after which the visitor's stored key is known to be unusable. */
-export const DISCONNECTING_ERROR_CODES: ReadonlySet<string> = new Set(['INVALID_KEY', 'NOT_CONNECTED']);
 
 export function toAskErrorMessage(errorCode: string): string {
   return ASK_ERROR_MESSAGES[errorCode] ?? ASK_ERROR_MESSAGES.PROVIDER_ERROR;
