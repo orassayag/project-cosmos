@@ -1,92 +1,47 @@
+# Stage 8 report — agent-chat browser tests + final acceptance pass
+
 ## Files
+e2e/agent-chat.spec.ts
 README.md
-package.json
-docs/plans/server-owned-data-decisions.md
-scripts/cosmos-check.ts
-scripts/dump-cosmos-response.ts
-scripts/dump-baseline.ts
-scripts/__tests__/cosmosResponseFixture.test.ts
-client/src/App.tsx
-client/src/api/cosmosIndex.ts
-client/src/player/runner.ts
-client/src/scenarios/runner.ts
-client/src/theme/statusMeta.ts
-client/src/theme/driftRuns.ts
-client/src/hooks/useDeepLink.ts
-client/src/overlays/OverlayManager.tsx
+client/src/components/ConnectAgentModal.tsx
+client/src/components/__tests__/ConnectAgentModal.test.tsx
 client/src/styles/app.css
-client/src/components/ActivityLog.tsx
-client/src/components/AskPanel.tsx
-client/src/components/askStream.ts
-client/src/components/ChangelogPanel.tsx
-client/src/components/DomainBar.tsx
-client/src/components/DriftFooter.tsx
-client/src/components/HelpModal.tsx
-client/src/components/IncidentBanner.tsx
-client/src/components/IncidentBar.tsx
-client/src/components/IntroOverlay.tsx
-client/src/components/PlaybackControls.tsx
-client/src/components/ScenarioStatus.tsx
-client/src/components/Spotlight.tsx
-client/src/components/StepPanel.tsx
-client/src/components/TechIcon.tsx
-client/src/map/AmbientPackets.tsx
-client/src/map/BlastLegend.tsx
-client/src/map/ClusterBackdrop.tsx
-client/src/map/CometPackets.tsx
-client/src/map/DriftOverlay.tsx
-client/src/map/Edge.tsx
-client/src/map/HealthCard.tsx
-client/src/map/HealthLegend.tsx
-client/src/map/Map.tsx
-client/src/map/NebulaField.tsx
-client/src/map/OwnershipLegend.tsx
-client/src/map/Planet.tsx
-client/src/map/ServiceNode.tsx
-client/src/map/ServicePanel.tsx
-client/src/map/SubServicePanel.tsx
-client/src/map/TopicNode.tsx
-client/src/map/TopicPanel.tsx
-client/src/map/blast-radius.ts
-client/src/map/ecosystem.ts
-client/src/map/edge-builder.ts
-client/src/map/edge-resolver.ts
-client/src/map/topic-groups.ts
-client/src/map/topicGroupLayout.ts
-client/src/map/__tests__/clusters.test.tsx
-client/src/__tests__/askMapActions.test.tsx
-client/src/__tests__/askUnknownAction.test.ts
-client/src/__tests__/loadingGate.test.tsx
-client/src/__tests__/renderWithCosmos.tsx
-client/src/__tests__/fixtures/cosmos-response.json
-client/src/demo/__tests__/demoMode.test.ts
-client/src/demo/__tests__/demoTargets.test.tsx
-client/src/demo/__tests__/scriptedAnswer.test.ts
-client/src/demo/__tests__/scripts.test.ts
 
 ## Summary
-Every client feature now renders from the `/api/cosmos` response: components read `useCosmos()` / `useCosmosIndex()` (id lookups only), the runner and deep links take the loaded response, and the module-load derivations (`DEPENDENTS_OF`, `TOPIC_GROUPS`, `CONNECTED_NODE_IDS`, the edge list, client drift search) are deleted in favour of `derived.*`; only geometry and presentation tables stay client-side (`client/src/theme/`). The five Phase 6 Ask map actions now run: each opens its view above the answer (phones: the existing one-panel stack; desktop: the answer is kept beneath instead of being aborted), `openPassport` opens beside the answer on desktop, and `openChangelogEntry` pages to and marks the entry. Tests run on a fixture generated from the real route (`npm run fixture:cosmos`, freshness test in `npm test`) through `renderWithCosmos`, with a new component-level `askMapActions.test.tsx` (9 tests: each action on a phone viewport, unknown id, two desktop cases).
+- New `e2e/agent-chat.spec.ts` with three Playwright tests:
+  - **Demo:** `/?demo=ai` with no AI env. Bot dot is `lc-status-dot--on`; both scripted questions and answers appear; `shipping` stays undimmed while other services dim; the follow-up chip gives the second answer; the tour reaches `data-demo-state="done"`; zero requests to `/api/ai/ask`.
+  - **Chat (desktop):** `/api/ai/status` mocked 200, `/api/ai/ask` mocked with real NDJSON lines (`token` / `action` highlight / `usage` / `done`). Ask → token count `≈ 1,280 tokens` → chip "Who owns payments?" → body has exactly 3 messages (checked content) → a held request → Stop → "Reply stopped" → New chat → next body has 1 message. `payments` ends up undimmed.
+  - **Phone (390×844, touch):** with a scenario loaded and the step strip closed, the bot sits fully above the playback bar. Then the same chat flow, then the sheet's "Close the chat" button is in the top-right and closes the sheet.
+- Stage-6 leftovers: "answer panel" wording in `ConnectAgentModal.tsx` comment and its test name/harness label now say "agent chat". Removed the unused `.lc-chat-trigger` CSS and its orphan header comment.
+- README: `pnpm test:e2e` rows now say they drive the agent chat (desktop + phone, faked agent) and the `?demo=ai` tour; test list mentions the agent chat; "One panel at a time" says "agent chat" instead of "ask". The rest of the AI/README sections already matched shipped behaviour (no ask input, keyless setup window, env vars, `A` shortcut, chat, demo tours).
 
-Gates (verified, run by me): `npm run build` ✅ (COSMOS_VERSION e14ae1d530f1cc30; the >500 kB chunk warning is pre-existing — the bundle still carries the old data via `demo/scripts.ts` until Phase 9) · `npm run typecheck` ✅ · `npm run lint` ✅ 0 errors, 1 pre-existing warning (`Map.tsx:834`, was :821) · `npm test` ✅ client 214/214 (24 files), server 333/333, scripts 6/6 · `npm run validate` ✅ 0 errors · `npm run cosmos:check -- --phase 8` ✅ 27/27 (phases 0–8) · `npm run parity:screens` ✅ 16/16 twice (fresh build + `--skip-build`; max 79 px = 0.0038%, counts vary between runs = comet noise) · `npm run test:e2e` ✅ 4/4 with `BASE_URL=http://localhost:5175` (5173/5174 held by unrelated Vite) · demo limits ✅ via `scripts.test.ts` (now on the fixture). Not verified: per-row `parity:screens`/`test:e2e` runs (the rows were migrated in one pass and checked together, twice); a real-browser look at the Ask actions on a phone (covered only by the jsdom component test — the actions need a live agent); `demo=ai`/`demo=all` re-recording (tours unchanged).
+Verification (all run by me, verified):
+- `pnpm typecheck` green. `pnpm lint` green (1 pre-existing warning, `client/src/map/Map.tsx:836`). e2e specs are outside both workspaces' tsconfig, so I also ran an ad-hoc strict `tsc --noEmit` and `eslint e2e` on them: clean.
+- `pnpm test` green: server 369/369, client 304/304, scripts 11/11.
+- `pnpm validate` green (0 errors, 0 warnings). `pnpm build` green. `pnpm types:emit` leaves no diff.
+- `pnpm test:e2e` (via `BASE_URL`, see Open questions): 7/7 passed, and 14/14 with `--repeat-each=2` (no flakes). demo=ai test runs ~26.5s.
+- Server checks (scratch probe, deleted after): `startDevServer` with `VERCEL=1` and a fake key → `/api/ai/status` 503 `AI_NOT_LOCAL`; same without `VERCEL` → 200 connected; importing `server/src/app.ts` directly (no dev script) with a key → 503 `AI_NOT_LOCAL`. `curl http://10.0.0.12:8787/api/ai/status` (this machine's LAN IP) → connection refused, since the dev server listens on 127.0.0.1 only.
+- No background processes left from this stage (my temporary Vite on :5199 was stopped).
 
 ## Commit message
-feat(client): render every feature from /api/cosmos and run the Ask map actions
+test(e2e): cover the agent chat and the demo chat in Playwright
 
-Phase 8 of the server-owned-data migration: components read the loaded response
-instead of the client data copy, module-load derivations give way to `derived`,
-and the agent's blast/passport/health/ownership/changelog actions now open their
-views above the answer. Tests use a fixture written from the real route.
-
-Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+The unit tests check the chat's pieces one by one; this spec checks the whole
+chain in a real browser: bot, chat, request contract, map reaction, and demo=ai.
+Also drops leftover "answer panel" wording and the unused chat-trigger CSS.
 
 ## Key decisions
-- **Data access:** `client/src/api/cosmosIndex.ts` (`indexCosmos` cached per response, `useCosmosIndex`, `stepsFor`, `nodeKindOf`, `nodeName`). `App` is above the provider, so it indexes the ready response from `useCosmosLoad()` directly. Runner moved to `client/src/player/runner.ts` as `useScenarioRunner(response | null)`; `resolvePlayableId(id, index)`; `useDeepLink` takes `defaultDomainId`; active domain is `null` until picked and resolves to `data.domains[0]`.
-- **Deleted:** `client/src/map/topic-groups.ts` (→ `topicGroupLayout.ts`, ring geometry over `derived.topicGroups`), `client/src/map/blast-radius.ts` (→ `derived.blastRadius`, presentation in `theme/statusMeta.ts`), `client/src/scenarios/runner.ts` (moved), `scripts/dump-baseline.ts` + `npm run baseline:dump` (imported the deleted derivations; baseline fixtures stay frozen). `deriveEdges` → `buildEdges(derived.edges, …)`; verified once that server edge order equals the old client order and no hop was skipped, so curve sides are unchanged.
-- **Kept client-side on purpose (no visible change):** Map's `TOPICS_TOUCHING_SERVICE` (differs from `serviceLinks` for `through` receivers) and home bbox → `useMemo` on `version`; `TopicPanel` lists from `data.steps` (`topicLinks` is sorted and would reorder two topics); Spotlight does not add incidents (would change results); `driftEntriesByRun` stays as presentation.
-- **Ask actions:** `OverlayManager.open(id, { keepBeneath: true })` stacks above on desktop too; `Map` takes `blastRequest`/`onBlastRequestConsumed`; `SpotlightTarget.keepAsk` puts the inspector on the right (`lc-map-panel--right`) on desktop; `ChangelogPanel` takes `focus: { entryId, requestId }` and marks the entry (`aria-current`, new `.lc-changelog-item--focused` rule). Unknown ids/kinds stay no-ops (`askUnknownAction.test.ts` rewritten: the five kinds parse, malformed/unknown ones don't).
-- **IntroOverlay** shows before data loads, so `tagline` is a prop (empty until the response arrives).
-- **cosmos:check phase 8** (3 checks) excludes `client/src/demo/` like the Phase 2 grep: `demo/scripts.ts` still imports old data until Phase 9. The client parity twin and `scenarios/palette.ts`'s `paletteVar` remain until Phase 11.
-- **For later stages:** fixture must be regenerated with `npm run fixture:cosmos` after any data change (Phase 9 adds `data.demo`/`source`). Phase 9: rewrite `demo/scripts.ts` to `data.demo` and drop the demo exclusion. Phase 12: CLAUDE.md "Layout" still describes `client/src/scenarios/` as the place for changes. File count ≈ 64 (over the 10-file ceiling; most edits are import swaps); `Map.tsx` and `App.tsx` were already over 400 lines.
+- "Stop mid-stream" is a request held open by the route mock, not a half-sent body. `route.fulfill` sends the body in one piece, so a partial-token stream is not possible with `page.route`. The test proves Stop on an in-flight request shows "Reply stopped"; the partial-text case stays covered by `useAgentChat` unit tests.
+- The phone overlap check needs the playback bar on screen, so it loads `?scenario=<first ready>`. On phones the step narration strip hides the bot (by design), so the test closes the strip first, then checks the bot's bottom edge is above the bar's top edge.
+- Highlight is asserted through the existing `data-dimmed` attribute on `g.lc-service-node`; no new test ids were added to app code.
+- No demo=all segment added (brief: ~3.7s headroom). No behaviour change, so no demo re-recording.
+- Did not edit `CLAUDE.md`, though its `pnpm test:e2e` comment ("loads the map via /api/cosmos") is now incomplete — out of this stage's file scope. One-line follow-up if wanted.
 
 ## Open questions
-- Written to `.claude/status/stage-8-blocker.md` (non-blocking; all Phase 8 work is done): (1) should `demo=ai` show one of the new actions now (CLAUDE.md invariant) or wait for the Phase 9 tour rewrite — any surface action fired at typing start covers the answer; (2) keep the chosen desktop behaviour (view opens above the answer, which returns on close), or show views beside the answer / defer them until the answer finishes?
+- **Stale dev servers block plain `pnpm test:e2e` on this machine.** An old Vite from Sep 25 (pid 23408) holds :5173 and answers 404 for `/api/cosmos`; another old Vite (Oct 1, pid 36483) holds :5174. Playwright then tries to start `pnpm dev`, which cannot bind, and times out. I did not kill processes I did not start. I ran the suite against my own Vite on :5199 (`BASE_URL=http://localhost:5199`), using the already-running current API dev server on :8787. Kill those two old Vite processes, then `pnpm test:e2e` should work as-is.
+- Manual checks for the user (need a real key or a second device; NOT verified here):
+  - 390px first, then desktop: empty `.env` → bot red, window says "No AI key is set yet".
+  - With `ANTHROPIC_API_KEY`: bot green; ask (dots, then reply with token count); follow-up chip; play a scenario from the chat (chat folds only after the reply); press `a` to reopen.
+  - Stop, ask again, New chat during a stream, close and reopen mid-stream (reply complete).
+  - Wrong key → chat shows the "key refused" message.
+  - `curl http://<lan-ip>:8787/api/ai/status` from another device is refused (only checked from this same machine).

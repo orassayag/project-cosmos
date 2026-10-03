@@ -1,79 +1,32 @@
-# Stage 5 report — P4 + P5: GET /api/cosmos, lazy AI imports, COSMOS_VERSION, types:emit
-
 ## Files
-.github/workflows/validate-on-pr.yml
-README.md
-docs/plans/server-owned-data-decisions.md
-package.json
-scripts/cosmos-check.ts
-server/package.json
-server/src/app.ts
-server/src/cosmos/apiTypes.ts
-server/src/cosmos/schema.ts
-server/src/cosmos/view.ts
-server/src/__tests__/cosmosRoute.test.ts
-server/src/__tests__/cosmosIsolation.test.ts
-server/scripts/print-cosmos-version.ts
-server/scripts/emit-client-types.ts
-server/scripts/__tests__/emitClientTypes.test.ts
-client/src/api/cosmos-api.ts
+client/src/hooks/useAgentChat.ts
+client/src/hooks/__tests__/useAgentChat.test.ts
+client/src/components/askStream.ts
 
 ## Summary
-**Files ceiling:** 16 files, over the guide of 10. Phases 4 and 5 together need a route, 2 server tests, 2 scripts with a test, a generated client file, package/CI wiring, cosmos:check entries, README and the decisions log. Largest file is `schema.ts` at about 370 lines, under the 400 ceiling.
-
-**Phase 4 (route)**
-- `GET /api/cosmos` in `server/src/app.ts` returns `{ version, data, derived }`. `data` and `derived` are exactly `getCosmosView()`.
-- `server/src/cosmos/view.ts` adds `getCosmosResponseBody()`, which builds the version and serialized JSON once per process, and `getCosmosVersion()`. The version is the first 16 hex chars of the sha256 of the serialized view.
-- Response headers are `ETag: "<version>"` and `Cache-Control: public, max-age=60, s-maxage=31536000, stale-while-revalidate=86400`. A matching `If-None-Match` gets a 304 (accepts a list, a `W/` prefix, or `*`).
-- `answerQuestion` is now `await import()`ed inside `POST /ai/ask`. It was the only static path to LangChain, LangGraph, `ai` and the provider SDKs.
-- `server/scripts/print-cosmos-version.ts` runs at the end of the server `build` script and prints `COSMOS_VERSION=<version>`. Local value: `8dd1bb04e4445ec8`.
-- Gzip size is **35,290 bytes (~34.5 KB)**, well under 100 KB. `playable.stepsById` is kept, and a test now enforces the budget.
-
-**Phase 5 (client types)**
-- `CosmosResponse` added to the import-free `apiTypes.ts`.
-- `schema.ts` gains strict Zod schemas for every derived type, plus `CosmosResponseSchema satisfies z.ZodType<CosmosResponse>`.
-- New root script `npm run types:emit` (`server/scripts/emit-client-types.ts`). It rejects any `import` or `export … from` line and writes header + source byte for byte to `client/src/api/cosmos-api.ts`.
-- A new CI step runs `types:emit` then `git diff --exit-code client/src/api/cosmos-api.ts`.
-- `cosmos:check` gains 4 phase-4 and 4 phase-5 entries.
-- README updated: route row, script row and CI description.
-
-**Tests added**
-- `cosmosRoute.test.ts` (7): full shape parses with `CosmosResponseSchema` and equals the view; exact headers; 304 variants; 200 on a stale ETag; gzip budget; version format and memo.
-- `cosmosIsolation.test.ts`: agent modules, `@langchain/*` and `ai` are mocked to throw on load, and `/api/cosmos` still returns 200.
-- `emitClientTypes.test.ts` (7): output equals header + source; 4 import/re-export forms are rejected; an "imports" comment is allowed; the committed client copy equals a fresh emit.
-
-**Gates** (all on `feature/add-ai`, uncommitted tree)
-- `npm run build`: ✅ (prints `COSMOS_VERSION=8dd1bb04e4445ec8`)
-- `npm run typecheck`: ✅ (covers the `satisfies`, and the client compiles `cosmos-api.ts`)
-- `npm run lint`: ✅ 0 errors, 1 pre-existing warning (`Map.tsx:821`)
-- `npm test`: ✅ client 182, server 312 (was 297), scripts 5
-- `npm run validate`: ✅ 0 errors
-- `npm run cosmos:check`: ✅ 17/17 across all phases, including phase 4 and phase 5
-- Version-change check: a temporary `brand.helpTitle` edit gave `03999d8489c264ac`; after reverting, `8dd1bb04e4445ec8` again.
-- `parity:screens` not run, because no client behaviour changed: `cosmos-api.ts` is types only and nothing imports it.
+- New `useAgentChat({ onAction? })` hook in `client/src/hooks/useAgentChat.ts`. It returns `{ messages, isStreaming, send, stop, newChat, retry }` and owns the in-flight request: the `AbortController`, the streaming flag and the partial reply. The chat window will only render this state, so closing it never aborts or loses a reply (I6).
+- `send(question)` trims the question and ignores a blank one. It stops any running reply first, then builds the request with the existing `toRequestMessages` and streams it. Map actions from the stream go to `onAction`.
+- `stop()` aborts the fetch and keeps the partial reply as `status: 'stopped'`. When that reply goes into a later request, it is sent as `${partial}\n\n(reply stopped by the visitor)`, or just the note when nothing had arrived yet. So it is never empty and turns still alternate (I3).
+- `newChat()` calls `stop()` and then clears the chat. Each request gets an id, and any event from an older id is dropped, so a late chunk can never land in the new chat.
+- Errors (I7): a failed request adds an `error` message with the provider text from `toAskErrorMessage`. `retry(errorMessageId)` removes the failed question and its error, then asks the question again. Error messages and failed replies are never sent back to the server. A finished reply stores its own `usage` (`{ inputTokens, outputTokens }`).
+- `askStream.ts`: new `streamAskMessages(messages, signal, onEvent)` posts `{ messages }`. The existing `streamAskAnswer(question, …)` now wraps it, so the current AskPanel behaves exactly as before and nothing in `App.tsx` changed.
+- Tests: 8 in `useAgentChat.test.ts`, using a fake controllable streaming `fetch`. They cover a stop before the first chunk followed by a new question (the request is valid and carries the note), the note after a partial reply, new chat during a stream (abort called, no late chunk), a real child window unmounting mid-stream (the reply finishes in state and nothing is aborted), a 401 `INVALID_KEY` (error message with the provider text while `useAiConnection` stays `connected`), retry without sending the error back, and usage stored per reply plus action relay and history in the next request.
+- Checks: `pnpm typecheck` passes. `pnpm lint` shows 0 errors and 1 warning that was already there (`client/src/map/Map.tsx:834`). Client `pnpm test` passes 277/277 (269 plus 8 new). `pnpm build` passes.
+- Not wired into the UI (that is stage 6). Not checked in a browser with a real key. Demos were not re-recorded because no demo behaviour changed.
 
 ## Commit message
-feat(server): serve the cosmos view at GET /api/cosmos and emit its types to the client
+feat(client): add useAgentChat hook that owns the running chat reply
 
-The client will soon fetch one CDN-cached JSON instead of computing the map itself, so the server
-now owns the HTTP contract (ETag/304, long s-maxage) and the response types it copies to the client.
-The AI stack loads lazily so a broken agent can never take the map down.
+The coming chat window needs chat memory that outlives the window: stopping, starting a new chat and errors all have to stay consistent with what the server accepts.
+The hook keeps the running request, sends a stopped reply back with a short note so turns alternate, drops late chunks after a new chat, and shows provider errors as chat messages.
 
 ## Key decisions
-- **Response shape:** the payload is `getCosmosView()` as it is now.
-  - `data.demo` is missing (it arrives in Phase 9).
-  - Extra keys stay: `palette`/`steps` in `data`; `serviceLinks`/`topicLinks`/`dependentsOf`/`driftLinks` in `derived`.
-  - Logged in the decisions file.
-- **Hand-written ETag matching** instead of Hono's `etag` middleware, because the middleware re-hashes the body on every request.
-- **Only `askAnswer` is lazy.** The cosmos-map.json snapshot import stays static: it is plain JSON, and Phase 11 replaces it.
-- **Client runtime guard deferred to Phase 7.** There is no client fetch layer yet, and this stage must not wire the client to fetch.
-- **One `apiTypes.ts` comment reworded** (it named `realtime-hub`), because its client copy would fail the Phase 2 AstroMart-name grep.
-- **No version note written** (the orchestrator owns it).
-
-## Open questions
-- **Manual preview checks (not done, no deploy allowed):**
-  1. On a Vercel preview, the second `GET /api/cosmos` should show `x-vercel-cache: HIT`.
-  2. A second preview built from a data change should serve a new `version`.
-  3. The preview build log should contain `COSMOS_VERSION=…`. Not verified that Vercel Services runs the server workspace's `build` script.
-  4. Cold-start time after the lazy import is unmeasured. If it is slow, stop and ask before splitting the function.
-- The CI `git diff --exit-code` step only catches a stale copy once `client/src/api/cosmos-api.ts` is committed, because it is untracked now. Locally, `emitClientTypes.test.ts` already fails on a stale copy.
+- **Where provider error text lives.** There is no `providerErrors.ts`. The mapping is `ASK_ERROR_MESSAGES` / `toAskErrorMessage` in `client/src/components/askStream.ts`, and the hook reuses it.
+- **Message shape.** `AgentChatMessage` is one of three types. `AgentUserMessage` is `{ id, role: 'user', content }`. `AgentReplyMessage` is `{ id, role: 'assistant', content, status: 'streaming'|'done'|'stopped'|'failed', usage: TokenUsage | null }`. `AgentErrorMessage` is `{ id, role: 'error', errorCode, content, question }`. Ids are `chat-N` strings from a counter. The token count text is left to the UI (stage 6 can use the existing `formatUsage`).
+- **`toChatHistory(messages)` is exported.** It is the only mapping from chat state to `ChatMessage[]`: it skips error messages and `failed`/`streaming` replies and adds the note to `stopped` replies. `toRequestMessages` then applies the server limits. `STOPPED_REPLY_NOTE` is exported too.
+- **An error after part of a reply.** If tokens had already arrived, the partial reply stays visible as `status: 'failed'` and is never sent back. An empty placeholder reply is removed. Either way, the unanswered question is dropped from the next request by `toRequestMessages` (two user turns in a row).
+- **`send` while a reply is still running** stops it first rather than ignoring the new question. The stopped reply then goes into the new request with the note. Stage 6 can still disable sending while streaming if it wants to.
+- **Sync state mirror.** Messages are kept in a ref as well as React state, so that `stop()` followed by `send()` in the same tick (and `retry`) read the latest history.
+- **Abort on unmount.** The hook aborts its request only when the hook itself unmounts, which means when `App` unmounts. Closing the chat window never does.
+- **`askStream.ts` change kept small.** Instead of a new module, `streamAskMessages` was added beside `streamAskAnswer`, and the per-request id check lives in the hook. `streamAskMessages` already emits nothing after an abort.
+- No `onAnswerStart` equivalent was added. Stage 6 can tell when an answer starts from `status === 'streaming' && content !== ''`.

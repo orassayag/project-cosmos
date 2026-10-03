@@ -1,65 +1,60 @@
-# Stage 6 report — P6: Agents read the full model
+# Stage 6 report — AgentChat panel
 
 ## Files
+client/src/components/AgentChat.tsx
+client/src/components/AskPanel.tsx
+client/src/components/followUps.ts
+client/src/components/askStream.ts
+client/src/components/Spotlight.tsx
+client/src/hooks/useAgentChat.ts
+client/src/App.tsx
+client/src/map/Map.tsx
+client/src/demo/types.ts
+client/src/styles/app.css
+client/src/styles/responsive.css
+client/src/components/__tests__/AgentChat.test.tsx
+client/src/components/__tests__/AskPanel.test.tsx
+client/src/components/__tests__/followUps.test.ts
+client/src/__tests__/chatLayout.test.tsx
+client/src/__tests__/askMapActions.test.tsx
+client/src/__tests__/agentShortcut.test.tsx
+client/src/demo/__tests__/demoTargets.test.tsx
+client/src/hooks/__tests__/useAgentChat.test.ts
 README.md
-client/src/api/cosmos-api.ts
-client/src/__tests__/askUnknownAction.test.ts
-docs/plans/server-owned-data-decisions.md
-scripts/cosmos-check.ts
-server/src/__tests__/agentEval.test.ts
-server/src/__tests__/askRoute.test.ts
-server/src/__tests__/cosmosMap.test.ts
-server/src/__tests__/cosmosParity.test.ts
-server/src/agent/__tests__/classify.test.ts
-server/src/agent/__tests__/context.test.ts
-server/src/agent/__tests__/graph.test.ts
-server/src/agent/__tests__/localRelevance.test.ts
-server/src/agent/__tests__/route.test.ts
-server/src/agent/askAnswer.ts
-server/src/agent/context.ts
-server/src/agent/graph.ts
-server/src/agent/mapActionTools.ts
-server/src/agent/mapSnapshot.ts
-server/src/agent/readTools.ts
-server/src/agent/systemPrompt.ts
-server/src/agent/types/cosmosMapSnapshot.ts
-server/src/app.ts
-server/src/cosmos/apiTypes.ts
-server/src/cosmos/schema.ts
-server/src/cosmos/view.ts
 
 ## Summary
-The AI agent now reads `getCosmosView()` instead of `cosmos-map.json`. `app.ts` passes the view to `answerQuestion`. Triage and routing use a snapshot built from the view, and that snapshot is checked to equal the old file exactly. The digest gains an `As of` line, one health/on-call line per service and a latest-drift summary. It went from 1,942 to 2,607 cl100k tokens (+34%, under the 50% limit; 7,584 → 9,321 chars). The agent gains six read tools (`get_service`, `get_steps`, `blast_radius`, `who_owns`, `on_call`, `drift`) and five map actions (`show_blast_radius`, `open_passport`, `show_health`, `show_ownership`, `open_changelog_entry`), with every id checked against the view.
-
-`derived.asOf` (2026-08-14) was added to the API types, the Zod schema and the emitted client copy. A mocked-LLM eval passes all four plan questions. A client test proves that unknown actions do nothing.
-
-Gates, all green:
-- `npm run build` (COSMOS_VERSION=e14ae1d530f1cc30)
-- `npm run typecheck`
-- `npm run lint`: 0 errors, plus the 1 known warning at Map.tsx:821
-- `npm test`: client 189, server 333, scripts 5
-- `npm run validate`: 0 issues
-- `npm run cosmos:check`: 19/19, including the new phase 6 checks
-
-The file count (26) is over the 10-file ceiling. The acceptance grep forces seven existing tests to stop importing the JSON, and the plan asks for the eval, the client test, types, the schema, emitted types, the check script, the README and the decisions log. Each of those edits is small.
+- `AskPanel` is gone. The new `AgentChat` shows the chat from `useAgentChat`: user and agent bubbles, the streaming reply, error bubbles with a "Try again" button, token count under finished replies, and a "Reply stopped" note.
+- Phone: a full-width bottom sheet (max 75vh) with its own top-right close button. It joins the "one card at a time" block in place of the old ask card. The message list scrolls and the composer stays pinned, so the question box no longer drops below the fold on 844×390.
+- Desktop: docked on the right, 360px wide, below the top bar. The zoom steppers and the bot move left of it.
+- Layout rules (I5): if a right-side card (step panel, health card, changelog) opens while a reply is streaming, the chat stays open and the card waits. Once the reply ends, the chat folds into a small tab with the latest line and an unread dot. Clicking the tab, the bot, or pressing `A` reopens the chat and closes that card. A playing scenario keeps playing. The inspector stays on the left while the chat is docked, and `focusNode` pads `right: 380`.
+- Thinking dots show until the first chunk (`aria-label="The agent is thinking"`). They are static when reduced motion is on.
+- Counter: shows `N / 500` past 400 characters. At 500 it turns red and Send is disabled. The textarea has `maxLength=500`.
+- Stop replaces Send while a reply streams. New chat sits in the header and returns to the starter chips.
+- Follow-up chips: pure `suggestFollowUps(lastAnswer, snapshot)` in `followUps.ts`. It gives at most 3 chips from the answer's map actions and the service/scenario ids it mentions, and only uses ids that exist. Tapping a chip sends it.
+- `A` now toggles the new chat. The demos still work: the composer keeps `ask-input` / `ask-search`, and the scripted answer plays through the chat.
+- README: updated the Ask the agent section, the feature bullet and the `A` row.
+- Checks: `pnpm typecheck` passes. `pnpm lint` has 0 errors and 1 old warning (`client/src/map/Map.tsx:836`, was :834). `pnpm test` passes: client 288, server 360, scripts 11, including the demo script length tests. `pnpm build` passes.
+- I ran `?demo=ai` in Playwright on my own Vite (port 5199) at 390×844, 1440×900 and 844×390 and looked at screenshots. The phone sheet, the desktop dock with the inspector on the left, and the pinned composer in landscape all look right. I did not check the folded tab in a browser: that needs a live agent. It is only covered by `chatLayout.test.tsx`. Not checked with a real key.
+- Demos not re-recorded (`pnpm record:demo` not run).
 
 ## Commit message
-feat(agent): read the cosmos view, add read tools and view map actions
+feat(client): replace the answer panel with a multi-turn agent chat
 
-The agent answered from a separate cosmos-map.json snapshot, so it could not see health, drift
-or payloads, and it could drift away from the map. It now reads getCosmosView(), gains read
-tools and map actions checked against the view, and measures relative time from derived.asOf.
+The agent is now a conversation, so it needs a chat window rather than a one-question panel.
+It is a bottom sheet on phones and a right-side dock on desktop. It folds away only after an
+answer ends, has Stop and New chat, and suggests follow-ups without extra model calls.
 
 ## Key decisions
-- **`asOf` lives in `derived`, not `data`.** It is computed as the later of `health.asOf` and the latest drift run, so putting it in `data` would duplicate two facts. No data value changed. The payload gains one field and the `version` changes.
-- **The snapshot is a projection of the view.** `agent/mapSnapshot.ts` builds `CosmosMapSnapshot` from the view, and `cosmosParity.test.ts` checks it deep-equals `baseline-cosmos-map.json`. So `classify.ts`, `localRelevance.ts` and `route.ts` are untouched and behave the same. `graph`, `context` and `mapActionTools` take the view directly.
-- **Tests that imported the JSON** now use `getMapSnapshot()`, because the acceptance grep covers tests too. Their assertions are unchanged except where behaviour is meant to change:
-  - the graph test now expects 13 bound tools (map actions first, then read tools);
-  - the askRoute test expects `view`.
-- **The phase 6 cosmos:check greps `generated/cosmos-map\.json`** with the parity test excluded. Two comments still mention the old file name.
-- **New NDJSON action kinds:** `showBlastRadius {nodeId}`, `openPassport {nodeId}`, `showHealth`, `showOwnership`, `openChangelogEntry {entryId}`. Phase 8 must handle exactly these names. Today the client's `parseAskStreamLine` turns them into `null`, so they do nothing.
-- **`who_owns` on a topic** returns the owners of the services that publish it. **`on_call`** for a service with no health row falls back to its team's rotation; a service with no team returns null.
-- **`drift` uses `searchDrift`**, which matches one substring. The tool description tells the model to send a single keyword.
-- **Digest budget.** `context.test.ts` caps the digest at 11,376 chars (1.5× the baseline) and checks that no step payload appears in it. Tokens were measured with `js-tiktoken` in a temporary test that has since been removed. `js-tiktoken` is only a transitive dependency, so the permanent suite does not use it.
-- **No `demo=ai` change.** The visible Ask behaviour is the same: the new actions do nothing on the client, and the scripted demo answer is fixed text. Phase 8 should show the new actions in the tours once they do something.
-- **Not verified here:** whether a real model picks these tools. The plan's live four-question check with a real key is still a manual step.
+- **20 files, over the 10-file ceiling.** The brief flagged this stage as large. The extra files are the AskPanel deletions, tests that pointed at `.lc-ask-panel`, and a one-line `keepAsk` removal in `Spotlight.tsx`. `App.tsx` (973 lines) and `Map.tsx` were already far past the 400-line ceiling before this stage.
+- **On desktop the chat is not in the overlay manager.** On phones it is still `OVERLAY.ask` in the stack, so one card at a time still applies. On desktop it uses its own dock state in the shell (`isChatDockOpen`), so map legends and modals never close it. Esc reset still closes it, through `resetNonce`.
+- **The chat view is derived, not stored.** It is `collapsed` when a right card is open and no reply is streaming. If the visitor closes that card themselves, the chat opens again by itself.
+- **While streaming, the right card is held back, not just hidden.** `StepPanel` gets `open={panelOpen && !isChatDocked}`, the changelog gets `open` false, and Map holds back the health card. Their state is kept. A changelog the visitor clicks mid-reply therefore only shows once the reply ends. This is the plan rule applied the same way to every card.
+- **Map has new props** `chatDocked`, `healthCardCloseNonce`, `onHealthCardChange`. App needs to know when the health card is open and needs a way to close it without leaving health mode. `keepAsk` is removed everywhere: the chat no longer shares the left edge, so node clicks no longer close it.
+- **The map focus no longer reads the overlay.** App passes `askFocusIds` only while the chat is open and shown, and an empty list while it is folded. This way, highlights from a finished answer don't dim a scenario that is playing.
+- **The folded tab sits above the bot** on the bot's right edge and moves with it beside the step panel. A strip on the very edge would have overlapped the 14px-inset step panel.
+- **`AskAction` moved to `askStream.ts`**, where the stream protocol lives. Its importers were updated.
+- **`useAgentChat` changes:** replies now carry `actions: AskAction[]`, which the follow-up chips need. New `sendScripted(question, answer)` plays the demo answer word by word through the same message flow, so Stop and New chat also work in demos. It is meant to be replaced by stage 7's scripted turns. Shared `startRequest` keeps stage 5's order: stop first, then build history.
+- **The starter chips are back.** I brought back the deleted `STARTER_QUESTIONS` and their dashed-pill style, because the plan's "existing starter-chip style" no longer existed.
+- **The Send button is an icon** with `aria-label="Send"`. The demo-target test now checks the label instead of the text "Search". Send is also disabled while the draft is empty.
+- The folded tab and the right-card rules are desktop only. On phones the stack and the one-card CSS already keep the chat and other cards apart.
+- Left for later: stale "answer panel" wording in a `ConnectAgentModal.tsx` comment and its test name (not touched, out of scope). The old `.lc-chat-trigger` CSS is unused and was left alone.

@@ -1,98 +1,48 @@
-# Stage 5 work brief — P4 + P5: GET /api/cosmos, lazy AI imports, print-cosmos-version, types:emit + CI diff
+# Stage 5 work brief — useAgentChat hook: in-flight ownership, stop marker, new-chat abort, errors + token usage, askStream { messages } (plan §2.4)
 
-Plan: docs/plans/server-owned-data-migration-plan.md (Phases 4 and 5 below are pasted verbatim; the
-ground rules, stop list and target architecture follow for context). Stages 1–4 (Phases 0–3) are
-committed — see the ledger. `getCosmosView()` already exists in `server/src/cosmos/view.ts`.
+Plan: docs/plans/ai-refactor.md. Branch: feature/ai-refactor.
 
-Orchestrator notes for this stage:
-- **No Vercel deploy from this stage.** The two preview checks in Phase 4 ("second request is
-  `x-vercel-cache: HIT`", "a second preview from a data change serves the new `version`") are an
-  outward-facing action — do not deploy. List them under `## Open questions` as manual checks, and
-  verify locally what can be verified (headers, ETag/304, version changes when the view changes).
-- `data.demo` arrives in Phase 9 and `data.clusters` may or may not exist yet in the view — return
-  what `getCosmosView()` has now; record any key the plan lists that isn't present yet in the
-  decisions log rather than inventing data.
-- Gzip size > 100 KB is a stop condition (I7). If close, consider the Stage 4 note: drop
-  `playable.stepsById` from the payload. Over the limit → write a blocker, don't guess.
-- Add a `cosmos:check` phase 4 and phase 5 entry set (follow the existing pattern in
-  `scripts/cosmos-check.ts`).
+## Scope boundary for this stage
+- Build the chat-state hook `client/src/hooks/useAgentChat.ts` and its unit tests, plus any change to `client/src/components/askStream.ts` the hook needs (abort signal, per-request id, usage/error surfacing).
+- Do NOT build the `AgentChat` panel, the phone sheet / desktop dock, Stop/New-chat buttons, thinking dots, counter, or follow-up chips — that is stage 6. Do NOT touch demo scripted turns — that is stage 7.
+- Wiring the hook into `App.tsx` is stage 6's job (it creates the panel that renders it). Leave the existing single-question AskPanel working as-is unless a shared helper extraction is genuinely required; if you change it, keep its tests green.
+- No server change is expected (the server already accepts `{ messages }` and passes aborts on — stage 4).
 
-### Ground rules for the executing agent
+## Plan section (verbatim)
 
-- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
-- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
-- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
-- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
-- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
-- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
-- The AstroMart map must look and behave identically after every phase.
-- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
+#### 2.4 Chat state: `useAgentChat` (I3, I6, I7)
+- `client/src/hooks/useAgentChat.ts`, owned by `App.tsx`, holds the messages **and the
+  in-flight request** (its `AbortController`, streaming flag, partial reply). `AgentChat` only
+  renders this state, so unmounting the window never aborts or loses a reply (I6).
+- `send(question)` builds the request with `toRequestMessages` (2.1) and streams via
+  `askStream.ts` (posts `{ messages }`). Map actions emitted mid-stream still run through
+  `onAskAction`.
+- `stop()` aborts the fetch; the server already passes the abort on. The partial reply is kept
+  and marked `stopped: true`. When it goes into later requests, its content is
+  `${partial}\n\n(reply stopped by the visitor)`, or just `(reply stopped by the visitor)` if it
+  was empty. So it is never empty, roles still alternate, and the agent knows the reply was cut
+  short (I3).
+- `newChat()` calls `stop()` first, then clears the messages, so a late chunk can never land in
+  the fresh chat (I6). Chunks are tagged with a per-request id, and chunks from an older id are
+  dropped.
+- **Errors and cost (I7):** a failed request appends an `error` message whose text comes from
+  the existing `providerErrors.ts` mapping (e.g. "The AI provider refused the key in
+  server/.env"), with a retry action. A finished reply stores its token usage, shown under the
+  reply in small text (`1,240 tokens`), as the old panel did. Error messages are never sent back
+  to the server.
+- Verify: `client/src/hooks/__tests__/useAgentChat.test.ts` (new, unit, faked stream). Protects:
+  - Stop before the first chunk, then ask again → the request is valid and contains the marker.
+  - New chat during a stream → the abort is called and no late chunk appears.
+  - Unmount mid-stream → the reply completes in state.
+  - A 401 → an error message with the provider text, and the bot stays green.
+  - Usage is stored per reply.
 
-### Target architecture
 
-```mermaid
-flowchart TB
-  DS["Drift Sync and humans<br/>edit data files through reviewed PRs"]
-  subgraph Server["Server · Vercel function"]
-    DATA["server/src/cosmos/data<br/>typed TS in git"]
-    VIEW["derive/ + getCosmosView()<br/>blast radius, ownership, health status,<br/>topic groups, drift search, playable"]
-    ROUTE["GET /api/cosmos<br/>CDN-cached, ETag, no AI imports"]
-    AGENTS["AI agents (lazy-loaded)<br/>read tools + map actions on the view"]
-  end
-  subgraph Client["Client · renders only"]
-    RENDER["Fetch once; warp covers first load<br/>useCosmos() feeds map, overlays, tours"]
-    ASK["Ask panel<br/>streams answers, runs map actions"]
-  end
-  DS -- merged PR --> DATA --> VIEW --> ROUTE
-  VIEW -- same view --> AGENTS
-  ROUTE -- one JSON --> RENDER
-  AGENTS -- answers + actions --> ASK
-```
-
-The only way data changes is a reviewed PR to the files. The client never computes a system fact.
-
-### Phase 4 — The cosmos API route
-
-Response:
-
-```
-{
-  "version": "<sha256 of serialized view, first 16 hex>",
-  "data":    { brand, domains, clusters, services, topics, scenarios, incidents, owners, drift, health, demo },
-  "derived": { edges, connectedNodeIds, blastRadius, ownership, topicGroups, healthStatus, latestDrift, driftSearchText, playable }
-}
-```
-
-- Read `server/src/app.ts` first; match its `/api` prefixing, `notFound`, `onError`. Add the route beside `/ai/*`. It imports only `cosmos/view.ts`.
-- Compute `version` and the serialized body once per process. Export `getCosmosVersion()` from `view.ts` for the build log (I6).
-- `ETag: "<version>"`; 304 on matching `If-None-Match`. `Cache-Control: public, max-age=60, s-maxage=31536000, stale-while-revalidate=86400`. Verify on a preview that the second request is `x-vercel-cache: HIT`, and that a second preview built from a data change serves the new `version` (record both).
-- **Build prints the version (I6).** Add `server/scripts/print-cosmos-version.ts` and call it from the server build script so every Vercel build log contains `COSMOS_VERSION=<version>`. Phase 13 compares against it.
-- **Isolate the AI stack.** Move `import { answerQuestion } from './agent/askAnswer.js'` and every import that pulls LangChain, LangGraph or provider SDKs into `await import()` inside the `/ai/*` handlers.
-- *Tests* in `server/src/__tests__/cosmosRoute.test.ts` via `app.request()`: 200 with full shape that parses with the Zod schema; 304 with matching ETag; exact `Cache-Control`/`ETag` headers — protects the HTTP contract the client and CDN depend on. `server/src/__tests__/cosmosIsolation.test.ts`: import `app.ts` with agent modules mocked to throw on load; `GET /api/cosmos` still 200 — protects "map loads when AI is broken". Unit/integration-in-process layer.
-- Record gzip size in the decisions log. Over 100 KB is a stop condition (I7).
-- Slow cold starts on preview after lazy imports → stop and ask before splitting the function.
-
-**Acceptance:** tests pass; preview shows CDN HIT on the second request; broken agent import does not break the route; gzip ≤100 KB.
-
-### Phase 5 — API contract and client types
-
-The server owns the response type; the client receives a byte-for-byte copy of one self-contained file (I3). This copies shape, never data, so it respects the no-shared-package rule and avoids pulling Zod/Hono types into the client build.
-
-- `server/src/cosmos/apiTypes.ts` contains `CosmosResponse` and every type it references, with **no imports** and no runtime code. `types.ts` re-exports from it. `schema.ts` declares `CosmosResponseSchema satisfies z.ZodType<CosmosResponse>`, so a type/schema mismatch is a compile error.
-- `server/scripts/emit-client-types.ts`, wired as root `npm run types:emit`, reads `apiTypes.ts`, fails if it contains any `import`/`export … from` line, prepends `// GENERATED from server/src/cosmos/apiTypes.ts by npm run types:emit — do not edit.` and writes `client/src/api/cosmos-api.ts`. No `tsc` involved.
-- CI step in `.github/workflows/validate-on-pr.yml`: `npm run types:emit` then `git diff --exit-code client/src/api/cosmos-api.ts`.
-- *Tests:* `server/scripts/__tests__/emitClientTypes.test.ts` — output equals header + source; an input with an import line is rejected (protects the single-file invariant). The `satisfies` in `schema.ts` is enforced by `npm run typecheck`. Unit layer.
-- Client runtime guard in the fetch layer: `version` is a string and every top-level `data`/`derived` key exists. Full validation stays server-side.
-
-**Acceptance:** editing a field in `apiTypes.ts` without re-running `types:emit` fails CI; client typechecks against `cosmos-api.ts`.
-
-### Stop and ask the owner if
-
-- A Phase 0 baseline command fails on `main`.
-- A data value must change to make a test pass — **except** the two Phase 2 changes named above (`color`→`palette`, prefix rule→`groupServiceId`), which are proven by equivalence tests instead.
-- Vercel's CDN does not serve a new `version` after a deploy, or cold starts stay slow after lazy imports.
-- The gzip size of `/api/cosmos` is over 100 KB (I7).
-- The production `version` does not match the build's `COSMOS_VERSION` (I6).
-- The digest grows more than 50% and trimming would remove information.
-- Any change seems to need a database, write endpoint, auth or shared package.
-- A phase would change how the map looks or behaves for a visitor.
+## Related plan context (verbatim)
+- Issue I3: A stopped reply is sent with a short "stopped" note, so it is never empty and turns still alternate.
+- Issue I6: The shared chat memory owns the running answer. New chat stops it first; closing the window does not.
+- Issue I7: Errors appear as chat messages and token counts under replies. The old "disconnect on a bad key" code is removed.
+- Known accepted gap: A bad key is found on the first question, not by the status check. The bot stays green until then, but the error is shown plainly in the chat (I7).
+- Out of scope: keeping the chat after a page reload (memory only).
+- §2.1: client trimming lives in `client/src/api/chatHistory.ts` (`toRequestMessages(history, question)`, already built in stage 4) — reuse it, don't re-implement.
+- §2.3: Client `onAskAction` handles only the seven map action types; unknown types are ignored and logged at WARN (already in askStream.ts / App.tsx from stage 4).

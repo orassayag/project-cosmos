@@ -861,14 +861,20 @@ body:has(.lc-map-stage[data-panning='true']) * {
 .lc-agent-button:active { transform: scale(0.94); }
 .lc-agent-button--on { border-color: color-mix(in srgb, var(--svc-green) 55%, var(--border)); }
 .lc-agent-button--off { border-color: color-mix(in srgb, var(--svc-red) 55%, var(--border)); }
+/* A square whose bottom-right corner pokes out of the circle; its top-right and
+   bottom-left corners stay inside it, so the two outer borders continue the ring. */
 .lc-agent-button-tail {
   position: absolute;
-  right: 4px;
-  bottom: -3px;
-  width: 12px;
-  height: 12px;
-  background: inherit;
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  right: 2px;
+  bottom: 2px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 0 1px 1px 0;
+  border-color: inherit;
+  border-bottom-right-radius: 2px;
+  background: var(--surface-1);
   pointer-events: none;
 }
 .lc-agent-button .lc-status-dot {

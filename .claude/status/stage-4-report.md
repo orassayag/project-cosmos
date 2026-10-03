@@ -1,70 +1,48 @@
-# Stage 4 report — P3: Move derived logic to the server
-
 ## Files
-server/src/cosmos/apiTypes.ts
-server/src/cosmos/index.ts
-server/src/cosmos/view.ts
-server/src/cosmos/derive/graph.ts
-server/src/cosmos/derive/blastRadius.ts
-server/src/cosmos/derive/ownership.ts
-server/src/cosmos/derive/health.ts
-server/src/cosmos/derive/topicGroups.ts
-server/src/cosmos/derive/drift.ts
-server/src/cosmos/derive/playable.ts
-server/src/cosmos/derive/__tests__/cosmosFixture.ts
-server/src/cosmos/derive/__tests__/graph.test.ts
-server/src/cosmos/derive/__tests__/blastRadius.test.ts
-server/src/cosmos/derive/__tests__/ownership.test.ts
-server/src/cosmos/derive/__tests__/health.test.ts
-server/src/cosmos/derive/__tests__/drift.test.ts
-server/src/cosmos/derive/__tests__/playable.test.ts
-server/src/__tests__/cosmosParity.test.ts
-scripts/cosmos-check.ts
-docs/plans/server-owned-data-decisions.md
+server/src/schemas/askRequestSchema.ts
+server/src/schemas/__tests__/askRequestSchema.test.ts
+server/src/app.ts
+server/src/agent/askAnswer.ts
+server/src/agent/graph.ts
+server/src/agent/route.ts
+server/src/agent/offTopicAnswers.ts
+server/src/agent/__tests__/graph.test.ts
+server/src/agent/__tests__/route.test.ts
+server/src/agent/__tests__/classify.test.ts
+server/src/__tests__/askRoute.test.ts
+server/src/__tests__/agentEval.test.ts
+client/src/api/chatHistory.ts
+client/src/api/__tests__/chatHistory.test.ts
+client/src/components/askStream.ts
+client/src/App.tsx
+client/src/__tests__/askMapActions.test.tsx
+client/src/__tests__/askUnknownAction.test.ts
+client/src/components/__tests__/AskPanel.test.tsx
+README.md
 
 ## Summary
-Phase 3 is done. The server now computes every derived fact from its own data copy, and parity proves it matches the baseline. The client is untouched (its copies stay until Phase 8).
-- **Derive modules** (`server/src/cosmos/derive/`), all pure functions that take the data as an argument:
-  - `graph.ts`: logical edges (`{ key, type, from, to }`, no SVG path), `connectedNodeIds`, per-service `calls`/`publishes`/`consumes`/`domains` and per-topic `producers`/`consumers` (ported from `snapshot-map.ts`), and the shared `expandStepHops`.
-  - `blastRadius.ts`: `deriveDependentsOf`, `dependentsOf(map, nodeId)`, `computeBlastRadius`, and the full map for every service and topic.
-  - `ownership.ts`: `resolveOwner`, `ownerLabel`, `groupServicesByTeam`, `deriveOwnership`.
-  - `health.ts`: `daysSinceCommit`, `statusFor`, `resolveHealth` (status + on-call + team label), plus counts per status.
-  - `topicGroups.ts`: groups from `groupServiceId` (`{ id, serviceId, memberIds }`; ring geometry stays client-side).
-  - `drift.ts`: latest run (`date`, `entries`, `byNode` with severity ranking), `driftSearchText`, `searchDrift(query)`, `driftPrUrl`, `driftCommitUrl`, `driftBranch`, `driftPrName`.
-  - `playable.ts`: scenarios + incidents as one list, `stepsById`, `stepsFor(id)`, `isIncident`.
-- **`view.ts`**: `getCosmosView()` returns `{ data, derived }`. It is built once, memoized and deep-frozen. `data` is the same object `getCosmosData()` returns. `deepFreeze` is now exported from `index.ts`.
-- **Types**: `CosmosView`, `CosmosDerived` and every type they use were added to `apiTypes.ts`, which still has no imports.
-- **Tests**:
-  - `cosmosParity.test.ts` now checks every derived value against `baseline-full.json`: blast radius and 1-hop dependents for every service and topic, edges (without `d`), connected node ids, topic groups (without geometry), team groups, health per service plus counts, `LATEST_DRIFT_*`, `STEPS_BY_SCENARIO` and incident steps. It also checks per-service links and owner label, and per-topic producers/consumers, against `baseline-cosmos-map.json`. All pass with no fixture change.
-  - New unit tests in `derive/__tests__/` run on a small fixture. They cover hop expansion, edge dedupe and sub-service skipping, dependency direction, the BFS levels, owner fallback and overrides, health thresholds, drift severity, every search facet, URLs, playable lookups, and view memoization and freezing.
-- **cosmos:check phase 3** (3 checks): the derive modules and `view.ts` exist; derive modules import neither `data/` nor `index.ts`; the parity test has the derived block.
-- Gates, all run in this stage on feature/add-ai with the changes uncommitted:
-  - `npm run build`: ✅
-  - `npm run typecheck`: ✅
-  - `npm run lint`: ✅ 0 errors, 1 warning that was already there (Map.tsx:821 exhaustive-deps)
-  - `npm test`: ✅ client 182/182 (no client file changed), server 297/297 (182 + 115 new across the parity block and the derive unit tests), scripts 5/5. The demo tour time-limit tests are included and pass.
-  - `npm run validate`: ✅ 0 errors, 0 warnings, no drift
-  - `npm run cosmos:check -- --phase 3`: ✅ 9/9. Phases 0 (3/3), 1 (5/5) and 2 (6/6) are also green.
-  - `npm run parity:screens`: not run. No client file changed, so the screens cannot be affected.
-- README: no update needed. The change is server-internal, with no new command, script, route or visible feature.
+- `POST /api/ai/ask` now takes only `{ messages: [{ role, content }] }`. The schema is strict (no `system`/`tool` roles, no extra fields, no tool-call fields), holds 1–20 messages, must start and end with the user, must alternate, totals at most 8,000 characters, caps each message at 2,000 and the newest question at 500. Every 400 names the field (for example `messages`, `messages.0.role`, `messages.2.content`). The server rejects; it never trims.
+- Only a chat's first message is classified. Any follow-up goes straight to the agent with the whole history and no hints, so it can never get the off-topic reply.
+- The graph seeds its state with the mapped history. User turns become `HumanMessage`, assistant turns become plain-text `AIMessage` with no tool calls.
+- Off-topic questions now get one fixed reply: "I can only help with the AstroMart map — try asking about a service, a flow, or a team." The joke list (`offTopicAnswers.ts`) and the random pick are gone.
+- `AGENT_TOOL_NAMES` (13 names) is exported from `graph.ts`. A test pins the bound tools to that list, and the list to the seven map actions plus the six read tools.
+- New pure client helper `toRequestMessages(history, question)` in `client/src/api/chatHistory.ts`. The existing single-question AskPanel now sends `{ messages: toRequestMessages([], question) }`, so the app keeps working.
+- Unknown agent action kinds are ignored and logged at WARN (`errorCode: 'UNKNOWN_ASK_ACTION'`). This happens both in the stream parser and in a `default` branch of `handleAskAction` in App.tsx.
+- README: the off-topic line now describes the fixed redirect. Added a bullet on follow-ups and history limits, plus the 13-tool allow-list. The API table shows the request shape.
+- Checks: `pnpm typecheck` clean. `pnpm lint` 0 errors, 1 pre-existing warning (`client/src/map/Map.tsx:834`). `pnpm test`: server 360/360, client 269/269, scripts 11/11. `pnpm build` passes.
+- Not verified in a running browser with a real model key. Demos were not re-recorded, because no demo behaviour changed in this stage.
 
 ## Commit message
-feat(server): derive blast radius, ownership, health, drift and playables on the server
+feat(agent): accept chat history and route follow-ups to the agent
 
-Phase 3 of the server-owned data migration: getCosmosView() computes every derived fact once
-from the server data copy, so agents and (later) the UI read the same answers. Parity against
-the Phase 0/2 baseline proves each value matches the client's current output.
+The ask endpoint now takes a short, validated chat history instead of a single question, so the agent can answer follow-ups like "and who owns it?".
+Only the first question is triaged. Off-topic questions get one polite fixed redirect, and the agent's tools are pinned to a reviewed 13-name allow-list.
 
 ## Key decisions
-(All of these are also in `docs/plans/server-owned-data-decisions.md`, in the new Phase 3 section.)
-- **Derive functions take data as an argument.** Only `view.ts` calls `getCosmosData()`. This keeps them pure and easy to test, and a cosmos:check entry enforces it.
-- **The split rule applied.** Edges drop the SVG `d` and topic groups drop `cx`/`cy`/`ringRadius`, because those are geometry. `*_META` presentation tables stay on the client. Locale formatting (`driftRunDateTime`), `driftEntriesByRun`, `activeNodeSet`/`shotNodeSet` and `radialMemberPosition` were not ported.
-- **Drift search uses the kind id instead of the display label.** Each label lower-cased equals its kind id, and the search text is lower-cased, so matching is identical without moving `DRIFT_KIND_META` to the server.
-- **Maps and sets became plain records and arrays**, so the view is JSON-ready for Phase 4.
-- **`derived` adds three keys to the plan's Phase 4 list:** `serviceLinks`/`topicLinks` (the graph exposes them in the plan's table), `dependentsOf` and `driftLinks`.
-- **Dependents are compared as sets.** The baseline lists 1-hop dependents in blast-radius order, while the server keeps graph insertion order.
-- **No client unit tests existed for these helpers**, so there was nothing to port. New server unit tests were written instead.
-
-## Open questions
-- **Search cross-check not run.** I could not run a one-off `tsx` script that compares `searchDrift` and the URL builders against the client's `driftEntryMatches`/`driftPrUrl`/`driftCommitUrl` over every real drift entry, because the permission was denied. The script is ready at the scratchpad path `driftEquiv.ts` if you want to run it. Equivalence currently rests on the label/kind argument plus the facet unit tests.
-- **Payload size for Phase 4.** `playable.stepsById` repeats steps that are already in `data.steps`/`data.incidents`. If the Phase 4 gzip measurement is close to 100 KB, drop `stepsById` from the payload and keep `stepsFor` as a function.
+- **Error paths.** Refinement errors point at the exact message: first, last and alternation problems at `messages.N.role`, a long question at `messages.N.content`, and the total cap at `messages`. A body in the old `{ question }` shape gets 400 with `field: 'messages'`, because the missing field is reported first.
+- **Limits in two places.** The client keeps its own copies of the limits (`CHAT_MAX_MESSAGES`, `CHAT_TOTAL_MAX_CHARS`, `CHAT_MESSAGE_MAX_LENGTH`) in `chatHistory.ts`, with a comment pointing at the server schema. `apiTypes.ts` holds only data types, so it was left alone and `types:emit` was not needed.
+- **How `toRequestMessages` trims.** It walks back from the new question and stops at the first turn that breaks a rule: wrong role order, empty, over 2,000 characters, or past the total cap. It then drops from the front until the first message is from the user. This matches the brief ("newest 19 + question, drop from front"). It also means an unanswered earlier question (two user turns in a row) never produces an invalid request.
+- **No client logger existed.** The client had no structured logger and no `console.*` use. So `warnUnknownAskAction` in `askStream.ts` writes one JSON `console.warn` line in the server's log shape (`level`, `scope`, `errorCode`, `noPHI`).
+- **Where the follow-up test lives.** The check that follow-ups are never classified sits at the route level, in `askRoute.test.ts` (classifier mocked; asserts it is never called and the agent gets the full history). It is not in `classify.test.ts`, because the branching is in `answerQuestion`, not in `decideRoute` or `classifyQuestion`. `route.test.ts` and `classify.test.ts` were updated for the fixed reply and the removed pick-index parameter.
+- **Layout-storage test.** The test spies on `Storage.prototype` set/remove/clear for all seven actions. `playScenario` needed jsdom stubs for `SVGElement.getTotalLength` and `getPointAtLength`.
+- **Brief path vs. real path.** `askStream.ts` lives at `client/src/components/askStream.ts`, not `client/src/api/`. It was edited where it is.
