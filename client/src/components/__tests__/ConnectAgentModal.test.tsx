@@ -11,7 +11,7 @@ function Harness({ status = 'notLocal' }: { status?: AiConnectionStatus }) {
   return (
     <OverlayProvider value={overlay}>
       <output data-testid="active-overlay">{overlay.active ?? 'none'}</output>
-      <button type="button" onClick={() => overlay.open(OVERLAY.ask)}>Open answer</button>
+      <button type="button" onClick={() => overlay.open(OVERLAY.ask)}>Open chat</button>
       <button type="button" onClick={() => overlay.open(OVERLAY.connect)}>Open connect</button>
       <ConnectAgentModal status={status} />
     </OverlayProvider>
@@ -88,11 +88,11 @@ describe('ConnectAgentModal', () => {
     expect(screen.getByTestId('active-overlay').textContent).toBe('none');
   });
 
-  it('stacks over the answer panel on phones and brings it back when closed', () => {
+  it('stacks over the agent chat on phones and brings it back when closed', () => {
     stubPhoneViewport();
     render(<Harness />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open answer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open chat' }));
     fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
     expect(screen.getByTestId('active-overlay').textContent).toBe(OVERLAY.connect);
 

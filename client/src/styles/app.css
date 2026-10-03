@@ -2427,31 +2427,6 @@ body:has(.lc-map-stage[data-panning='true']) * {
   padding: 1px 5px;
 }
 
-/* ── Project Cosmos chat ────────────────────────────────────────────── */
-/* ── Project Cosmos chat trigger ─────────────────────────────────────── */
-.lc-chat-trigger {
-  position: absolute;
-  right: 58px;
-  bottom: 14px;
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--svc-magenta) 40%, var(--border));
-  background: color-mix(in srgb, var(--surface-1) 80%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--svc-magenta);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  z-index: 10;
-  transition: box-shadow 300ms var(--ease-std), border-color 300ms var(--ease-std), color 300ms var(--ease-std);
-  box-shadow: 0 0 12px -4px color-mix(in srgb, var(--svc-magenta) 40%, transparent);
-}
-.lc-chat-trigger:hover,
-.lc-chat-trigger[data-open='true'] {
-  border-color: var(--svc-magenta);
-  box-shadow: 0 0 20px -4px color-mix(in srgb, var(--svc-magenta) 65%, transparent);
-}
-
 /* ── Agent chat: docked right on desktop (a bottom sheet on phones, responsive.css) ── */
 .lc-chat-panel {
   position: absolute;
