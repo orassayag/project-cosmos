@@ -1,4 +1,3 @@
-import { OFF_TOPIC_ANSWERS } from './offTopicAnswers.js';
 import type { CosmosMapSnapshot } from './mapSnapshot.js';
 
 export const INTENTS = ['explainFlow', 'findService', 'playScenario', 'incident', 'ownership'] as const;
@@ -6,6 +5,8 @@ export type Intent = (typeof INTENTS)[number];
 
 export const OFF_TOPIC_THRESHOLD = 0.35;
 export const DIRECT_ACTION_THRESHOLD = 0.6;
+
+export const OFF_TOPIC_ANSWER = 'I can only help with the AstroMart map — try asking about a service, a flow, or a team.';
 
 /** Classifier output, already mapped out of the evaluator's shape. `targetScenarioId` is null for the "none" choice. */
 export interface Classification {
@@ -29,10 +30,6 @@ export type RouteDecision =
   | { kind: 'directAction'; answer: string; action: { type: 'playScenario'; scenarioId: string } }
   | { kind: 'agent'; hints: AgentHints };
 
-export type PickIndex = (length: number) => number;
-
-const randomIndex: PickIndex = (length) => Math.floor(Math.random() * length);
-
 type PlayableSnapshot = Pick<CosmosMapSnapshot, 'scenarios' | 'incidents'>;
 
 // Incidents are playable too, so they count as scenario targets alongside regular scenarios.
@@ -41,26 +38,19 @@ function findPlayable(snapshot: PlayableSnapshot, scenarioId: string | null) {
   return [...snapshot.scenarios, ...snapshot.incidents].find((entry) => entry.id === scenarioId);
 }
 
-function offTopic(pickIndex: PickIndex): RouteDecision {
-  const index = Math.min(Math.max(pickIndex(OFF_TOPIC_ANSWERS.length), 0), OFF_TOPIC_ANSWERS.length - 1);
-  return { kind: 'offTopic', answer: OFF_TOPIC_ANSWERS[index] };
-}
+const OFF_TOPIC: RouteDecision = { kind: 'offTopic', answer: OFF_TOPIC_ANSWER };
 
-/** Decides how to answer a question without calling the visitor's model for off-topic or direct-action cases. */
-export function decideRoute(
-  input: RouteInput,
-  snapshot: PlayableSnapshot,
-  pickIndex: PickIndex = randomIndex,
-): RouteDecision {
+/** Decides how to answer a question without calling the configured model for off-topic or direct-action cases. */
+export function decideRoute(input: RouteInput, snapshot: PlayableSnapshot): RouteDecision {
   if (input.source === 'localRelevance') {
     return input.onTopic
       ? { kind: 'agent', hints: { intent: null, targetScenarioId: null } }
-      : offTopic(pickIndex);
+      : OFF_TOPIC;
   }
 
   const { onTopicProbability, intent, targetScenarioId, targetScenarioProbability } = input.classification;
   if (onTopicProbability < OFF_TOPIC_THRESHOLD) {
-    return offTopic(pickIndex);
+    return OFF_TOPIC;
   }
 
   // An id the snapshot doesn't know (a stale or invented choice) is dropped rather than played.

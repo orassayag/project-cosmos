@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { getMapSnapshot } from '../mapSnapshot.js';
-import { OFF_TOPIC_ANSWERS } from '../offTopicAnswers.js';
-import { decideRoute, type Classification, type RouteDecision } from '../route.js';
+import { decideRoute, OFF_TOPIC_ANSWER, type Classification, type RouteDecision } from '../route.js';
 
 const cosmosMap = getMapSnapshot();
 
 const PLACE_ORDER_ID = 'shopping.place-order';
 const PLACE_ORDER_TITLE = 'Place an order';
 const INCIDENT_ID = 'payment-cascade-2026-03-12';
-
-const pickFirst = () => 0;
 
 function classify(overrides: Partial<Classification>): Classification {
   return {
@@ -21,7 +18,10 @@ function classify(overrides: Partial<Classification>): Classification {
   };
 }
 
-const OFF_TOPIC: RouteDecision = { kind: 'offTopic', answer: OFF_TOPIC_ANSWERS[0] };
+const OFF_TOPIC: RouteDecision = {
+  kind: 'offTopic',
+  answer: 'I can only help with the AstroMart map — try asking about a service, a flow, or a team.',
+};
 const PLAY_PLACE_ORDER: RouteDecision = {
   kind: 'directAction',
   answer: `Playing *${PLACE_ORDER_TITLE}* for you ▶`,
@@ -66,34 +66,27 @@ const CASES: { name: string; classification: Classification; expected: RouteDeci
 
 describe('decideRoute — classifier results', () => {
   it.each(CASES)('$name', ({ classification, expected }) => {
-    expect(decideRoute({ source: 'classifier', classification }, cosmosMap, pickFirst)).toEqual(expected);
+    expect(decideRoute({ source: 'classifier', classification }, cosmosMap)).toEqual(expected);
   });
 
-  it('picks the off-topic line with the injected index', () => {
-    const decision = decideRoute(
-      { source: 'classifier', classification: classify({ onTopicProbability: 0.1 }) },
-      cosmosMap,
-      () => 2,
+  it('always gives the same fixed redirect for an off-topic question', () => {
+    const decisions = [0, 0.1, 0.2, 0.34].map((onTopicProbability) =>
+      decideRoute({ source: 'classifier', classification: classify({ onTopicProbability }) }, cosmosMap),
     );
-    expect(decision).toEqual({ kind: 'offTopic', answer: OFF_TOPIC_ANSWERS[2] });
-  });
 
-  it('only ever returns lines from OFF_TOPIC_ANSWERS with the default random pick', () => {
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      const decision = decideRoute({ source: 'localRelevance', onTopic: false }, cosmosMap);
-      expect(decision.kind).toBe('offTopic');
-      if (decision.kind === 'offTopic') expect(OFF_TOPIC_ANSWERS).toContain(decision.answer);
-    }
+    expect(new Set(decisions.map((decision) => (decision.kind === 'offTopic' ? decision.answer : null)))).toEqual(
+      new Set([OFF_TOPIC_ANSWER]),
+    );
   });
 });
 
 describe('decideRoute — localRelevance fallback', () => {
-  it('routes an off-topic fallback to a funny reply', () => {
-    expect(decideRoute({ source: 'localRelevance', onTopic: false }, cosmosMap, pickFirst)).toEqual(OFF_TOPIC);
+  it('routes an off-topic fallback to the fixed redirect', () => {
+    expect(decideRoute({ source: 'localRelevance', onTopic: false }, cosmosMap)).toEqual(OFF_TOPIC);
   });
 
   it('routes an on-topic fallback to the agent without hints, never a direct action', () => {
-    expect(decideRoute({ source: 'localRelevance', onTopic: true }, cosmosMap, pickFirst)).toEqual({
+    expect(decideRoute({ source: 'localRelevance', onTopic: true }, cosmosMap)).toEqual({
       kind: 'agent',
       hints: { intent: null, targetScenarioId: null },
     });

@@ -171,7 +171,7 @@ The page never asks for, sends or stores a key. The server reads the keys from i
 
 ```
 question → JEV triage (AI_GATEWAY_API_KEY; free keyword fallback)
-   ├─ off-topic                        → a canned playful reply, 0 model tokens
+   ├─ off-topic                        → one fixed redirect to the map, 0 model tokens
    ├─ "play X" with a confident target → plays the scenario directly, 0 tokens
    └─ everything else                  → LangGraph agent on the configured Claude / OpenAI key
                                            ├─ streams the answer (NDJSON)
@@ -184,8 +184,9 @@ question → JEV triage (AI_GATEWAY_API_KEY; free keyword fallback)
                                               which comes back when the view is closed
 ```
 
+- **Follow-ups skip triage.** The server takes the chat as `{ messages }` (up to the last 20 messages, alternating user/assistant, ≤ 8,000 characters, newest question ≤ 500) and only triages a chat's first question; every later question goes straight to the agent with the history, so *"and who owns it?"* is never mistaken for off-topic. The client trims older turns to fit; the server rejects, never trims.
 - **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the configured model.
-- **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map (services, topics, scenarios, steps, teams, one health/on-call line per service, the latest drift run) plus read tools for the rest — payloads, blast radius, ownership, on-call and drift history. Relative times ("past 24 hours") are measured from the data's `asOf` date, not the real clock. Its map-action tools accept only ids that exist on the map, so it can never point at an invented service. Answers are capped at ~150 words.
+- **The agent** is a LangGraph `StateGraph` (agent ⇄ tools) over LangChain chat models — `claude-sonnet-5` or `gpt-6-sol` — with a compact digest of the map (services, topics, scenarios, steps, teams, one health/on-call line per service, the latest drift run) plus read tools for the rest — payloads, blast radius, ownership, on-call and drift history. Relative times ("past 24 hours") are measured from the data's `asOf` date, not the real clock. Its tools are exactly the 13 above (`AGENT_TOOL_NAMES` in `server/src/agent/graph.ts`): it can read the map and show things on it, never edit the layout, start a demo, or write any saved state. Its map-action tools accept only ids that exist on the map, so it can never point at an invented service. Answers are capped at ~150 words.
 - **Errors are explained, not dumped**: out of credit, rate-limited, invalid key, or a general provider problem — never echoing any part of the key.
 
 ### Server API
@@ -196,7 +197,7 @@ The server (`server/`) is a [Hono](https://hono.dev) app served under `/api`:
 |---|---|
 | `GET /api/cosmos` | The whole map as one JSON — `{ version, data, derived }` — with `ETag: "<version>"` (304 on a matching `If-None-Match`) and a CDN cache that lasts until the next deploy. Does not load the AI stack |
 | `GET /api/ai/status` | `200 { connected: true, provider }` when the local dev server has a model key; otherwise `503 { errorCode: 'AI_NOT_LOCAL' }` (not the local dev server) or `503 { errorCode: 'AI_NOT_CONFIGURED' }` (local, no key). Never calls the provider |
-| `POST /api/ai/ask` | Streams `token` / `action` / `usage` / `error` / `done` events as NDJSON |
+| `POST /api/ai/ask` | Takes `{ messages: [{ role, content }] }` and streams `token` / `action` / `usage` / `error` / `done` events as NDJSON |
 
 The agent reads the same view `GET /api/cosmos` serves (`getCosmosView()`), so its answers and the map can't disagree.
 

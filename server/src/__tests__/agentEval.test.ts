@@ -78,7 +78,7 @@ class EvalChatModel extends FakeStreamingChatModel {
 async function ask(question: string, toolCalls: ScriptedToolCall[]) {
   const model = new EvalChatModel(toolCalls);
   const events: AgentStreamEvent[] = [];
-  for await (const event of streamAgentAnswer({ model, view, hints: NO_HINTS, question })) {
+  for await (const event of streamAgentAnswer({ model, view, hints: NO_HINTS, messages: [{ role: 'user', content: question }] })) {
     events.push(event);
   }
   const resultOf = (name: string) => {

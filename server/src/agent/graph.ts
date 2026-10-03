@@ -4,6 +4,7 @@ import type { RunnableConfig } from '@langchain/core/runnables';
 import { END, MessagesAnnotation, START, StateGraph } from '@langchain/langgraph';
 import { ToolNode, toolsCondition } from '@langchain/langgraph/prebuilt';
 import type { CosmosView } from '../cosmos/types.js';
+import type { ChatMessage } from '../schemas/askRequestSchema.js';
 import { getMapDigest } from './context.js';
 import { createMapActionTools, isMapActionEvent, type MapActionEvent } from './mapActionTools.js';
 import { toProviderError } from './providerErrors.js';
@@ -16,6 +17,24 @@ export const TOOLS_NODE = 'tools';
 // Every super-step counts: agent + tools per round, so this allows three tool rounds and a final answer.
 export const AGENT_RECURSION_LIMIT = 8;
 
+// The agent may only look at the map and show things on it. graph.test.ts pins the bound tools to this
+// list, so a new tool cannot ship until it is reviewed against that rule and added here.
+export const AGENT_TOOL_NAMES = [
+  'highlight_services',
+  'play_scenario',
+  'show_blast_radius',
+  'open_passport',
+  'show_health',
+  'show_ownership',
+  'open_changelog_entry',
+  'get_service',
+  'get_steps',
+  'blast_radius',
+  'who_owns',
+  'on_call',
+  'drift',
+] as const;
+
 export type TokenEvent = { type: 'token'; text: string };
 export type UsageEvent = { type: 'usage'; inputTokens: number; outputTokens: number };
 export type AgentStreamEvent = TokenEvent | MapActionEvent | UsageEvent;
@@ -27,7 +46,7 @@ export interface AgentGraphInput {
 }
 
 export interface AgentAnswerInput extends AgentGraphInput {
-  question: string;
+  messages: readonly ChatMessage[];
   signal?: AbortSignal;
 }
 
@@ -53,6 +72,13 @@ export function buildAgentGraph({ model, view, hints }: AgentGraphInput) {
     .compile();
 }
 
+// Client assistant turns become plain text, never tool calls, so a crafted history cannot fake tool output.
+export function toModelMessages(messages: readonly ChatMessage[]): BaseMessage[] {
+  return messages.map((message) =>
+    message.role === 'user' ? new HumanMessage(message.content) : new AIMessage(message.content),
+  );
+}
+
 function sumUsage(messages: readonly BaseMessage[], total: UsageEvent): void {
   for (const message of messages) {
     if (AIMessage.isInstance(message) && message.usage_metadata) {
@@ -67,14 +93,14 @@ function sumUsage(messages: readonly BaseMessage[], total: UsageEvent): void {
  * Any failure is rethrown as a ProviderError so the caller can put its errorCode on the wire.
  */
 export async function* streamAgentAnswer({
-  question,
+  messages,
   signal,
   ...graphInput
 }: AgentAnswerInput): AsyncGenerator<AgentStreamEvent> {
   const usage: UsageEvent = { type: 'usage', inputTokens: 0, outputTokens: 0 };
   try {
     const stream = await buildAgentGraph(graphInput).stream(
-      { messages: [new HumanMessage(question)] },
+      { messages: toModelMessages(messages) },
       { streamMode: ['messages', 'custom', 'updates'], recursionLimit: AGENT_RECURSION_LIMIT, signal },
     );
     for await (const [mode, chunk] of stream) {
