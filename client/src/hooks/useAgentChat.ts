@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toRequestMessages, type ChatMessage } from '../api/chatHistory';
-import type { AskAction } from '../components/AskPanel';
-import { streamAskMessages, toAskErrorMessage, type AskStreamEvent } from '../components/askStream';
+import { streamAskMessages, toAskErrorMessage, type AskAction, type AskStreamEvent } from '../components/askStream';
+import type { DemoScriptedAnswer } from '../demo/types';
 
 export const STOPPED_REPLY_NOTE = '(reply stopped by the visitor)';
 
@@ -24,6 +24,8 @@ export interface AgentReplyMessage {
   content: string;
   status: AgentReplyStatus;
   usage: TokenUsage | null;
+  /** Map actions the reply ran; follow-up chips are built from them. */
+  actions: AskAction[];
 }
 
 export interface AgentErrorMessage {
@@ -41,6 +43,8 @@ export interface AgentChat {
   messages: AgentChatMessage[];
   isStreaming: boolean;
   send: (question: string) => void;
+  /** Demo only: plays a fixed answer word by word through the same message flow, so Stop and New chat still apply. */
+  sendScripted: (question: string, answer: DemoScriptedAnswer) => void;
   stop: () => void;
   newChat: () => void;
   retry: (errorMessageId: string) => void;
@@ -117,23 +121,30 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
     finishRequest();
   }, [finishRequest, updateReply]);
 
+  const startRequest = useCallback(
+    (question: string): InFlightRequest & { history: ChatMessage[] } => {
+      stop();
+      const history = toChatHistory(messagesRef.current);
+      lastRequestIdRef.current += 1;
+      const inFlight = { requestId: lastRequestIdRef.current, replyId: nextMessageId(), controller: new AbortController() };
+      inFlightRef.current = inFlight;
+      updateMessages((previous) => [
+        ...previous,
+        { id: nextMessageId(), role: 'user', content: question },
+        { id: inFlight.replyId, role: 'assistant', content: '', status: 'streaming', usage: null, actions: [] },
+      ]);
+      setIsStreaming(true);
+      return { ...inFlight, history };
+    },
+    [nextMessageId, stop, updateMessages],
+  );
+
   const send = useCallback(
     (question: string) => {
       const trimmedQuestion = question.trim();
       if (trimmedQuestion === '') return;
-      stop();
-      const requestMessages = toRequestMessages(toChatHistory(messagesRef.current), trimmedQuestion);
-      lastRequestIdRef.current += 1;
-      const requestId = lastRequestIdRef.current;
-      const replyId = nextMessageId();
-      const controller = new AbortController();
-      inFlightRef.current = { requestId, replyId, controller };
-      updateMessages((previous) => [
-        ...previous,
-        { id: nextMessageId(), role: 'user', content: trimmedQuestion },
-        { id: replyId, role: 'assistant', content: '', status: 'streaming', usage: null },
-      ]);
-      setIsStreaming(true);
+      const { requestId, replyId, controller, history } = startRequest(trimmedQuestion);
+      const requestMessages = toRequestMessages(history, trimmedQuestion);
 
       const handleEvent = (event: AskStreamEvent) => {
         if (inFlightRef.current?.requestId !== requestId) return;
@@ -142,6 +153,7 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
             updateReply(replyId, (reply) => ({ ...reply, content: reply.content + event.text }));
             break;
           case 'action':
+            updateReply(replyId, (reply) => ({ ...reply, actions: [...reply.actions, event] }));
             onActionRef.current?.(event);
             break;
           case 'usage':
@@ -174,7 +186,35 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
       };
       void streamAskMessages(requestMessages, controller.signal, handleEvent);
     },
-    [finishRequest, nextMessageId, stop, updateMessages, updateReply],
+    [finishRequest, nextMessageId, startRequest, updateMessages, updateReply],
+  );
+
+  const sendScripted = useCallback(
+    (question: string, answer: DemoScriptedAnswer) => {
+      const trimmedQuestion = question.trim();
+      if (trimmedQuestion === '') return;
+      const { replyId, controller } = startRequest(trimmedQuestion);
+      const { thinkingMs, wordMs, actions = [] } = answer;
+      const words = answer.text.split(' ');
+      const timeoutIds = [
+        window.setTimeout(() => {
+          updateReply(replyId, (reply) => ({ ...reply, actions }));
+          actions.forEach((action) => onActionRef.current?.(action));
+        }, thinkingMs),
+        ...words.map((_word, index) =>
+          window.setTimeout(
+            () => updateReply(replyId, (reply) => ({ ...reply, content: words.slice(0, index + 1).join(' ') })),
+            thinkingMs + (index + 1) * wordMs,
+          ),
+        ),
+        window.setTimeout(() => {
+          updateReply(replyId, (reply) => ({ ...reply, status: 'done' }));
+          finishRequest();
+        }, thinkingMs + words.length * wordMs),
+      ];
+      controller.signal.addEventListener('abort', () => timeoutIds.forEach((id) => window.clearTimeout(id)));
+    },
+    [finishRequest, startRequest, updateReply],
   );
 
   const newChat = useCallback(() => {
@@ -198,5 +238,5 @@ export function useAgentChat({ onAction }: UseAgentChatOptions = {}): AgentChat 
 
   useEffect(() => () => inFlightRef.current?.controller.abort(), []);
 
-  return { messages, isStreaming, send, stop, newChat, retry };
+  return { messages, isStreaming, send, sendScripted, stop, newChat, retry };
 }

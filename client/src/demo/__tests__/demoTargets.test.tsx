@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent } from '@testing-library/react';
 import { AgentButton } from '../../components/AgentButton';
-import { AskPanel } from '../../components/AskPanel';
+import { AgentChat } from '../../components/AgentChat';
 import { DomainBar } from '../../components/DomainBar';
 import { IncidentBar } from '../../components/IncidentBar';
 import { IntroOverlay } from '../../components/IntroOverlay';
@@ -38,7 +38,17 @@ function DemoSurfaces() {
       <IncidentBar activeScenarioId={null} onPickIncident={vi.fn()} />
       <AgentButton status="connected" provider="anthropic" onOpenChat={vi.fn()} onOpenSetup={vi.fn()} />
       {/* The panel the green bot opens, before anything is asked. */}
-      <AskPanel question="" onAsk={vi.fn()} onClose={vi.fn()} />
+      <AgentChat
+        messages={[]}
+        isStreaming={false}
+        view="open"
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        onNewChat={vi.fn()}
+        onRetry={vi.fn()}
+        onClose={vi.fn()}
+        onExpand={vi.fn()}
+      />
       <PlaybackControls
         runner={STUB_RUNNER}
         steps={STUB_STEPS}
@@ -100,7 +110,7 @@ describe('data-demo-target attributes', () => {
 
     expect(findTargets('connect-open')[0].getAttribute('aria-label')).toBe('Open the agent chat');
     expect(findTargets('domain-fulfillment')[0].textContent).toContain('Fulfillment');
-    expect(findTargets('ask-search')[0].textContent).toBe('Search');
+    expect(findTargets('ask-search')[0].getAttribute('aria-label')).toBe('Send');
     expect(findTargets('legend-ownership')[0].textContent).toBe('Ownership');
   });
 });

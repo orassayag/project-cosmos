@@ -18,9 +18,10 @@ import { HelpButton } from './components/HelpButton';
 import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
 import { AgentButton } from './components/AgentButton';
-import { AskPanel } from './components/AskPanel';
-import type { AskAction } from './components/AskPanel';
+import { AgentChat } from './components/AgentChat';
+import type { AgentChatView } from './components/AgentChat';
 import { warnUnknownAskAction } from './components/askStream';
+import type { AskAction } from './components/askStream';
 import { ConnectAgentModal } from './components/ConnectAgentModal';
 import { DemoCaption } from './components/DemoCaption';
 import { DemoPointer } from './components/DemoPointer';
@@ -36,10 +37,11 @@ import { OverlayProvider, useOverlay, useOverlayManager, OVERLAY } from './overl
 import { MOBILE_QUERY, useViewport } from './hooks/useViewport';
 import { useAiConnection } from './hooks/useAiConnection';
 import type { AiConnection } from './hooks/useAiConnection';
+import { useAgentChat } from './hooks/useAgentChat';
+import type { AgentChat as AgentChatState } from './hooks/useAgentChat';
 import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from './demo/demoMode';
 import { buildDemoScript } from './demo/scripts';
 import { buildDemoScriptedAnswer } from './demo/scriptedAnswer';
-import type { DemoScriptedAnswer } from './demo/types';
 import { useDemoAiConnection } from './demo/useDemoAiConnection';
 import { useDemoRunner } from './demo/useDemoRunner';
 
@@ -49,6 +51,8 @@ import { readInitialDeepLink, resolvePlayableId, useDeepLink } from './hooks/use
 import { driftRunDateTime } from './theme/driftRuns';
 
 interface ActivityEntry { idx: number; step: Step }
+
+const NO_FOCUS_IDS: string[] = [];
 
 export function App() {
   const initial = useMemo(readInitialDeepLink, []);
@@ -294,29 +298,11 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleResetGalaxy]);
 
-  // The ask state lives here, not in the shell, because the demo runner asks questions too.
-  const [askQuestion, setAskQuestion] = useState<string | null>(null);
-  const [askNonce, setAskNonce] = useState(0);
-  // The nodes the map "focuses" on while the answer shows: the list starts empty
-  // and the agent's highlight actions fill it. The focus only engages once the
-  // answer starts (not during "thinking").
+  // The nodes the map "focuses" on for the latest answer: emptied on each new question and
+  // filled by the agent's highlight actions. The focus only engages once the answer starts.
   const [askFocusIds, setAskFocusIds] = useState<string[]>([]);
-  const [askAnswering, setAskAnswering] = useState(false);
-  const [askScriptedAnswer, setAskScriptedAnswer] = useState<DemoScriptedAnswer | undefined>(undefined);
-  const openAskPanel = useCallback(
-    (question: string, focusIds: string[], scriptedAnswer?: DemoScriptedAnswer) => {
-      setAskQuestion(question);
-      setAskNonce((n) => n + 1);
-      setAskFocusIds(focusIds);
-      setAskScriptedAnswer(scriptedAnswer);
-      setAskAnswering(false);
-      overlay.open(OVERLAY.ask);
-    },
-    [overlay],
-  );
-  const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
-  // Surfaces an Ask action opens sit above the answer, which keeps streaming beneath them
-  // (buried on phones, hidden on desktop) and comes back when they close. Unknown ids are no-ops.
+  // Surfaces an Ask action opens sit above the chat on phones, which keeps streaming beneath
+  // them and comes back when they close. Unknown ids are no-ops.
   const [blastRequest, setBlastRequest] = useState<{ nodeId: string } | null>(null);
   const [changelogFocus, setChangelogFocus] = useState<ChangelogFocus | null>(null);
   const handleBlastRequestConsumed = useCallback(() => setBlastRequest(null), []);
@@ -334,7 +320,7 @@ export function App() {
         return;
       case 'openPassport': {
         const kind = nodeKindOf(cosmosIndex, action.nodeId);
-        if (kind) setSpotlightTarget({ id: action.nodeId, kind, keepAsk: true });
+        if (kind) setSpotlightTarget({ id: action.nodeId, kind });
         return;
       }
       case 'showHealth':
@@ -375,15 +361,21 @@ export function App() {
   // Checked only once the shell shows (as before the demo existed), and never while the demo runs.
   const realAi = useAiConnection({ enabled: !isDemoActive && isShellShown });
   const aiConnection: AiConnection = isDemoActive ? demoAi : realAi;
+  // Owned here, not in the shell, so a reply keeps streaming whatever the chat window does.
+  const agentChat = useAgentChat({ onAction: handleAskAction });
+  const { send: sendChat, sendScripted: sendScriptedChat, newChat } = agentChat;
   const handleAsk = useCallback((question: string) => {
-    // The demo's question goes through the real Search; only the answer is scripted.
-    openAskPanel(question, [], isDemoActive ? demoScriptedAnswer : undefined);
-  }, [openAskPanel, isDemoActive, demoScriptedAnswer]);
-  const handleOpenAgentChat = useCallback(() => {
-    // A mounted answer is only re-surfaced: remounting it would ask the agent again.
-    if (askQuestion !== null && overlay.isStacked(OVERLAY.ask)) overlay.open(OVERLAY.ask);
-    else openAskPanel('', []);
-  }, [askQuestion, overlay, openAskPanel]);
+    setAskFocusIds([]);
+    // The demo's question goes through the real Send; only the answer is scripted.
+    if (isDemoActive && demoScriptedAnswer) sendScriptedChat(question, demoScriptedAnswer);
+    else sendChat(question);
+  }, [isDemoActive, demoScriptedAnswer, sendChat, sendScriptedChat]);
+  const handleNewChat = useCallback(() => {
+    setAskFocusIds([]);
+    newChat();
+  }, [newChat]);
+  const latestReply = agentChat.messages.filter((message) => message.role === 'assistant').at(-1);
+  const hasAnswerStarted = latestReply !== undefined && latestReply.content !== '';
 
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow
@@ -463,14 +455,10 @@ export function App() {
           resetNonce={resetNonce}
           activeIncident={activeIncident}
           aiConnection={aiConnection}
-          askQuestion={askQuestion}
-          askNonce={askNonce}
-          askFocusIds={askAnswering ? askFocusIds : []}
-          askScriptedAnswer={askScriptedAnswer}
+          agentChat={agentChat}
+          askFocusIds={hasAnswerStarted ? askFocusIds : NO_FOCUS_IDS}
           onAsk={handleAsk}
-          onOpenAgentChat={handleOpenAgentChat}
-          onAnswerStart={handleAnswerStart}
-          onAskAction={handleAskAction}
+          onNewChat={handleNewChat}
         />
         {demoOverlays}
       </OverlayProvider>
@@ -513,14 +501,10 @@ interface ProjectCosmosShellProps {
   resetNonce: number;
   activeIncident: Incident | null;
   aiConnection: AiConnection;
-  askQuestion: string | null;
-  askNonce: number;
+  agentChat: AgentChatState;
   askFocusIds: string[];
-  askScriptedAnswer: DemoScriptedAnswer | undefined;
   onAsk: (question: string) => void;
-  onOpenAgentChat: () => void;
-  onAnswerStart: () => void;
-  onAskAction: (action: AskAction) => void;
+  onNewChat: () => void;
 }
 
 function ProjectCosmosShell(p: ProjectCosmosShellProps) {
@@ -539,8 +523,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, projectCosmosState, resetNonce,
     driftDate, onSelectDrift,
     activeIncident,
-    aiConnection, askQuestion, askNonce, askFocusIds, askScriptedAnswer,
-    onAsk, onOpenAgentChat, onAnswerStart, onAskAction,
+    aiConnection, agentChat, askFocusIds, onAsk, onNewChat,
   } = p;
 
   // Presentation mode: hide the chrome and fatten the comets for talks.
@@ -558,8 +541,6 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   // through this single-slot manager so none can override another.
   const overlay = useOverlay();
 
-  // The answer panel is a managed overlay so it can never stack with the star
-  // inspector or any other surface — opening one closes the rest.
   const { servicesById } = useCosmosIndex();
   const { runTimeUtc: driftRunTimeUtc } = useCosmos().data.drift;
   const handleOpenAgentSetup = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
@@ -602,15 +583,60 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [presentation]);
 
-  // Same surface the bot opens: the answer panel when connected, the setup window otherwise.
+  // Phones: the chat is a bottom sheet in the overlay stack (one card at a time).
+  // Desktop: it docks on the right outside the stack, so legends and modals never close it.
+  const [isChatDockOpen, setIsChatDockOpen] = useState(false);
+  const isChatMounted = isMobile ? overlay.isStacked(OVERLAY.ask) : isChatDockOpen;
+  const [isHealthCardOpen, setIsHealthCardOpen] = useState(false);
+  const [healthCardCloseNonce, setHealthCardCloseNonce] = useState(0);
+  const isRightCardOpen =
+    !isMobile && ((panelOpen && currentStep !== null && scenario !== null) || isHealthCardOpen || overlay.isOpen(OVERLAY.changelog));
+  // A right-side card that opens mid-reply waits behind the chat; the chat folds to its tab once the reply ends.
+  const chatView: AgentChatView = isRightCardOpen && !agentChat.isStreaming ? 'collapsed' : 'open';
+  const isChatDocked = !isMobile && isChatDockOpen && chatView === 'open';
+
+  const [hasUnreadReply, setHasUnreadReply] = useState(false);
+  const [wasStreaming, setWasStreaming] = useState(agentChat.isStreaming);
+  if (wasStreaming !== agentChat.isStreaming) {
+    setWasStreaming(agentChat.isStreaming);
+    if (!agentChat.isStreaming && isRightCardOpen) setHasUnreadReply(true);
+  }
+  if (hasUnreadReply && chatView === 'open') setHasUnreadReply(false);
+
+  const handledResetNonceRef = useRef(resetNonce);
+  useEffect(() => {
+    if (resetNonce === handledResetNonceRef.current) return;
+    handledResetNonceRef.current = resetNonce;
+    setIsChatDockOpen(false);
+  }, [resetNonce]);
+
+  // Reopening the chat closes whichever right-side card it folded behind; that card's own
+  // state stays (a playing scenario keeps playing, and the playback bar brings its panel back).
+  const openAgentChat = useCallback(() => {
+    if (isMobile) {
+      overlay.open(OVERLAY.ask);
+      return;
+    }
+    setPanelOpen(false);
+    setHealthCardCloseNonce((nonce) => nonce + 1);
+    overlay.close(OVERLAY.changelog);
+    setIsChatDockOpen(true);
+  }, [isMobile, overlay, setPanelOpen]);
+  const closeAgentChat = useCallback(() => {
+    if (isMobile) overlay.close(OVERLAY.ask);
+    else setIsChatDockOpen(false);
+  }, [isMobile, overlay]);
+
+  // Same surface the bot opens: the chat when connected, the setup window otherwise.
   const toggleAgent = useCallback(() => {
     if (aiConnection.status === 'connected') {
-      if (overlay.isOpen(OVERLAY.ask)) overlay.close(OVERLAY.ask);
-      else onOpenAgentChat();
+      const isChatShown = isMobile ? overlay.isOpen(OVERLAY.ask) : isChatDockOpen && chatView === 'open';
+      if (isChatShown) closeAgentChat();
+      else openAgentChat();
     } else {
       overlay.toggle(OVERLAY.connect);
     }
-  }, [aiConnection.status, overlay, onOpenAgentChat]);
+  }, [aiConnection.status, isMobile, overlay, isChatDockOpen, chatView, closeAgentChat, openAgentChat]);
 
   // Keyboard: P toggles presentation, A the agent; arrows / space drive playback so the
   // deck is navigable once the on-screen controls are hidden.
@@ -811,7 +837,10 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           blastRequest={blastRequest}
           onBlastRequestConsumed={onBlastRequestConsumed}
           resetNonce={resetNonce}
-          askFocusIds={askFocusIds}
+          askFocusIds={isChatMounted && chatView === 'open' ? askFocusIds : NO_FOCUS_IDS}
+          chatDocked={isChatDocked}
+          healthCardCloseNonce={healthCardCloseNonce}
+          onHealthCardChange={setIsHealthCardOpen}
           incidentActive={!!activeIncident}
           explodeNodeId={explodedStarId}
           explodeTargetId={explodeTargetId}
@@ -833,7 +862,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           scenario={scenario}
           steps={steps}
           idx={state.idx}
-          open={panelOpen}
+          open={panelOpen && !isChatDocked}
           onPrev={navPrev}
           onNext={navNext}
           onClose={() => setPanelOpen(false)}
@@ -845,23 +874,26 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           onClear={() => setHistory([])}
         />
 
-        {overlay.isStacked(OVERLAY.ask) && askQuestion !== null && (
-          <AskPanel
-            key={askNonce}
-            question={askQuestion}
-            onAsk={onAsk}
-            hidden={!overlay.isOpen(OVERLAY.ask)}
-            onClose={() => overlay.close(OVERLAY.ask)}
-            onAnswerStart={onAnswerStart}
-            onAction={onAskAction}
-            scriptedAnswer={askScriptedAnswer}
+        {isChatMounted && (
+          <AgentChat
+            messages={agentChat.messages}
+            isStreaming={agentChat.isStreaming}
+            view={chatView}
+            hidden={isMobile && !overlay.isOpen(OVERLAY.ask)}
+            hasUnread={hasUnreadReply}
+            onSend={onAsk}
+            onStop={agentChat.stop}
+            onNewChat={onNewChat}
+            onRetry={agentChat.retry}
+            onClose={closeAgentChat}
+            onExpand={openAgentChat}
           />
         )}
 
         <AgentButton
           status={aiConnection.status}
           provider={aiConnection.provider}
-          onOpenChat={onOpenAgentChat}
+          onOpenChat={openAgentChat}
           onOpenSetup={handleOpenAgentSetup}
         />
 
@@ -902,7 +934,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
       <ConnectAgentModal status={aiConnection.status} />
 
       <ChangelogPanel
-        open={overlay.isOpen(OVERLAY.changelog) && !warping}
+        open={overlay.isOpen(OVERLAY.changelog) && !warping && !isChatDocked}
         stacked={overlay.isStacked(OVERLAY.changelog)}
         onClose={() => overlay.close(OVERLAY.changelog)}
         onSelectNode={(target) => {

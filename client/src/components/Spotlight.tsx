@@ -16,8 +16,6 @@ interface Result {
 export interface SpotlightTarget {
   id: string;
   kind: 'service' | 'topic';
-  /** Set by an Ask passport action: the answer stays open beside the inspector on desktop. */
-  keepAsk?: boolean;
 }
 
 interface SpotlightProps {
