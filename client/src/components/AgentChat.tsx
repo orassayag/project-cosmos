@@ -42,11 +42,25 @@ function EmphasizedText({ text }: { text: string }) {
   );
 }
 
-function ChipRow({ label, questions, onPick }: { label: string; questions: readonly string[]; onPick: (question: string) => void }) {
+interface ChipRowProps {
+  label: string;
+  questions: readonly string[];
+  onPick: (question: string) => void;
+  /** The demo taps the first chip of this row. */
+  firstChipDemoTarget?: string;
+}
+
+function ChipRow({ label, questions, onPick, firstChipDemoTarget }: ChipRowProps) {
   return (
     <div className="lc-chat-chips" role="group" aria-label={label}>
-      {questions.map((question) => (
-        <button key={question} type="button" className="lc-chat-chip" onClick={() => onPick(question)}>
+      {questions.map((question, index) => (
+        <button
+          key={question}
+          type="button"
+          className="lc-chat-chip"
+          data-demo-target={index === 0 ? firstChipDemoTarget : undefined}
+          onClick={() => onPick(question)}
+        >
           {question}
         </button>
       ))}
@@ -107,7 +121,10 @@ export function AgentChat({
 
   const lastMessage = messages[messages.length - 1];
   const finishedReply = !isStreaming && lastMessage?.role === 'assistant' && lastMessage.status === 'done' ? lastMessage : null;
-  const followUps = useMemo(() => (finishedReply ? suggestFollowUps(finishedReply, data) : []), [finishedReply, data]);
+  const followUps = useMemo(
+    () => (finishedReply ? finishedReply.followUps ?? suggestFollowUps(finishedReply, data) : []),
+    [finishedReply, data],
+  );
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -197,14 +214,16 @@ export function AgentChat({
             );
           })
         )}
-        {followUps.length > 0 && <ChipRow label="Suggested follow-ups" questions={followUps} onPick={onSend} />}
+        {followUps.length > 0 && (
+          <ChipRow label="Suggested follow-ups" questions={followUps} onPick={onSend} firstChipDemoTarget="agent-followup-0" />
+        )}
       </div>
 
       <div className="lc-chat-footer">
         <div className="lc-chat-composer">
           <textarea
             className="lc-chat-input"
-            data-demo-target="ask-input"
+            data-demo-target="agent-composer"
             aria-label="Your question"
             placeholder="Ask about the map"
             rows={2}
@@ -230,7 +249,7 @@ export function AgentChat({
           <button
             type="button"
             className="lc-chat-send"
-            data-demo-target="ask-search"
+            data-demo-target="agent-send"
             onClick={submit}
             disabled={!canSend}
             aria-label="Send"

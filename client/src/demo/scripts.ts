@@ -1,10 +1,10 @@
-import type { CosmosResponse, Step } from '../api/cosmos-api';
+import type { CosmosResponse, DemoAnswerScript, Step } from '../api/cosmos-api';
 import { indexCosmos, stepsFor } from '../api/cosmosIndex';
 import { shotTimelineMs } from '../map/CometPackets';
-import { buildDemoScriptedAnswer } from './scriptedAnswer';
+import { buildDemoScriptedTurns, scriptedAnswerDurationMs } from './scriptedAnswer';
 import { typingDurationMs } from './humanMotion';
 import { POINTER_MOVE_MS } from './runDemo';
-import type { DemoModeName, DemoScript, DemoScriptedAnswer, DemoStep } from './types';
+import type { DemoModeName, DemoScript, DemoStep } from './types';
 
 /** Allowance for the React commits between one shot's timeline ending and the next one starting. */
 const SHOT_HANDOFF_MS = 100;
@@ -38,10 +38,6 @@ export function playbackDurationMs(response: CosmosResponse, playableId: string)
   return Math.ceil(totalMs / 100) * 100;
 }
 
-export function scriptedAnswerDurationMs(answer: DemoScriptedAnswer): number {
-  return answer.thinkingMs + answer.text.split(' ').length * answer.wordMs;
-}
-
 /** Play is pressed only after the pointer's glide, so the step covers both. */
 function pressAndPlayMs(response: CosmosResponse, playableId: string): number {
   return POINTER_MOVE_MS + playbackDurationMs(response, playableId);
@@ -55,16 +51,26 @@ function closeDrawer({ isPhone }: DemoLayout): DemoStep[] {
   return isPhone ? [{ kind: 'click', target: 'menu-close', durationMs: 900 }] : [];
 }
 
-/** Opens the green agent bot, types the question into its panel and searches. */
+/** Leaves room for the reply to finish and its follow-up chips to render before the next gesture. */
+const ANSWER_SETTLE_MS = 400;
+
+function answerWaitMs(answer: DemoAnswerScript): number {
+  return Math.ceil((scriptedAnswerDurationMs(answer) + ANSWER_SETTLE_MS) / 100) * 100;
+}
+
+/** Opens the green agent bot, asks the first scripted question, then taps each reply's first follow-up chip. */
 function askAgentSteps(response: CosmosResponse, layout: DemoLayout): DemoStep[] {
-  const { aiTour } = response.data.demo;
-  const answerMs = Math.ceil(scriptedAnswerDurationMs(buildDemoScriptedAnswer(aiTour, layout)) / 100) * 100;
+  const [firstTurn, ...followUpTurns] = buildDemoScriptedTurns(response.data.demo.aiTour, layout);
   return [
-    { kind: 'click', target: 'connect-open', durationMs: 1100, caption: 'Opening the AI agent' },
-    { kind: 'click', target: 'ask-input', durationMs: 900, caption: 'Asking the map a question' },
-    { kind: 'type', target: 'ask-input', text: aiTour.question, durationMs: POINTER_MOVE_MS + typingDurationMs(aiTour.question) + 300 },
-    { kind: 'click', target: 'ask-search', durationMs: 800 },
-    { kind: 'wait', durationMs: answerMs, caption: 'The agent answers from the live map' },
+    { kind: 'click', target: 'agent-button', durationMs: 1100, caption: 'Opening the AI agent' },
+    { kind: 'click', target: 'agent-composer', durationMs: 900, caption: 'Asking the map a question' },
+    { kind: 'type', target: 'agent-composer', text: firstTurn.question, durationMs: POINTER_MOVE_MS + typingDurationMs(firstTurn.question) + 300 },
+    { kind: 'click', target: 'agent-send', durationMs: 800 },
+    { kind: 'wait', durationMs: answerWaitMs(firstTurn.scriptedAnswer), caption: 'The agent answers from the live map' },
+    ...followUpTurns.flatMap((turn): DemoStep[] => [
+      { kind: 'click', target: 'agent-followup-0', durationMs: POINTER_MOVE_MS + 300, caption: 'Following up with a suggested question' },
+      { kind: 'wait', durationMs: answerWaitMs(turn.scriptedAnswer) },
+    ]),
   ];
 }
 

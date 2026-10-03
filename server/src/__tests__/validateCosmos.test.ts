@@ -68,8 +68,26 @@ describe('validateCosmos', () => {
       if (!service?.ecosystem) throw new Error('fixture has no service ecosystem');
       service.ecosystem.internalEdges[0].to = 'no-such-sub-service';
     }],
+    ['unknown-demo-reference', (data) => { data.demo.aiTour.turns[0].actions.push({ type: 'action', kind: 'openPassport', nodeId: 'no-such-node' }); }],
+    ['unknown-demo-reference', (data) => { data.demo.aiTour.turns[1].actions.push({ type: 'action', kind: 'playScenario', scenarioId: 'no-such-scenario' }); }],
+    ['demo-follow-up-mismatch', (data) => { data.demo.aiTour.turns[0].followUps[0] = 'Who owns shipping'; }],
+    ['demo-follow-up-mismatch', (data) => { data.demo.aiTour.turns[0].followUps = []; }],
   ])('reports %s on a deliberately broken clone', (expectedCode, breakData) => {
     expect(errorCodes(brokenClone(breakData))).toContain(expectedCode);
+  });
+
+  it('names the turn and both questions when a demo chip does not ask the next question', () => {
+    const data = brokenClone((clone) => { clone.demo.aiTour.turns[0].followUps = ['Who runs shipping?']; });
+    const issue = validateCosmos(data).errors.find((candidate) => candidate.code === 'demo-follow-up-mismatch');
+    expect(issue?.context).toEqual({ turnIndex: 0, followUp: 'Who runs shipping?', nextQuestion: data.demo.aiTour.turns[1].question });
+  });
+
+  it('reports which demo turn action names an unknown id', () => {
+    const data = brokenClone((clone) => {
+      clone.demo.aiTour.turns[1].actions.push({ type: 'action', kind: 'highlight', serviceIds: ['shipping', 'no-such-service'] });
+    });
+    const issues = validateCosmos(data).errors.filter((candidate) => candidate.code === 'unknown-demo-reference');
+    expect(issues.map((issue) => issue.context)).toEqual([{ field: 'aiTour.turns.1.actions.highlight', id: 'no-such-service' }]);
   });
 
   it('reports a dangling incident step with the incident id', () => {

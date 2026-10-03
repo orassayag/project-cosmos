@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getCosmosData } from '../cosmos/index.js';
-import type { CosmosData } from '../cosmos/types.js';
+import type { CosmosData, DemoMapAction } from '../cosmos/types.js';
 import { validateCosmos } from '../cosmos/validate.js';
 import { buildCosmosDerived } from '../cosmos/view.js';
 
@@ -18,6 +18,10 @@ function staleCitations(data: CosmosData): string[] {
     const entry = data.drift.entries.find((candidate) => candidate.id === entryId);
     return !entry || entry.date < earliest || entry.date > asOf;
   });
+}
+
+function highlightedServiceIds(actions: DemoMapAction[]): string[] {
+  return actions.flatMap((action) => (action.kind === 'highlight' ? action.serviceIds : []));
 }
 
 function withCitedDateShifted(days: number): CosmosData {
@@ -46,13 +50,41 @@ describe('demo data', () => {
     expect(data.incidents.find((incident) => incident.id === allTour.incidentId)?.date).toBe(newestDate);
   });
 
-  it('highlights services only, each named in the scripted answer', () => {
-    expect(aiTour.highlightServiceIds.length).toBeGreaterThan(0);
-    for (const serviceId of aiTour.highlightServiceIds) {
-      expect(serviceIds.has(serviceId), serviceId).toBe(true);
-      expect(aiTour.scriptedAnswer.text).toContain(serviceId);
+  it('holds a 2–3 turn chat whose first chip always asks the next scripted question', () => {
+    expect(aiTour.turns.length).toBeGreaterThanOrEqual(2);
+    expect(aiTour.turns.length).toBeLessThanOrEqual(3);
+    aiTour.turns.slice(1).forEach((turn, index) => {
+      expect(aiTour.turns[index].followUps[0]).toBe(turn.question);
+    });
+    expect(validateCosmos(data).errors.filter((issue) => issue.code === 'demo-follow-up-mismatch')).toEqual([]);
+  });
+
+  it('highlights services only, each named in its own scripted answer', () => {
+    for (const turn of aiTour.turns) {
+      const highlightedIds = highlightedServiceIds(turn.actions);
+      expect(highlightedIds.length, turn.question).toBeGreaterThan(0);
+      for (const serviceId of highlightedIds) {
+        expect(serviceIds.has(serviceId), serviceId).toBe(true);
+        expect(turn.scriptedAnswer.text).toContain(serviceId);
+      }
     }
-    expect(aiTour.highlightServiceIds).toContain(aiTour.passportNodeId);
+  });
+
+  it('opens the passport of a service the first answer highlights', () => {
+    const [firstTurn] = aiTour.turns;
+    const passportNodeIds = firstTurn.actions.flatMap((action) => (action.kind === 'openPassport' ? [action.nodeId] : []));
+    expect(passportNodeIds).toHaveLength(1);
+    expect(highlightedServiceIds(firstTurn.actions)).toContain(passportNodeIds[0]);
+  });
+
+  it('answers "Who owns <service>?" with its team, highlighting every service that team owns', () => {
+    const ownershipTurn = aiTour.turns.find((turn) => /^Who owns \S+\?$/.test(turn.question));
+    const serviceId = ownershipTurn?.question.match(/^Who owns (\S+)\?$/)?.[1];
+    const team = data.services.find((service) => service.id === serviceId)?.team;
+    expect(team, ownershipTurn?.question).toBeDefined();
+    const teamServiceIds = data.services.filter((service) => service.team === team).map((service) => service.id);
+    expect(ownershipTurn?.scriptedAnswer.text).toContain(data.owners.teams[team!].label);
+    expect([...highlightedServiceIds(ownershipTurn?.actions ?? [])].sort()).toEqual([...teamServiceIds].sort());
   });
 
   it('cites drift entries that exist and sit within 24h of asOf', () => {
@@ -60,10 +92,10 @@ describe('demo data', () => {
     expect(staleCitations(data)).toEqual([]);
   });
 
-  it('cites drift entries whose nodes the answer highlights', () => {
+  it('cites drift entries whose nodes the first answer highlights', () => {
     for (const entryId of aiTour.citedDriftEntryIds) {
       const entry = data.drift.entries.find((candidate) => candidate.id === entryId);
-      expect(entry?.nodeIds.some((nodeId) => aiTour.highlightServiceIds.includes(nodeId)), entryId).toBe(true);
+      expect(entry?.nodeIds.some((nodeId) => highlightedServiceIds(aiTour.turns[0].actions).includes(nodeId)), entryId).toBe(true);
     }
   });
 

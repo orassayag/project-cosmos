@@ -41,8 +41,8 @@ describe('DemoPointer', () => {
   });
 
   it('comes to rest near the middle of the target, not on its exact centre', async () => {
-    addTarget('connect-open', { left: 100, top: 40, width: 80, height: 20 });
-    render(<DemoPointer pointer={{ target: 'connect-open', moveId: 1 }} isVisible speed={1} />);
+    addTarget('agent-button', { left: 100, top: 40, width: 80, height: 20 });
+    render(<DemoPointer pointer={{ target: 'agent-button', moveId: 1 }} isVisible speed={1} />);
     await flushFrames();
 
     const { x, y } = pointerPosition();
@@ -55,8 +55,8 @@ describe('DemoPointer', () => {
   });
 
   it('is still on its way part-way through the move', async () => {
-    addTarget('connect-open', { left: 1500, top: 40, width: 80, height: 20 });
-    render(<DemoPointer pointer={{ target: 'connect-open', moveId: 1 }} isVisible speed={1} />);
+    addTarget('agent-button', { left: 1500, top: 40, width: 80, height: 20 });
+    render(<DemoPointer pointer={{ target: 'agent-button', moveId: 1 }} isVisible speed={1} />);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(150);
     });
@@ -67,8 +67,8 @@ describe('DemoPointer', () => {
   });
 
   it('dips and rings as the press lands, timed by speed', async () => {
-    addTarget('connect-open', { left: 100, top: 40, width: 80, height: 20 });
-    render(<DemoPointer pointer={{ target: 'connect-open', moveId: 1 }} isVisible speed={2} />);
+    addTarget('agent-button', { left: 100, top: 40, width: 80, height: 20 });
+    render(<DemoPointer pointer={{ target: 'agent-button', moveId: 1 }} isVisible speed={2} />);
     await flushFrames();
 
     const ring = screen.getByTestId('demo-pointer').querySelector<HTMLElement>('.lc-demo-pointer-ripple');
@@ -77,18 +77,18 @@ describe('DemoPointer', () => {
   });
 
   it('stays hidden while the target element does not exist', async () => {
-    render(<DemoPointer pointer={{ target: 'ask-search', moveId: 2 }} isVisible speed={1} />);
+    render(<DemoPointer pointer={{ target: 'agent-send', moveId: 2 }} isVisible speed={1} />);
     await flushFrames();
 
     expect(screen.getByTestId('demo-pointer').style.visibility).toBe('hidden');
   });
 
   it('stays where it was when a later target is missing', async () => {
-    addTarget('ask-input', { left: 0, top: 0, width: 200, height: 40 });
-    const { rerender } = render(<DemoPointer pointer={{ target: 'ask-input', moveId: 3 }} isVisible speed={1} />);
+    addTarget('agent-composer', { left: 0, top: 0, width: 200, height: 40 });
+    const { rerender } = render(<DemoPointer pointer={{ target: 'agent-composer', moveId: 3 }} isVisible speed={1} />);
     await flushFrames();
     const settled = pointerPosition();
-    rerender(<DemoPointer pointer={{ target: 'ask-search', moveId: 4 }} isVisible speed={1} />);
+    rerender(<DemoPointer pointer={{ target: 'agent-send', moveId: 4 }} isVisible speed={1} />);
     await flushFrames();
 
     expect(pointerPosition()).toEqual(settled);
@@ -110,10 +110,10 @@ describe('DemoPointer', () => {
   });
 
   it('hides once the overlay is no longer visible', async () => {
-    addTarget('ask-input', { left: 0, top: 0, width: 200, height: 40 });
-    const { rerender } = render(<DemoPointer pointer={{ target: 'ask-input', moveId: 5 }} isVisible speed={1} />);
+    addTarget('agent-composer', { left: 0, top: 0, width: 200, height: 40 });
+    const { rerender } = render(<DemoPointer pointer={{ target: 'agent-composer', moveId: 5 }} isVisible speed={1} />);
     await flushFrames();
-    rerender(<DemoPointer pointer={{ target: 'ask-input', moveId: 6 }} isVisible={false} speed={1} />);
+    rerender(<DemoPointer pointer={{ target: 'agent-composer', moveId: 6 }} isVisible={false} speed={1} />);
 
     expect(screen.queryByTestId('demo-pointer')).toBeNull();
   });

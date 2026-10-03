@@ -109,7 +109,7 @@ describe('agent eval (mocked LLM)', () => {
 
   it('answers the demo=ai question with the same drift entries the scripted answer cites', async () => {
     const { aiTour } = view.data.demo;
-    const { resultOf } = await ask(aiTour.question, [
+    const { resultOf } = await ask(aiTour.turns[0].question, [
       { name: DRIFT_TOOL_NAME, args: { query: aiTour.domainId, since: dayBefore(view.derived.asOf) } },
     ]);
 

@@ -74,7 +74,7 @@ describe('scaledDuration', () => {
 
 describe('pressElement', () => {
   it('fires the full mouse sequence a real click makes and focuses the element', () => {
-    const button = addElement('button', 'ask-search');
+    const button = addElement('button', 'agent-send');
     const seen = recordEvents(button, ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']);
 
     pressElement(button);
@@ -84,8 +84,8 @@ describe('pressElement', () => {
   });
 
   it('keeps focus where it was when mouse-down is prevented, like the Search button does', () => {
-    const field = addElement('textarea', 'ask-input');
-    const button = addElement('button', 'ask-search');
+    const field = addElement('textarea', 'agent-composer');
+    const button = addElement('button', 'agent-send');
     button.addEventListener('mousedown', (event) => event.preventDefault());
     field.focus();
 
@@ -95,7 +95,7 @@ describe('pressElement', () => {
   });
 
   it('dispatches untrusted events, so the demo never aborts itself', () => {
-    const button = addElement('button', 'ask-search');
+    const button = addElement('button', 'agent-send');
     const trust: boolean[] = [];
     button.addEventListener('pointerdown', (event) => trust.push(event.isTrusted));
     pressElement(button);
@@ -124,11 +124,11 @@ describe('runDemo', () => {
   });
 
   it('types into the field one key at a time through input events React can see', async () => {
-    const field = addElement('textarea', 'ask-input');
+    const field = addElement('textarea', 'agent-composer');
     const inputs: string[] = [];
     field.addEventListener('input', (event) => inputs.push((event as InputEvent).data ?? ''));
 
-    const result = run([{ kind: 'type', target: 'ask-input', text: 'Hi!', durationMs: 2000 }]);
+    const result = run([{ kind: 'type', target: 'agent-composer', text: 'Hi!', durationMs: 2000 }]);
     await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS);
     expect(field.value).toBe('H');
     expect(document.activeElement).toBe(field);
@@ -142,11 +142,11 @@ describe('runDemo', () => {
   });
 
   it('pastes the whole text in one input event', async () => {
-    const field = addElement('textarea', 'ask-input');
+    const field = addElement('textarea', 'agent-composer');
     const inputTypes: string[] = [];
     field.addEventListener('input', (event) => inputTypes.push((event as InputEvent).inputType));
 
-    const result = run([{ kind: 'paste', target: 'ask-input', text: 'sk-demo', durationMs: 1000 }]);
+    const result = run([{ kind: 'paste', target: 'agent-composer', text: 'sk-demo', durationMs: 1000 }]);
     await vi.runAllTimersAsync();
 
     await expect(result).resolves.toBe('done');
@@ -167,19 +167,19 @@ describe('runDemo', () => {
   });
 
   it('fails with the missing target when it never renders', async () => {
-    const result = run([{ kind: 'click', target: 'connect-open', durationMs: 1000 }]);
+    const result = run([{ kind: 'click', target: 'agent-button', durationMs: 1000 }]);
     const assertion = expect(result).rejects.toThrow(DemoTargetMissingError);
 
     await vi.advanceTimersByTimeAsync(TARGET_TIMEOUT_MS + 100);
     await assertion;
-    await expect(result).rejects.toThrow('connect-open');
+    await expect(result).rejects.toThrow('agent-button');
   });
 
   it('finishes in a quarter of the time at speed 4', async () => {
-    addElement('button', 'ask-search');
+    addElement('button', 'agent-send');
     let outcome: string | undefined;
     void run(
-      [{ kind: 'click', target: 'ask-search', durationMs: 1000 }, { kind: 'wait', durationMs: 2000 }],
+      [{ kind: 'click', target: 'agent-send', durationMs: 1000 }, { kind: 'wait', durationMs: 2000 }],
       { speed: 4 },
     ).then((value) => { outcome = value; });
 
@@ -199,9 +199,9 @@ describe('runDemo', () => {
   });
 
   it('stops on abort mid-type: no later key and no pending timer', async () => {
-    const field = addElement('textarea', 'ask-input');
+    const field = addElement('textarea', 'agent-composer');
     const controller = new AbortController();
-    const result = run([{ kind: 'type', target: 'ask-input', text: 'hello', durationMs: 2000 }], { signal: controller.signal });
+    const result = run([{ kind: 'type', target: 'agent-composer', text: 'hello', durationMs: 2000 }], { signal: controller.signal });
 
     await vi.advanceTimersByTimeAsync(POINTER_MOVE_MS + typingDelaysMs('hello')[0]);
     controller.abort();
@@ -214,11 +214,11 @@ describe('runDemo', () => {
 
   it('presses nothing when the signal is already aborted', async () => {
     const onClick = vi.fn();
-    addElement('button', 'ask-search').addEventListener('click', onClick);
+    addElement('button', 'agent-send').addEventListener('click', onClick);
     const controller = new AbortController();
     controller.abort();
 
-    await expect(run([{ kind: 'click', target: 'ask-search', durationMs: 100 }], { signal: controller.signal })).resolves.toBe('aborted');
+    await expect(run([{ kind: 'click', target: 'agent-send', durationMs: 100 }], { signal: controller.signal })).resolves.toBe('aborted');
     expect(onClick).not.toHaveBeenCalled();
   });
 
@@ -241,7 +241,7 @@ describe('abortOnTrustedInput', () => {
   it('ignores the runner’s own untrusted presses', () => {
     const controller = new AbortController();
     const cleanup = abortOnTrustedInput(controller);
-    pressElement(addElement('button', 'ask-search'));
+    pressElement(addElement('button', 'agent-send'));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(controller.signal.aborted).toBe(false);
     cleanup();
