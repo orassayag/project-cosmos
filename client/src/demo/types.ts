@@ -1,4 +1,4 @@
-import type { AskAction } from '../components/AskPanel';
+import type { AskAction } from '../components/askStream';
 
 /** Every fixed `data-demo-target`; domain, scenario and incident buttons add `domain-<id>` / `scenario-<id>` / `incident-<id>`. */
 export const DEMO_TARGETS = [

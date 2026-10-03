@@ -270,6 +270,10 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-stage:has(.lc-step-panel) .lc-map-stepper--zoom { right: 388px; }
   .lc-stage:has(.lc-step-panel) .lc-agent-button { right: 388px; }
   .lc-stage:has(.lc-step-panel) .lc-map-stepper--traffic { right: 430px; }
+  /* The docked chat takes the same right column, and its collapsed tab rides with the bot. */
+  .lc-stage:has(.lc-chat-panel) :is(.lc-map-stepper--zoom, .lc-agent-button),
+  .lc-stage:has(.lc-step-panel) .lc-chat-tab { right: 388px; }
+  .lc-stage:has(.lc-chat-panel) .lc-map-stepper--traffic { right: 430px; }
 }
 /* Compact desktop while a scenario is loaded: the centred 640px transport no longer
    fits between the left column (activity log, view chips) and the step panel, so
@@ -278,7 +282,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-stage:has(.lc-controls) {
     --lc-transport-clearance: 134px;
   }
-  .lc-stage:has(.lc-controls) .lc-step-panel { bottom: var(--lc-transport-clearance); }
+  .lc-stage:has(.lc-controls) :is(.lc-step-panel, .lc-chat-panel) { bottom: var(--lc-transport-clearance); }
   .lc-stage:has(.lc-controls) .lc-layout-controls { bottom: var(--lc-transport-clearance); }
   .lc-stage:has(.lc-controls) .lc-activity {
     bottom: calc(var(--lc-transport-clearance) + 40px);
@@ -312,8 +316,8 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-topbar-side { gap: 8px; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-domain-tab { padding: 7px 10px; letter-spacing: 0.12em; }
   .lc-scenario-status-label { max-width: 22ch; }
-  .lc-step-panel { width: min(320px, 42vw); }
-  .lc-map-panel, .lc-ask-panel { width: min(320px, 62vw); }
+  .lc-step-panel, .lc-chat-panel { width: min(320px, 42vw); }
+  .lc-map-panel { width: min(320px, 62vw); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -396,7 +400,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-stage:has(.lc-controls) { --playback-h: calc(var(--lc-controls-h, 150px) + 10px); }
   .lc-agent-button { right: calc(8px + var(--safe-right)); }
   /* Below 16px iOS zooms the page in when the field takes focus. */
-  .lc-ask-composer-field { font-size: 16px; }
+  .lc-chat-input { font-size: 16px; }
 
   /* Map-view toggles (Changes / Ownership / Blast / Health / Edit) become a
      horizontally-scrollable chip strip pinned to the top of the stage. */
@@ -436,7 +440,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-health-legend,
   .lc-health-card,
   .lc-map-panel,
-  .lc-ask-panel {
+  .lc-chat-panel {
     top: auto !important;
     bottom: calc(8px + var(--safe-bottom)) !important;
     left: calc(8px + var(--safe-left)) !important;
@@ -454,21 +458,26 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-drift-overlay-scroll { max-height: none !important; overflow: visible !important; }
   /* The star inspector gets more room than the legends: its description and
      ownership block are the whole point of tapping a star. */
-  .lc-map-panel,
-  .lc-ask-panel { max-height: min(50%, 380px) !important; }
+  .lc-map-panel { max-height: min(50%, 380px) !important; }
+  /* The chat sheet is taller and never scrolls as a whole: its message list scrolls
+     and the composer stays pinned, even on a short landscape phone. */
+  .lc-chat-panel {
+    max-height: min(75vh, calc(100% - 16px)) !important;
+    overflow: hidden !important;
+  }
 
   /* The map steppers sit in the bottom-right corner, which both the
      right-docked cards and the full-width bottom-sheet legends cover; hide
      them while any of them is open so they never collide (pinch-to-zoom
      still works). They are already hidden while the transport bar plays. */
   .lc-stage:has(
-    .lc-map-panel, .lc-ask-panel, .lc-health-card, .lc-step-panel, .lc-owner-legend,
+    .lc-map-panel, .lc-chat-panel, .lc-health-card, .lc-step-panel, .lc-owner-legend,
     .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
   ) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
   /* The bot would float over any bottom sheet or narration strip, so it waits
      behind them like the steppers. A buried ask panel ([hidden]) does not count. */
   .lc-stage:has(
-    .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card, .lc-step-panel, .lc-incident-panel,
+    .lc-map-panel, .lc-chat-panel:not([hidden]), .lc-health-card, .lc-step-panel, .lc-incident-panel,
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
   ) .lc-agent-button,
   body:has(.lc-connect-overlay) .lc-agent-button { display: none; }
@@ -512,17 +521,17 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
      side; on a phone that pair would collide, so a detail card takes over and
      the context panels behind it are hidden. Close the card (its corner ×) to
      bring the previous one back. Priority, high → low:
-       connect-agent modal  >  inspector / ask / health card  >
+       connect-agent modal  >  inspector / agent chat / health card  >
        step + incident narration  >  legends. The modal is portaled to <body>,
        hence `body:has`. */
   body:has(.lc-connect-overlay) .lc-stage :is(
-    .lc-map-panel, .lc-ask-panel, .lc-health-card,
+    .lc-map-panel, .lc-chat-panel, .lc-health-card,
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
   ),
   .lc-stage:has(.lc-map-panel) :is(
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
   ),
-  .lc-stage:has(.lc-ask-panel:not([hidden])) :is(
+  .lc-stage:has(.lc-chat-panel:not([hidden])) :is(
     .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-step-panel, .lc-incident-panel
   ),
   .lc-stage:has(.lc-health-card) :is(
@@ -534,7 +543,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   /* The demo caption strip (portaled to <body>) is lowest of all: any detail card
      or narration panel owns the bottom, so the caption waits behind it. */
   body:has(
-    .lc-connect-overlay, .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card,
+    .lc-connect-overlay, .lc-map-panel, .lc-chat-panel:not([hidden]), .lc-health-card,
     .lc-step-panel, .lc-incident-panel
   ) .lc-demo-caption {
     display: none !important;
@@ -550,9 +559,13 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
 
   /* The on-call card is a bottom sheet too; while playing it lifts to sit
      directly above the transport bar instead of behind it. */
-  .lc-stage:has(.lc-controls) :is(.lc-health-card, .lc-map-panel, .lc-ask-panel) {
+  .lc-stage:has(.lc-controls) :is(.lc-health-card, .lc-map-panel) {
     bottom: calc(var(--lc-controls-h, 150px) + 18px + var(--safe-bottom)) !important;
     max-height: min(30%, 200px) !important;
+  }
+  .lc-stage:has(.lc-controls) .lc-chat-panel {
+    bottom: calc(var(--lc-controls-h, 150px) + 18px + var(--safe-bottom)) !important;
+    max-height: calc(100% - var(--lc-controls-h, 150px) - 26px - var(--safe-bottom)) !important;
   }
 
   /* ── Transport: desktop-style centered pill, just narrower ── */

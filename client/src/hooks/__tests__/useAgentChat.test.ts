@@ -101,7 +101,7 @@ describe('useAgentChat', () => {
   it('appends the marker after a partial stopped reply', () => {
     const history = toChatHistory([
       { id: '1', role: 'user', content: 'q' },
-      { id: '2', role: 'assistant', content: 'Half an answer ', status: 'stopped', usage: null },
+      { id: '2', role: 'assistant', content: 'Half an answer ', status: 'stopped', usage: null, actions: [] },
     ]);
     expect(history[1]).toEqual({ role: 'assistant', content: `Half an answer\n\n${STOPPED_REPLY_NOTE}` });
   });

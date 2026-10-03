@@ -1,5 +1,13 @@
 import { toRequestMessages, type ChatMessage } from '../api/chatHistory';
-import type { AskAction } from './AskPanel';
+
+export type AskAction =
+  | { type: 'action'; kind: 'highlight'; serviceIds: string[] }
+  | { type: 'action'; kind: 'playScenario'; scenarioId: string }
+  | { type: 'action'; kind: 'showBlastRadius'; nodeId: string }
+  | { type: 'action'; kind: 'openPassport'; nodeId: string }
+  | { type: 'action'; kind: 'showHealth' }
+  | { type: 'action'; kind: 'showOwnership' }
+  | { type: 'action'; kind: 'openChangelogEntry'; entryId: string };
 
 export type AskStreamEvent =
   | { type: 'token'; text: string }
