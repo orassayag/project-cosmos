@@ -1,59 +1,81 @@
-# Stage 4 work brief — P3: Move derived logic to the server
+# Stage 4 work brief — Chat request contract + client trimming, follow-up-aware routing, fixed off-topic reply, 13-tool allow-list (plan §2.1, §2.2, §2.3)
 
-Plan: docs/plans/server-owned-data-migration-plan.md (branch feature/add-ai). Stage plan line: P3: derive/* modules (graph, blastRadius, ownership, health, topicGroups, drift, playable) + getCosmosView() + derived parity ⚠ large (~900 LOC).
+Plan: docs/plans/ai-refactor.md. Spec: none.
 
-## Ground rules (pasted from plan)
-### Ground rules for the executing agent
+## Plan context (Summary)
+## Summary
+Turn "Ask the Agent" from a single-question panel that asks visitors for API keys into a
+multi-turn chat that needs no keys. The server reads the model keys from its own `server/.env`,
+and only when the owner runs it on their own machine: the dev server listens on loopback only,
+and the agent is switched on only by the local dev script. The ask inputs at the top of the
+page go away. A bot button sits bottom-right and stays red (not connected) or green (connected).
+Red opens a window that explains how to set up the agent and JEV locally, with wording based on
+why it is red. Green opens a right-side chat. The agent can only look at the map and show things
+on it, never change saved state, and its errors and token use appear right in the chat.
 
-- Execute phases in order, one phase per branch or commit series; do not start a phase until the previous phase's acceptance passes. The plan targets v1.33.3+; if paths have moved, re-run the Phase 0 inventory and update paths first.
-- `CLAUDE.md` wins on process: Conventional Commits, `scripts/version-note.sh write` before every commit, README check on every commit.
-- Gates before every commit: `npm run build`, `npm run typecheck`, `npm run lint`, `npm test`. Never run `tsc` without `--noEmit`/`-b`.
-- Repo invariants hold throughout: unique global `phaseId`; step `from`/`to`/`via`/`through` resolve; world 2400×1400; capsules ≥150px apart; AstroMart stays fictional.
-- UI invariants hold throughout: mobile-first, one panel at a time on phones, top-right close control on every floating panel.
-- Demo tours keep working after every phase: `?demo=all` ≤120s, `?demo=ai` ≤60s (`client/src/demo/__tests__/scripts.test.ts` or its current location guards them).
-- The AstroMart map must look and behave identically after every phase.
-- Ambiguity → smaller change, recorded in `docs/plans/server-owned-data-decisions.md`. Stop conditions are listed at the end.
+Both scripted demos show a connected agent holding a short conversation. They answer from
+scripted turns on the client, so the live site needs no AI key. This plan is a second review
+round. The decisions from the first round are built into `## Design`, and the issue IDs below
+are from this round.
 
-## Phase 3 (pasted verbatim from plan)
-### Phase 3 — Move derived logic to the server
+## Plan sections for this stage (verbatim)
+#### 2.1 Chat request contract (I4)
+- One limit, counted in messages: `CHAT_MAX_MESSAGES = 20`.
+- `server/src/schemas/askRequestSchema.ts`:
+  ```ts
+  ChatMessageSchema = z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().trim().min(1).max(2000) })
+  AskRequestSchema  = z.strictObject({ messages: z.array(ChatMessageSchema).min(1).max(CHAT_MAX_MESSAGES) })
+  ```
+  plus refinements, each with a field-named error: the first and last messages are `user`;
+  roles alternate; total characters ≤ `CHAT_TOTAL_MAX_CHARS = 8000`; the newest user message
+  keeps the existing 500-char limit. The server **rejects** anything longer and never trims
+  it. Strict objects reject `system`, `tool` and tool-call fields.
+- **Client trimming** (`client/src/api/chatHistory.ts`, pure `toRequestMessages(history, question)`):
+  takes the newest 19 messages plus the new question, then drops from the front until the first
+  message is `user`, and then until total characters fit. So a long chat always sends a valid
+  request, and the agent remembers "the last up-to-20 messages".
+- Assistant turns from the client go to the model as plain `AIMessage` text, never as tool
+  calls, so a crafted history cannot fake tool output.
+- Verify:
+  - `server/src/schemas/__tests__/askRequestSchema.test.ts` (new, unit). Protects: 21 messages
+    rejected with `messages` named; starting with `assistant` rejected; `system`/`tool` roles,
+    extra fields, non-alternating roles and over-length totals rejected.
+  - `client/src/api/__tests__/chatHistory.test.ts` (new, unit). Protects: output is always ≤20,
+    starts with `user`, alternates, and fits the character cap, for histories of 1–60 messages.
+  - Route-level: `askRoute.test.ts` 400 cases name the field.
 
-Split rule: a fact about the system is server logic; geometry, paths, animation and layout overrides are client logic.
+#### 2.2 Follow-up-aware routing
+- `answerQuestion` receives `messages`. If `messages.length === 1`, classify it as today
+  (`classifyQuestion` → `decideRoute`). Any later message skips classification and goes straight
+  to the agent with the whole history: `graph.ts` seeds `state.messages` with the mapped history
+  instead of a single `HumanMessage`.
+- The first-message off-topic reply becomes one fixed, polite redirect with no random jokes:
+  "I can only help with the AstroMart map — try asking about a service, a flow, or a team."
+- Verify: `server/src/agent/__tests__/route.test.ts` + `classify.test.ts` (extend, unit).
+  Protects: follow-ups are never classified and never get the off-topic reply.
+  `graph.test.ts` (extend). Protects: history reaches the model in order.
 
-| `server/src/cosmos/derive/` | Ported from | Exposes |
-| --- | --- | --- |
-| `graph.ts` | `server/scripts/snapshot-map.ts`, logical part of `client/src/map/edge-builder.ts` | logical edges; `calls`/`publishes`/`consumes` per service; `connectedNodeIds` |
-| `blastRadius.ts` | `client/src/map/blast-radius.ts` | `dependentsOf(nodeId)`, full map |
-| `ownership.ts` | `client/src/scenarios/owners.ts` | `resolveOwner`, `groupServicesByTeam`, `ownerLabel` |
-| `health.ts` | `client/src/scenarios/health.ts` helpers | status and on-call per service |
-| `topicGroups.ts` | `client/src/map/topic-groups.ts` | groups from `groupServiceId` |
-| `drift.ts` | `client/src/scenarios/drift.ts` helpers | latest entry, `searchDrift(query)`, prepared search text per entry, PR/commit URLs |
-| `playable.ts` | `client/src/scenarios/data.ts`, `runner.ts` lookups | scenarios + incidents as one playable list; `stepsFor(id)` |
+#### 2.3 Allowed agent actions
+- The agent's tool set is exactly, and only:
+  - Map actions (`mapActionTools.ts`): `highlight_services`, `play_scenario`,
+    `show_blast_radius`, `open_passport`, `show_health`, `show_ownership`, `open_changelog_entry`.
+  - Read tools (`readTools.ts`): `get_service`, `get_steps`, `blast_radius`, `who_owns`,
+    `on_call`, `drift`.
+- Explicitly excluded: layout edit mode, layout reset, starting a demo, and anything that writes
+  `localStorage`, cookies, or server data. No new tools in this plan.
+- Export `AGENT_TOOL_NAMES` from `graph.ts`. Client `onAskAction` handles only the seven map
+  action types; unknown types are ignored and logged at WARN.
+- Verify: `server/src/agent/__tests__/graph.test.ts` (extend, unit). Protects: the bound tool
+  names match the 13-name allow-list exactly, so adding a tool fails the test until the list is
+  reviewed. `client/src/__tests__/askMapActions.test.tsx` (extend). Protects: no action touches
+  layout storage.
 
-- `server/src/cosmos/view.ts`: `getCosmosView()` = data + all derived values, computed once, frozen, memoized. Pure functions only; no `client/` imports; no module-load side effects besides the memo.
-- Port the existing client unit tests for these helpers to `server/src/cosmos/derive/__tests__/`. Extend `cosmosParity.test.ts`: every derived value equals the derived section of `baseline-full.json` — protects agent/UI agreement. Unit layer. Client copies stay until Phase 8.
 
-**Acceptance:** derived parity passes for every node, team, service; existing client tests unchanged and green.
-
-## Related plan constraints (pasted)
-- Data only; leave `resolveOwner`, `groupServicesByTeam`, `driftEntryMatches`, PR/commit URL builders, `stepsForScenario` and health helpers for Phase 3. Do not copy `steps/core.ts`. Keep `color` unchanged for now.
-
-## Stop and ask the owner if (pasted)
-### Stop and ask the owner if
-
-- A Phase 0 baseline command fails on `main`.
-- A data value must change to make a test pass — **except** the two Phase 2 changes named above (`color`→`palette`, prefix rule→`groupServiceId`), which are proven by equivalence tests instead.
-- Vercel's CDN does not serve a new `version` after a deploy, or cold starts stay slow after lazy imports.
-- The gzip size of `/api/cosmos` is over 100 KB (I7).
-- The production `version` does not match the build's `COSMOS_VERSION` (I6).
-- The digest grows more than 50% and trimming would remove information.
-- Any change seems to need a database, write endpoint, auth or shared package.
-- A phase would change how the map looks or behaves for a visitor.
-
-## Stage-specific notes from the orchestrator
-- Prior stages' decisions log: docs/plans/server-owned-data-decisions.md — read it, and append a 'Phase 3' section for any judgment calls (smaller change when ambiguous).
-- Phase 1 deferred to Phase 3: LATEST_DRIFT_*, KIND_SEVERITY, HEALTH_BY_SERVICE, HEALTH_STATUS_COUNTS, STEPS_BY_SCENARIO parity, and every helper (see decisions log ~lines 160–210).
-- Phase 2 already made topicGroups data-driven via groupServiceId (client/src/map/topic-groups.ts) — port that, not the old prefix rule.
-- Compare derived values against the derived section of server/src/__tests__/fixtures/baseline-full.json (current, post-Phase-2 fixture). Do not regenerate the fixture unless a Phase-2-allowed value requires it; any other value change is a STOP condition.
-- Client copies stay untouched until Phase 8 — no client source changes in this stage (client tests must stay unchanged and green).
-- Add a 'phase 3' entry to scripts/cosmos-check.ts (A3) if the plan's acceptance is greppable/checkable (e.g. derive modules exist, server/src/cosmos never imports client/).
-- Gates: npm run build, typecheck, lint, npm test, npm run validate, npm run cosmos:check -- --phase 3 (and 0–2 stay green). parity:screens should be unaffected (no client change) — run it if cheap.
+## Orchestrator notes (scope boundaries for this stage)
+- Out of scope here (later stages): `useAgentChat` hook, stop marker, new-chat abort (stage 5, §2.4); the chat panel UI (stage 6); scripted demo turns (stage 7); Playwright (stage 8).
+- **Keep the app working between stages.** Once the server accepts only `{ messages }`, the current client (`client/src/api/askStream.ts`, which today sends a single question) would get 400s. Make the minimal client change so the existing single-question AskPanel still works: send `{ messages: toRequestMessages([], question) }` (or the equivalent shape). Stage 5 owns the full `askStream { messages }` API and history wiring — do not build the hook or history state now.
+- If a shared API type changes (`server/src/cosmos/apiTypes.ts`), run `pnpm types:emit` so `client/src/api/cosmos-api.ts` stays in sync (CI fails on a stale copy). Never hand-edit `cosmos-api.ts`.
+- The off-topic joke answers (`offTopicAnswers.ts` per the stage-1 ledger) and any random-star fallback are removed in favour of the single fixed redirect string. Update the README line that still mentions the "canned playful reply" (stage 3 left it for this stage).
+- `client onAskAction`: only the seven map-action types; unknown types ignored + WARN via the project's logger (never `console.*` unless that is the established client pattern — check first).
+- Validation errors must name the field (project error-handling rule).
+- Run `pnpm typecheck`, `pnpm lint`, `pnpm test` (and `pnpm build`) before reporting. Never run `tsc` without `--noEmit`/`-b`.
