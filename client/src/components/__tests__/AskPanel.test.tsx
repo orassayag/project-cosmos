@@ -123,7 +123,9 @@ describe('AskPanel (connected)', () => {
     expect(onAction).toHaveBeenCalledWith(highlight);
     expect(onAnswerStart).toHaveBeenCalledTimes(1);
     const [, askInit] = callsTo(fetchMock, '/api/ai/ask')[0];
-    expect(JSON.parse(String(askInit?.body))).toEqual({ question: 'What happens when a payment fails?' });
+    expect(JSON.parse(String(askInit?.body))).toEqual({
+      messages: [{ role: 'user', content: 'What happens when a payment fails?' }],
+    });
   });
 
   it('shows no usage line for an off-topic reply', async () => {

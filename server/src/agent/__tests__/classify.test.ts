@@ -29,7 +29,7 @@ describe('classifyQuestion', () => {
   }
 
   async function answer(question: string) {
-    const decision = decideRoute(await classifyModule.classifyQuestion(question, cosmosMap), cosmosMap, () => 0);
+    const decision = decideRoute(await classifyModule.classifyQuestion(question, cosmosMap), cosmosMap);
     if (decision.kind === 'agent') {
       visitorModel(question);
     }

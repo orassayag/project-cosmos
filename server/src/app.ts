@@ -107,7 +107,7 @@ app.post('/ai/ask', async (context) => {
   if (!validated.success) {
     return validated.response;
   }
-  const { question } = validated.data;
+  const { messages } = validated.data;
   // Lazy, so LangChain and the provider SDKs never load for (or can break) the map's own routes.
   const { answerQuestion } = await import('./agent/askAnswer.js');
 
@@ -119,7 +119,7 @@ app.post('/ai/ask', async (context) => {
       const streamAbort = new AbortController();
       responseStream.onAbort(() => streamAbort.abort());
       const signal = AbortSignal.any([context.req.raw.signal, streamAbort.signal]);
-      for await (const event of answerQuestion({ question, config, view: getCosmosView(), signal })) {
+      for await (const event of answerQuestion({ messages, config, view: getCosmosView(), signal })) {
         await responseStream.write(`${JSON.stringify(event)}\n`);
       }
     },

@@ -1,3 +1,4 @@
+import { toRequestMessages } from '../api/chatHistory';
 import type { AskAction } from './AskPanel';
 
 export type AskStreamEvent =
@@ -28,9 +29,33 @@ export function formatUsage(inputTokens: number, outputTokens: number): string {
   return `≈ ${tokenCountFormat.format(inputTokens + outputTokens)} tokens`;
 }
 
+// The client has no structured logger; this keeps the server's log-line shape so the warning stays greppable.
+export function warnUnknownAskAction(kind: unknown): void {
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      scope: 'ask',
+      message: 'Ignored an unknown agent action',
+      errorCode: 'UNKNOWN_ASK_ACTION',
+      kind: typeof kind === 'string' ? kind.slice(0, 64) : typeof kind,
+      noPHI: true,
+    }),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
+
+const KNOWN_ACTION_KINDS: ReadonlySet<string> = new Set([
+  'highlight',
+  'playScenario',
+  'showBlastRadius',
+  'openPassport',
+  'showHealth',
+  'showOwnership',
+  'openChangelogEntry',
+] satisfies AskAction['kind'][]);
 
 /** Returns null for blank, malformed, or unrecognised lines so one bad line never breaks the answer. */
 export function parseAskStreamLine(line: string): AskStreamEvent | null {
@@ -63,6 +88,7 @@ export function parseAskStreamLine(line: string): AskStreamEvent | null {
       if (parsed.kind === 'openChangelogEntry' && typeof parsed.entryId === 'string') {
         return { type: 'action', kind: 'openChangelogEntry', entryId: parsed.entryId };
       }
+      if (!KNOWN_ACTION_KINDS.has(parsed.kind as string)) warnUnknownAskAction(parsed.kind);
       return null;
     case 'usage':
       return Number.isFinite(parsed.inputTokens) && Number.isFinite(parsed.outputTokens)
@@ -136,7 +162,7 @@ export async function streamAskAnswer(
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ messages: toRequestMessages([], question) }),
       signal,
     });
     if (!response.ok || !response.body) {
