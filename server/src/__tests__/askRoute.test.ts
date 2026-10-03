@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createChatModel } from '../agent/chatModelFactory.js';
@@ -7,7 +6,6 @@ import { streamAgentAnswer, type AgentStreamEvent } from '../agent/graph.js';
 import { getMapSnapshot } from '../agent/mapSnapshot.js';
 import { ProviderError } from '../agent/providerErrors.js';
 import app from '../app.js';
-import { encryptCookiePayload } from '../cookieCrypto.js';
 import { getCosmosView } from '../cosmos/view.js';
 
 vi.mock('../agent/classify.js', () => ({ classifyQuestion: vi.fn() }));
@@ -21,14 +19,11 @@ const classifyQuestionMock = vi.mocked(classifyQuestion);
 const createChatModelMock = vi.mocked(createChatModel);
 const streamAgentAnswerMock = vi.mocked(streamAgentAnswer);
 
-function ask(body: unknown, cookieValue?: string, signal?: AbortSignal): Promise<Response> {
+function ask(body: unknown, signal?: AbortSignal): Promise<Response> {
   return Promise.resolve(
     app.request('/api/ai/ask', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cookieValue ? { Cookie: `cosmos_ai=${cookieValue}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: typeof body === 'string' ? body : JSON.stringify(body),
       signal,
     }),
@@ -52,13 +47,14 @@ function agentEvents(events: AgentStreamEvent[], failure?: Error): typeof stream
 }
 
 describe('POST /api/ai/ask', () => {
-  let validCookie: string;
   let consoleLines: Mock;
 
   beforeEach(() => {
-    const secret = randomBytes(32);
-    vi.stubEnv('AI_COOKIE_SECRET', secret.toString('base64'));
-    validCookie = encryptCookiePayload({ provider: 'anthropic', apiKey: API_KEY }, secret);
+    vi.stubEnv('VERCEL', undefined);
+    vi.stubEnv('COSMOS_LOCAL_AGENT', '1');
+    vi.stubEnv('ANTHROPIC_API_KEY', API_KEY);
+    vi.stubEnv('OPENAI_API_KEY', undefined);
+    vi.stubEnv('AI_GATEWAY_API_KEY', undefined);
     classifyQuestionMock.mockResolvedValue({ source: 'localRelevance', onTopic: true });
     createChatModelMock.mockReturnValue(FAKE_MODEL);
     consoleLines = vi.fn();
@@ -73,27 +69,24 @@ describe('POST /api/ai/ask', () => {
     vi.clearAllMocks();
   });
 
-  it('answers 401 NOT_CONNECTED without a cookie and never classifies', async () => {
+  it.each([
+    ['AI_NOT_LOCAL', { VERCEL: '1' }],
+    ['AI_NOT_LOCAL', { COSMOS_LOCAL_AGENT: undefined }],
+    ['AI_NOT_CONFIGURED', { ANTHROPIC_API_KEY: '  ' }],
+  ] as const)('answers 503 %s without classifying (%o)', async (errorCode, env) => {
+    for (const [name, value] of Object.entries(env)) {
+      vi.stubEnv(name, value);
+    }
+
     const response = await ask({ question: 'How does checkout work?' });
 
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ errorCode: 'NOT_CONNECTED' });
-    expect(classifyQuestionMock).not.toHaveBeenCalled();
-  });
-
-  it('treats a tampered cookie as not connected and clears it', async () => {
-    const flippedCharacter = validCookie[20] === 'A' ? 'B' : 'A';
-    const tamperedCookie = `${validCookie.slice(0, 20)}${flippedCharacter}${validCookie.slice(21)}`;
-
-    const response = await ask({ question: 'How does checkout work?' }, tamperedCookie);
-
-    expect(response.status).toBe(401);
-    expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ errorCode });
     expect(classifyQuestionMock).not.toHaveBeenCalled();
   });
 
   it('rejects a bad body with a named validation error', async () => {
-    const response = await ask({ question: '   ' }, validCookie);
+    const response = await ask({ question: '   ' });
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ errorCode: 'INVALID_REQUEST', field: 'question' });
@@ -101,7 +94,7 @@ describe('POST /api/ai/ask', () => {
   });
 
   it('rejects a body that is not JSON', async () => {
-    const response = await ask('not json', validCookie);
+    const response = await ask('not json');
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ errorCode: 'INVALID_REQUEST', field: 'body' });
@@ -110,7 +103,7 @@ describe('POST /api/ai/ask', () => {
   it('streams an off-topic reply with no usage and never builds the visitor model', async () => {
     classifyQuestionMock.mockResolvedValue({ source: 'localRelevance', onTopic: false });
 
-    const response = await ask({ question: "What's the weather?" }, validCookie);
+    const response = await ask({ question: "What's the weather?" });
     const events = await readEvents(response);
 
     expect(response.headers.get('content-type')).toBe('application/x-ndjson');
@@ -132,7 +125,7 @@ describe('POST /api/ai/ask', () => {
       },
     });
 
-    const events = await readEvents(await ask({ question: `Play ${scenario.title}` }, validCookie));
+    const events = await readEvents(await ask({ question: `Play ${scenario.title}` }));
 
     expect(events).toEqual([
       { type: 'token', text: `Playing *${scenario.title}* for you ▶` },
@@ -151,27 +144,36 @@ describe('POST /api/ai/ask', () => {
     ];
     streamAgentAnswerMock.mockImplementation(agentEvents(relayed));
 
-    const events = await readEvents(await ask({ question: 'How does checkout work?' }, validCookie));
+    const events = await readEvents(await ask({ question: 'How does checkout work?' }));
 
     expect(events).toEqual([...relayed, { type: 'done' }]);
-    expect(createChatModelMock).toHaveBeenCalledWith({ provider: 'anthropic', apiKey: API_KEY });
+    expect(createChatModelMock).toHaveBeenCalledWith({ provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: null });
     expect(streamAgentAnswerMock).toHaveBeenCalledWith(
       expect.objectContaining({ model: FAKE_MODEL, question: 'How does checkout work?', view: getCosmosView() }),
     );
   });
 
-  it("classifies with the visitor's gateway key when the cookie holds one", async () => {
-    const secret = randomBytes(32);
-    vi.stubEnv('AI_COOKIE_SECRET', secret.toString('base64'));
-    const cookieWithGatewayKey = encryptCookiePayload(
-      { provider: 'anthropic', apiKey: API_KEY, gatewayApiKey: 'visitor-gateway-key' },
-      secret,
-    );
+  it('classifies with the gateway key from the env', async () => {
+    vi.stubEnv('AI_GATEWAY_API_KEY', 'env-gateway-key');
     streamAgentAnswerMock.mockImplementation(agentEvents([]));
 
-    await readEvents(await ask({ question: 'How does checkout work?' }, cookieWithGatewayKey));
+    await readEvents(await ask({ question: 'How does checkout work?' }));
 
-    expect(classifyQuestionMock).toHaveBeenCalledWith('How does checkout work?', cosmosMap, 'visitor-gateway-key');
+    expect(classifyQuestionMock).toHaveBeenCalledWith('How does checkout work?', cosmosMap, 'env-gateway-key');
+  });
+
+  it('answers from the env keys and ignores any leftover cookie', async () => {
+    streamAgentAnswerMock.mockImplementation(agentEvents([]));
+
+    const response = await app.request('/api/ai/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: 'cosmos_ai=leftover' },
+      body: JSON.stringify({ question: 'How does checkout work?' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(await readEvents(response)).toEqual([{ type: 'done' }]);
   });
 
   it('turns a ProviderError into an error line, then done, and logs only safe fields', async () => {
@@ -182,7 +184,7 @@ describe('POST /api/ai/ask', () => {
       ),
     );
 
-    const events = await readEvents(await ask({ question: 'How does checkout work?' }, validCookie));
+    const events = await readEvents(await ask({ question: 'How does checkout work?' }));
 
     expect(events).toEqual([
       { type: 'token', text: 'Checkout' },
@@ -204,7 +206,7 @@ describe('POST /api/ai/ask', () => {
       throw new ProviderError('aborted', { errorCode: 'PROVIDER_ERROR' });
     });
 
-    const response = await ask({ question: 'How does checkout work?' }, validCookie, abortController.signal);
+    const response = await ask({ question: 'How does checkout work?' }, abortController.signal);
     const events = await readEvents(response);
 
     expect(events).toEqual([{ type: 'token', text: 'Checkout' }]);

@@ -1,15 +1,15 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOpenAI } from '@langchain/openai';
-import type { AiCookiePayload } from '../cookieCrypto.js';
+import type { AgentConfig } from '../agentConfig.js';
 import { DEFAULT_MODEL_IDS } from './models.js';
 
-// Answers are capped at ~150 words by the system prompt; the visitor's key pays for every token.
+// Answers are capped at ~150 words by the system prompt; the configured key pays for every token.
 export const MAX_OUTPUT_TOKENS = 1024;
-// LangChain retries 429s by default, which would only repeat an out-of-quota failure on the visitor's key.
+// LangChain retries 429s by default, which would only repeat an out-of-quota failure on the configured key.
 export const MODEL_MAX_RETRIES = 1;
 
-export function createChatModel({ provider, apiKey }: AiCookiePayload): BaseChatModel {
+export function createChatModel({ provider, apiKey }: Pick<AgentConfig, 'provider' | 'apiKey'>): BaseChatModel {
   if (provider === 'anthropic') {
     return new ChatAnthropic({
       model: DEFAULT_MODEL_IDS.anthropic,

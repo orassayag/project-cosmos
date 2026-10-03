@@ -109,17 +109,12 @@ function fallBackToLocalRelevance(question: string, snapshot: CosmosMapSnapshot)
   return { source: 'localRelevance', onTopic: localRelevance(question, snapshot) };
 }
 
-/**
- * Classifies a question for `decideRoute`; never calls the visitor's model, and falls back to the free keyword check.
- * A gateway key the visitor supplied is billed instead of the site owner's.
- */
+/** Classifies a question for `decideRoute`; never calls the chat model, and falls back to the free keyword check. */
 export async function classifyQuestion(
   question: string,
   snapshot: CosmosMapSnapshot,
-  visitorGatewayApiKey?: string,
+  gatewayApiKey: string | null = getGatewayApiKey(),
 ): Promise<RouteInput> {
-  const gatewayApiKey = visitorGatewayApiKey ?? getGatewayApiKey();
-  const keySource = visitorGatewayApiKey ? 'visitor' : 'site';
   if (!gatewayApiKey) {
     if (!hasWarnedMissingGatewayKey) {
       hasWarnedMissingGatewayKey = true;
@@ -133,7 +128,7 @@ export async function classifyQuestion(
   } catch (error) {
     // Logged per failure (not once) so gateway outages show up as a spike.
     const reason = error instanceof JevTimeoutError ? error.message : `JEV evaluation failed (${errorName(error)})`;
-    logger.warn(`${reason} with the ${keySource} gateway key; classifying with localRelevance`, { errorCode: JEV_UNAVAILABLE });
+    logger.warn(`${reason} with the gateway key; classifying with localRelevance`, { errorCode: JEV_UNAVAILABLE });
     return fallBackToLocalRelevance(question, snapshot);
   }
 }

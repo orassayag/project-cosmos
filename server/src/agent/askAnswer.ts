@@ -1,4 +1,4 @@
-import type { AiCookiePayload } from '../cookieCrypto.js';
+import type { AgentConfig } from '../agentConfig.js';
 import type { CosmosView } from '../cosmos/types.js';
 import { createLogger } from '../logger.js';
 import { createChatModel } from './chatModelFactory.js';
@@ -14,7 +14,7 @@ export type AskStreamEvent = AgentStreamEvent | ErrorEvent | DoneEvent;
 
 export interface AskAnswerInput {
   question: string;
-  payload: AiCookiePayload;
+  config: AgentConfig;
   view: CosmosView;
   signal: AbortSignal;
 }
@@ -26,23 +26,23 @@ const logger = createLogger('ask');
  * with `done`, including after an `error` event, so the client has one terminal signal.
  * An aborted request yields nothing further and is not logged: the visitor left.
  */
-export async function* answerQuestion({ question, payload, view, signal }: AskAnswerInput): AsyncGenerator<AskStreamEvent> {
+export async function* answerQuestion({ question, config, view, signal }: AskAnswerInput): AsyncGenerator<AskStreamEvent> {
   const snapshot = getMapSnapshot(view);
   try {
-    const decision = decideRoute(await classifyQuestion(question, snapshot, payload.gatewayApiKey), snapshot);
+    const decision = decideRoute(await classifyQuestion(question, snapshot, config.gatewayApiKey), snapshot);
     if (decision.kind === 'offTopic') {
       yield { type: 'token', text: decision.answer };
     } else if (decision.kind === 'directAction') {
       yield { type: 'token', text: decision.answer };
       yield { type: 'action', kind: 'playScenario', scenarioId: decision.action.scenarioId };
     } else {
-      const model = createChatModel(payload);
+      const model = createChatModel(config);
       yield* streamAgentAnswer({ model, view, hints: decision.hints, question, signal });
     }
   } catch (error) {
     if (signal.aborted) return;
     const { errorCode } = toProviderError(error);
-    const logFields = { errorCode, provider: payload.provider };
+    const logFields = { errorCode, provider: config.provider };
     if (errorCode === 'PROVIDER_ERROR') {
       logger.error('Agent answer failed', logFields);
     } else {

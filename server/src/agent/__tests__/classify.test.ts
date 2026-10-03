@@ -164,7 +164,7 @@ describe('classifyQuestion', () => {
     });
   });
 
-  describe('with a gateway key the visitor supplied', () => {
+  describe('with a gateway key passed in', () => {
     const ON_TOPIC_ANSWERS = {
       answers: {
         onTopic: { type: 'boolean', probability: 0.9 },
@@ -173,33 +173,39 @@ describe('classifyQuestion', () => {
       },
     };
 
-    it("bills the visitor's key instead of the site's", async () => {
+    it('bills the passed key instead of reading the env', async () => {
       evaluateStub.mockResolvedValue(ON_TOPIC_ANSWERS);
 
-      await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'visitor-gateway-key');
+      await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'passed-gateway-key');
 
-      expect(evaluateStub.mock.calls[0][0].model).toEqual({ modelId: 'typesafe-ai/jev', apiKey: 'visitor-gateway-key' });
+      expect(evaluateStub.mock.calls[0][0].model).toEqual({ modelId: 'typesafe-ai/jev', apiKey: 'passed-gateway-key' });
     });
 
-    it('still runs JEV when the site has no gateway key of its own', async () => {
+    it('still runs JEV when the env has no gateway key', async () => {
       vi.stubEnv('AI_GATEWAY_API_KEY', undefined);
       evaluateStub.mockResolvedValue(ON_TOPIC_ANSWERS);
 
-      const routeInput = await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'visitor-gateway-key');
+      const routeInput = await classifyModule.classifyQuestion(ON_TOPIC_QUESTION, cosmosMap, 'passed-gateway-key');
 
       expect(routeInput.source).toBe('classifier');
       expect(jevWarnings()).toHaveLength(0);
     });
 
-    it('falls back to localRelevance and names the visitor key when it is rejected', async () => {
-      evaluateStub.mockRejectedValue(new Error('gateway 401'));
-
-      const routeInput = await classifyModule.classifyQuestion(OFF_TOPIC_QUESTION, cosmosMap, 'bad-visitor-key');
+    it('uses localRelevance without calling JEV when the passed key is null', async () => {
+      const routeInput = await classifyModule.classifyQuestion(OFF_TOPIC_QUESTION, cosmosMap, null);
 
       expect(routeInput).toEqual({ source: 'localRelevance', onTopic: false });
-      const [warning] = jevWarnings() as { message: string }[];
-      expect(warning.message).toContain('visitor gateway key');
-      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('bad-visitor-key');
+      expect(evaluateStub).not.toHaveBeenCalled();
+    });
+
+    it('falls back to localRelevance without logging the key when it is rejected', async () => {
+      evaluateStub.mockRejectedValue(new Error('gateway 401'));
+
+      const routeInput = await classifyModule.classifyQuestion(OFF_TOPIC_QUESTION, cosmosMap, 'bad-gateway-key');
+
+      expect(routeInput).toEqual({ source: 'localRelevance', onTopic: false });
+      expect(jevWarnings()).toHaveLength(1);
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('bad-gateway-key');
     });
   });
 });
