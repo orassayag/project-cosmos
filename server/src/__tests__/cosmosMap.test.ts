@@ -7,7 +7,7 @@ function findDuplicates(ids: string[]): string[] {
   return ids.filter((id, index) => ids.indexOf(id) !== index);
 }
 
-describe('cosmos-map snapshot', () => {
+describe('agent map snapshot', () => {
   it('has services with unique ids', () => {
     const serviceIds = cosmosMap.services.map((service) => service.id);
     expect(serviceIds.length).toBeGreaterThan(0);

@@ -93,6 +93,47 @@ export function startCosmosFetch(): Promise<CosmosResponse> {
   return attempt;
 }
 
+export const DEV_POLL_INTERVAL_MS = 2_000;
+
+/** Resolves the served response when its version differs from `version`, or null when unchanged (304). */
+export async function fetchCosmosIfChanged(version: string): Promise<CosmosResponse | null> {
+  const response = await fetch(COSMOS_ENDPOINT, {
+    // `no-store` skips the browser cache (max-age=60) so every poll reaches the dev server.
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'If-None-Match': `"${version}"` },
+  });
+  if (response.status === 304) return null;
+  if (!response.ok) {
+    throw new CosmosFetchError(`${COSMOS_ENDPOINT} answered ${response.status}`, { errorCode: 'COSMOS_HTTP_STATUS' });
+  }
+  const next = guardCosmosResponse(await response.json());
+  return next.version === version ? null : next;
+}
+
+/**
+ * Dev only: polls the cosmos so a data edit (which restarts the dev server) reaches the open map.
+ * The `import.meta.env.DEV` guard lets the production build drop the polling entirely; the test
+ * runner opts in per test by stubbing MODE. Returns a stop function.
+ */
+export function startDevCosmosPolling(version: string, onChange: (response: CosmosResponse) => void): () => void {
+  if (!import.meta.env.DEV || import.meta.env.MODE === 'test') return () => {};
+  let isRequestInFlight = false;
+  const intervalId = setInterval(() => {
+    if (isRequestInFlight) return;
+    isRequestInFlight = true;
+    fetchCosmosIfChanged(version)
+      .then((next) => {
+        if (next) onChange(next);
+      })
+      // The dev server is down while it restarts after a data edit; the next tick asks again.
+      .catch(() => undefined)
+      .finally(() => {
+        isRequestInFlight = false;
+      });
+  }, DEV_POLL_INTERVAL_MS);
+  return () => clearInterval(intervalId);
+}
+
 /** Tests only: forget any loaded or in-flight response. */
 export function resetCosmosFetchForTests(): void {
   cachedPromise = undefined;

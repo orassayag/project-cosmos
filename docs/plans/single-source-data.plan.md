@@ -1,5 +1,7 @@
 # Single Source of Truth for Map Data — Plan
 
+> **Superseded** by the server-owned data migration ([decision record](server-owned-data.md), [plan](server-owned-data-migration-plan.md)). The data moved to `server/src/cosmos/data/`, served at `GET /api/cosmos`; no shared `packages/cosmos-data` workspace was created. Kept for history only.
+
 Base: `feature/add-ai` @ `3f6134a`
 
 ## Summary

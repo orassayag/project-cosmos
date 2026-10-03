@@ -11,7 +11,7 @@ const baselineFull = JSON.parse(readFileSync(new URL('./fixtures/baseline-full.j
 const baseline = baselineFull.data;
 const baselineDerived = baselineFull.derived;
 const baselineCosmosMap = JSON.parse(
-  readFileSync(new URL('./fixtures/baseline-cosmos-map.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./fixtures/baseline-agent-snapshot.json', import.meta.url), 'utf8'),
 );
 
 function toJson(value: unknown): unknown {
@@ -127,7 +127,7 @@ describe('server derived values parity with baseline-full.json', () => {
   });
 });
 
-describe('server derived links parity with baseline-cosmos-map.json', () => {
+describe('server derived links parity with baseline-agent-snapshot.json', () => {
   const { derived } = getCosmosView();
   const services = baselineCosmosMap.services as Record<string, unknown>[];
   const topics = baselineCosmosMap.topics as Record<string, unknown>[];
@@ -148,8 +148,8 @@ describe('server derived links parity with baseline-cosmos-map.json', () => {
   );
 });
 
-describe('agent snapshot parity with baseline-cosmos-map.json', () => {
-  it('the snapshot the agent builds from the view equals the legacy cosmos-map.json', () => {
+describe('agent snapshot parity with baseline-agent-snapshot.json', () => {
+  it('the snapshot the agent builds from the view equals the frozen pre-migration agent snapshot', () => {
     expect(toJson(buildMapSnapshot(getCosmosView()))).toStrictEqual(baselineCosmosMap);
   });
 });

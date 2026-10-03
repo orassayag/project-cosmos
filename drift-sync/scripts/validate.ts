@@ -5,7 +5,6 @@
  * Internal checks (no source-repo access):
  *  - validateCosmos() over the server data (server/src/cosmos/data/): ids resolve, phaseIds
  *    unique, spacing, palette, clusters, topic groups, demo references, owners
- *  - the legacy map snapshot matches a fresh in-memory one (until Phase 11 deletes it)
  *
  * External checks (greps source repos):
  *  - Every service.repo exists locally
@@ -25,7 +24,6 @@ import * as path from 'node:path';
 import { getCosmosData } from '../../server/src/cosmos/index.js';
 import type { Service, SubService, Topic } from '../../server/src/cosmos/types.js';
 import { validateCosmos } from '../../server/src/cosmos/validate.js';
-import { COSMOS_MAP_PATH, serializeCosmosMap } from '../../server/scripts/snapshot-map.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
 // ──────────────────────────────────────────────────────────────────
@@ -221,17 +219,6 @@ function checkCosmosInvariants(): void {
   }
 }
 
-function checkSnapshotFreshness(): void {
-  const committedSnapshot = existsSync(COSMOS_MAP_PATH) ? readFileSync(COSMOS_MAP_PATH, 'utf8') : null;
-  if (committedSnapshot === serializeCosmosMap()) return;
-  add({
-    severity: 'error',
-    code: 'stale-snapshot',
-    message: 'the legacy map snapshot is stale — run npm run snapshot',
-    context: { path: path.relative(process.cwd(), COSMOS_MAP_PATH), missing: committedSnapshot === null },
-  });
-}
-
 // ──────────────────────────────────────────────────────────────────
 //  External checks (require source repo access)
 // ──────────────────────────────────────────────────────────────────
@@ -339,7 +326,6 @@ function checkKafkaStepProducerConsumer(): void {
 function run(): void {
   // Internal checks — always run, fast, no source-repo dependency.
   checkCosmosInvariants();
-  checkSnapshotFreshness();
   // Cross-repo checks — require the tracked source repos cloned at reposRoot.
   // Skipped by default; opt in with --source-check for the deeper sweep.
   if (sourceCheck) {

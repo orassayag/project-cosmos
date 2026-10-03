@@ -33,7 +33,7 @@ Every service is a star. Kafka topics orbit between them. Real flows play as com
 
 Every architecture diagram starts dying the moment it's born. The wiki page is from two reorgs ago, the Lucidchart link is stale, and the only reliable documentation is a senior engineer with a whiteboard. Project Cosmos takes a different bet:
 
-1. **The map is the source, not a mirror.** Everything you see — services, topics, flows — is one set of plain TypeScript files. No database, no sync job to a diagramming SaaS. The map works with no server at all; the server only exists to power the optional AI agent.
+1. **The server owns the map, in git; the client renders it.** Everything you see — services, topics, flows — is one set of plain TypeScript files under `server/src/cosmos/data/`, served at `GET /api/cosmos`. No database, no sync job to a diagramming SaaS: a data change is a commit. The client holds no domain data; it draws whatever the server returns, and the AI agent reads the same model.
 2. **Flows are playable, not drawn.** A scenario is a real request traced hop-by-hop: URL, headers, payload, what got produced to which topic, what got written to which database. Press play and watch it fly.
 3. **Honesty is automated.** A nightly agent diffs your repos against the map and opens one PR per team when reality moved. Forgetting to update the docs stops being an option.
 4. **Questions get answered from the map, not from guesses.** The AI agent only knows what the map knows, and can only point at services and scenarios that really exist on it.
@@ -85,7 +85,7 @@ npm run dev
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
-`npm run dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
+`npm run dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. The server is required — the client ships no map data of its own. Edit anything in `server/src/cosmos/data/` while it runs: the server restarts and the open map picks up the new data within about 2 seconds, no reload. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
 
 ### Useful commands
 
@@ -95,18 +95,17 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 |---|---|
 | `npm run dev` | Client on `:5173` + API server on `:8787` (Vite proxies `/api` to it) |
 | `npm run dev:client` | Client only (Vite) — the map shows its error screen, since nothing answers `/api/cosmos` |
-| `npm run dev:server` | API server only, on `:8787` (`tsx watch`, restarts on change) |
+| `npm run dev:server` | API server only, on `:8787` (`tsx watch`, restarts on any server or data change) |
 | `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
 | `npm run typecheck` | Type-checks every workspace, no emit |
 | `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
 | `npm run test:e2e` | Playwright: boots `npm run dev` and loads the map through `/api/cosmos` in Chromium (first time: `npx playwright install chromium`; `BASE_URL` reuses an app that is already running) |
-| `npm run snapshot` | Regenerates the legacy `server/src/generated/cosmos-map.json` from the frozen client copy (removed with that copy) |
 | `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
 | `npm run validate` | Data sanity over `server/src/cosmos/data/` (`validateCosmos()`): ids resolve, `phaseId`s unique, spacing, palette, clusters, demo tours; `-- --source-check` also greps your cloned repos |
 | `npm run fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `npm test` fails on a stale copy |
 | `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
-| `npm run cosmos:check -- --phase N` | Runs the migration checks for phase `N` |
+| `npm run cosmos:check` | Runs the server-owned-data migration checks (`-- --phase N` for the checks up to phase `N`) |
 | `npm run fresh` | Replaces AstroMart in `server/src/cosmos/data/` with a minimal 2-star starter cosmos |
 | `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
 | `npm run sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
@@ -252,13 +251,19 @@ The entire universe lives in `server/src/cosmos/data/` — plain, typed TypeScri
 | **Demo tours** | What `?demo=all` and `?demo=ai` show | `demo.ts` |
 | **Incident** | A past production incident, frozen in time and replayable | `incidents/*.ts` |
 
-**Start from the template:** click **Use this template** on GitHub (or clone), then:
+**Start from the template (forks):** click **Use this template** on GitHub (or fork), then:
 
 ```bash
+git clone https://github.com/<you>/<your-cosmos>.git
+cd <your-cosmos>
 npm install
 npm run fresh   # replaces AstroMart with a minimal 2-star starter cosmos
 npm run dev     # your galaxy, ready to grow
 ```
+
+Then deploy both Vercel services (see [Deployment](#deployment)). The server is required: it is where the map lives, and the client only renders what `GET /api/cosmos` returns.
+
+Known gap: after `npm run fresh`, `npm run dev`, `npm run validate` and the client tests work, but the server type-check (part of `npm run build`) and the server tests still assume AstroMart (its teams, services and the frozen parity fixtures). Delete or adapt those server tests in your fork before relying on `npm run build` in CI.
 
 Two ways to populate it:
 
@@ -360,8 +365,7 @@ Merging the PR bumps the baseline inside the same PR — merge means caught-up, 
 
 ```
 client/                 Vite + React app (the map)
-  src/scenarios/        frozen client copy of the old data (read by nothing at runtime; being removed)
-  src/incidents/        frozen client copy of the old incidents (being removed)
+  src/api/              the /api/cosmos client, CosmosProvider, emitted API types
   src/map/              SVG map rendering, edges, planets, insight views
   src/components/       UI shell: intro, playback, step panel, Ask box, Connect window
   src/demo/             self-playing demo tours
@@ -370,8 +374,8 @@ client/                 Vite + React app (the map)
   src/styles/           tokens, app, components, responsive.css (loaded last)
 server/                 Hono API: GET /api/cosmos and the AI agent (Vercel Function)
   src/cosmos/data/      the universe as typed data — most changes belong here
+  src/cosmos/           schema, validateCosmos(), derived views, the /api/cosmos body
   src/agent/            JEV triage, routing, LangGraph agent, map-action tools
-  src/generated/        cosmos-map.json — committed snapshot of the map data
 drift-sync/             the nightly honesty pipeline (its own README)
 scripts/                fresh-start, demo recorder, version + README-reminder hooks
 versions/               the version ledger, one file per year
@@ -383,13 +387,14 @@ docs/                   plans and working status
 
 ## Deployment
 
-The app is one [Vercel](https://vercel.com) project using **Vercel Services** (`vercel.json`): `client/` serves the static app and `server/` serves `/api/*` as a function, both on one origin. Git auto-deploys are off — deploy deliberately with `vercel deploy`. Set `AI_COOKIE_SECRET` (and optionally `AI_GATEWAY_API_KEY`) in the project's environment variables; without them the map still deploys and works, with AI switched off.
+The app is one [Vercel](https://vercel.com) project using **Vercel Services** (`vercel.json`): `client/` serves the static app and `server/` serves `/api/*` as a function, both on one origin. Git auto-deploys are off — deploy deliberately with `vercel deploy`. Both services are required: the client loads the map from the server's `GET /api/cosmos`. Set `AI_COOKIE_SECRET` (and optionally `AI_GATEWAY_API_KEY`) in the project's environment variables; without them the map still deploys and works, with AI switched off.
 
 The old GitHub Pages address now serves only a redirect page (`pages-redirect/`) that forwards visitors and their deep links to Vercel.
 
 ## Testing and CI
 
 - **Vitest** in both workspaces (`npm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
+- **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `npm run test:e2e` (Playwright) loads the map through `/api/cosmos`, and `npm run parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
 - **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`npm run types:emit` + `git diff`), build, the drift-sync type-check, `npm test`, and `npm run validate` on every PR and push to `main`.
 
 ## Versioning
@@ -404,11 +409,11 @@ With Claude Code, `/update` writes the version note, commits, and pushes in one 
 
 ## Tech notes
 
-- **Client**: Vite 8 + React 19 + TypeScript (strict), Framer Motion for panels. The map needs no server and no database — the whole universe is typed data bundled into the build.
+- **Client**: Vite 8 + React 19 + TypeScript (strict), Framer Motion for panels. It holds no domain data: it fetches `GET /api/cosmos` once at startup (polling it every 2s in dev only) and renders the response. The response types are emitted from the server (`npm run types:emit`).
 - Comets glide on the **real rendered SVG paths** (GSAP MotionPath + `getPointAtLength()`), not approximations.
 - The hyperspace intro is a plain `<canvas>` and one perspective formula — no 3D library.
 - OKLCH color tokens, themeable (`cosmos`, `light`, `minimal`, `dark`).
-- **Server**: Hono on Vercel Functions (Node), Zod-validated requests, structured logging that never records keys, AES-256-GCM cookie sealing.
+- **Server**: Hono on Vercel Functions (Node). It owns the map: typed data in `server/src/cosmos/data/`, checked by Zod schemas and `validateCosmos()`, served with an `ETag` and CDN caching — no database. Zod-validated requests, structured logging that never records keys, AES-256-GCM cookie sealing.
 - **AI**: LangChain (`@langchain/anthropic`, `@langchain/openai`) + LangGraph for the agent; the AI SDK's evaluation API on Vercel AI Gateway for JEV triage; the Anthropic SDK for Drift Sync.
 
 ## Origin & credits

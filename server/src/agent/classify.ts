@@ -3,7 +3,7 @@ import { getGatewayApiKey } from '../config.js';
 import { createLogger } from '../logger.js';
 import { localRelevance } from './localRelevance.js';
 import type { Classification, RouteInput } from './route.js';
-import type { CosmosMapSnapshot } from './types/cosmosMapSnapshot.js';
+import type { CosmosMapSnapshot } from './mapSnapshot.js';
 
 export const JEV_MODEL_ID = 'typesafe-ai/jev';
 export const JEV_TIMEOUT_MS = 3000;

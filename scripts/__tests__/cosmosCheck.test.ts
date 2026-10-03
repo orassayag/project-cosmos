@@ -51,6 +51,15 @@ describe('cosmos-check runner', () => {
     assert.deepEqual(result.offendingFiles, ['missing.json']);
   });
 
+  it('lists paths that still exist for a files-absent check', () => {
+    const [result] = runChecks(
+      [{ name: 'deleted', phase: 11, type: 'files-absent', paths: ['client/src/leaky.ts', 'client/src/gone'] }],
+      repoDir,
+    );
+    assert.equal(result.isPassing, false);
+    assert.deepEqual(result.offendingFiles, ['client/src/leaky.ts']);
+  });
+
   it('rejects a malformed --phase value', () => {
     assert.equal(parsePhase([]), Infinity);
     assert.equal(parsePhase(['--phase', '3']), 3);

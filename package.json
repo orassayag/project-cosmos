@@ -17,7 +17,6 @@
     "test": "npm run test --workspaces && npm run test:scripts",
     "lint": "eslint .",
     "validate": "tsx drift-sync/scripts/validate.ts",
-    "snapshot": "npm run snapshot --workspace server",
     "types:emit": "tsx server/scripts/emit-client-types.ts",
     "sync": "tsx drift-sync/scripts/sync.ts",
     "sync:bootstrap": "tsx drift-sync/scripts/bootstrap-state.ts",

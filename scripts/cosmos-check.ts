@@ -23,6 +23,7 @@ interface CheckBase {
 export type CosmosCheck = CheckBase &
   (
     | { type: 'files-exist'; paths: string[] }
+    | { type: 'files-absent'; paths: string[] }
     | { type: 'grep-absent'; pattern: string; pathspecs: string[] }
     | { type: 'grep-present'; pattern: string; pathspecs: string[] }
   );
@@ -40,7 +41,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     type: 'files-exist',
     paths: [
       'server/src/__tests__/fixtures/baseline-full.json',
-      'server/src/__tests__/fixtures/baseline-cosmos-map.json',
+      'server/src/__tests__/fixtures/baseline-agent-snapshot.json',
     ],
   },
   {
@@ -67,7 +68,6 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     ],
   },
   {
-    // server/scripts/snapshot-map.ts still reads the client copy; Phase 11 deletes it.
     name: 'nothing under server/src imports client/ or drift-sync/',
     phase: 1,
     type: 'grep-absent',
@@ -295,8 +295,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pathspecs: ['client/src/demo/scripts.ts'],
   },
   {
-    // The plan's Phase 10 grep, scoped to writers and readers. The old data copies, the legacy snapshot
-    // script and the parity tests that still read them go in Phase 11; prose docs are finished in Phase 12.
+    // The plan's Phase 10 grep, scoped to writers and readers; the applier test names old paths to reject them.
     name: 'tools, skills and workflows read and write server/src/cosmos/data, not the old copies',
     phase: 10,
     type: 'grep-absent',
@@ -310,7 +309,6 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
       'skills',
       '.github',
       ':(exclude)scripts/cosmos-check.ts',
-      ':(exclude)server/scripts/snapshot-map.ts',
       ':(exclude)drift-sync/scripts/__tests__/applyEditsPaths.test.ts',
     ],
   },
@@ -326,6 +324,85 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     type: 'grep-present',
     pattern: 'validateCosmos\\(cosmosData\\)',
     pathspecs: ['drift-sync/scripts/validate.ts'],
+  },
+  {
+    name: 'the old client data, the legacy map snapshot and the client parity twin are deleted',
+    phase: 11,
+    type: 'files-absent',
+    paths: [
+      'client/src/scenarios',
+      'client/src/incidents',
+      'client/src/__tests__/cosmosParity.test.ts',
+      'server/src/generated/cosmos-map.json',
+      'server/src/agent/types/cosmosMapSnapshot.ts',
+      'server/scripts/snapshot-map.ts',
+    ],
+  },
+  {
+    name: 'nothing outside docs/ mentions cosmos-map',
+    phase: 11,
+    type: 'grep-absent',
+    pattern: 'cosmos-map',
+    pathspecs: ['.', ':(exclude)docs', ':(exclude)versions', ':(exclude).claude/status', ':(exclude)scripts/cosmos-check.ts'],
+  },
+  {
+    name: 'no snapshot script remains',
+    phase: 11,
+    type: 'grep-absent',
+    pattern: '"snapshot":',
+    pathspecs: ['package.json', 'server/package.json'],
+  },
+  {
+    name: 'the server parity test still guards the data',
+    phase: 11,
+    type: 'files-exist',
+    paths: ['server/src/__tests__/cosmosParity.test.ts', 'server/src/__tests__/fixtures/baseline-full.json'],
+  },
+  {
+    name: 'no AstroMart ids in client code outside tests and the emitted API types',
+    phase: 12,
+    type: 'grep-absent',
+    pattern: `storefront|api-gateway|'cart'|'search'|catalog|inventory|'orders'|payments|shipping|notifications|object-storage|realtime-hub|hub-|orders\\.|payments\\.|shopping\\.|fulfillment\\.|engagement\\.|AstroMart`,
+    pathspecs: [
+      ':(glob)client/src/**/*.ts',
+      ':(glob)client/src/**/*.tsx',
+      ':(exclude,glob)client/src/**/__tests__/**',
+      ':(exclude)client/src/api/cosmos-api.ts',
+    ],
+  },
+  {
+    name: 'docs and workflows name no cosmos-map file or snapshot step',
+    phase: 12,
+    type: 'grep-absent',
+    pattern: 'cosmos-map|npm run snapshot',
+    pathspecs: ['README.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'drift-sync/README.md', '.github', '.claude/skills', 'skills'],
+  },
+  {
+    name: 'README points data edits at server/src/cosmos/data',
+    phase: 12,
+    type: 'grep-present',
+    pattern: 'server/src/cosmos/data',
+    pathspecs: ['README.md'],
+  },
+  {
+    name: 'CLAUDE.md points data edits at server/src/cosmos/data',
+    phase: 12,
+    type: 'grep-present',
+    pattern: 'server/src/cosmos/data',
+    pathspecs: ['CLAUDE.md'],
+  },
+  {
+    name: 'dev live polling and its production guard are tested',
+    phase: 12,
+    type: 'files-exist',
+    paths: ['client/src/api/__tests__/devPolling.test.ts', 'client/src/__tests__/noDevPollingInProd.test.ts'],
+  },
+  {
+    name: 'dev polling is guarded by import.meta.env.DEV',
+    phase: 12,
+    type: 'grep-present',
+    pattern: 'import\\.meta\\.env\\.DEV',
+    pathspecs: ['client/src/api/cosmosClient.ts'],
   },
 ];
 
@@ -350,6 +427,10 @@ export function runCheck(check: CosmosCheck, cwd: string): CheckResult {
     case 'files-exist': {
       const missingPaths = check.paths.filter((path) => !existsSync(resolve(cwd, path)));
       return { check, isPassing: missingPaths.length === 0, offendingFiles: missingPaths };
+    }
+    case 'files-absent': {
+      const presentPaths = check.paths.filter((path) => existsSync(resolve(cwd, path)));
+      return { check, isPassing: presentPaths.length === 0, offendingFiles: presentPaths };
     }
     case 'grep-absent': {
       const matchingFiles = gitGrepFiles(cwd, check.pattern, check.pathspecs);

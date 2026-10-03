@@ -3,16 +3,18 @@
 ## Commands
 
 ```bash
-npm run dev        # client on :5173 + API dev server on :8787 (Vite proxies /api)
+npm run dev        # client on :5173 + API dev server on :8787 (Vite proxies /api); a data edit reaches the open map in ~2s
 npm run dev:client # client only (plain Vite; no /api, so the map shows its load error)
 npm run dev:server # API dev server only (tsx watch server/scripts/dev-server.ts)
 npm run test:e2e   # Playwright: boots npm run dev, loads the map via /api/cosmos
 npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
 npm run typecheck  # every workspace, no emit
 npm run lint       # eslint over client/, server/, drift-sync/, scripts/
-npm run snapshot   # regenerate the legacy server/src/generated/cosmos-map.json (frozen client copy; removed with it)
-npm run validate   # validateCosmos() over server/src/cosmos/data: ids resolve, phaseIds unique, spacing, palette, demo refs
+npm run validate   # validateCosmos() over server/src/cosmos/data: ids resolve, phaseIds unique, service spacing, palette, clusters, topic groups, ecosystem, demo refs, owners
 npm run fixture:cosmos # regenerate the client test fixture after any data edit
+npm run types:emit # copy server/src/cosmos/apiTypes.ts to client/src/api/cosmos-api.ts (CI fails on a stale copy)
+npm run parity:screens # compare 16 map views with docs/plans/baseline-screens (0.1% threshold)
+npm run cosmos:check   # migration checks (-- --phase N for one phase and earlier)
 ```
 
 Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
@@ -23,10 +25,10 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 
 - `server/src/cosmos/data/` — the entire universe as typed data, served at `GET /api/cosmos`: `services.ts`, `topics.ts`, `domains.ts`, `scenarios.ts`, `clusters.ts`, `palette.ts`, `owners.ts` (teams), `drift.ts`, `health.ts`, `demo.ts` (tour data), `steps/<domain>.ts` (barrel `steps/index.ts`). **Most changes belong here.** The client holds no domain data.
 - `server/src/cosmos/data/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/index.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
-- `client/src/scenarios/`, `client/src/incidents/` — frozen old client copy of the data, read by nothing at runtime; never edit (deleted in Phase 11).
+- `client/src/api/` — the only way client code gets data: `cosmosClient.ts` (fetch `/api/cosmos`; in dev it polls every 2s with `If-None-Match`), `CosmosProvider.tsx` (`useCosmos()`), `cosmos-api.ts` (emitted by `npm run types:emit`, never edit). Presentation tables keyed by data ids live in `client/src/theme/`.
 - `client/src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
 - `client/src/components/` — UI shell: intro, playback controls, step panel, tech icons.
-- `server/` — Node service workspace: the cosmos data, derivations, `GET /api/cosmos` and the AI agent. After a data edit run `npm run fixture:cosmos` and commit the client test fixture with it.
+- `server/` — Node service workspace: the cosmos data, derivations, `GET /api/cosmos` and the AI agent. After a data edit run `npm run fixture:cosmos` and commit the client test fixture with it. `server/src/__tests__/cosmosParity.test.ts` pins the data to `fixtures/baseline-full.json`, so a deliberate data change updates that fixture too.
 - `drift-sync/` — the nightly honesty pipeline (its own README).
 - `.claude/skills/` — `add-service`, `add-scenario` (plus `update`): THE documented procedures for growing the map. Follow them rather than improvising.
 
@@ -58,7 +60,7 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 
 - `phaseId` global, unique, never reused; every step's `phase` equals its scenario's `phaseId`.
 - Step `from`/`to`/`via`/`through` must exactly match `SERVICES[].id` / `TOPICS[].id`.
-- Service `hex` must equal `PALETTE[service.palette]` (`server/src/cosmos/data/palette.ts`); every palette key needs a `--svc-<key>` token in `client/src/styles/tokens.css`. Topics always `TOPIC_COLOR`/`TOPIC_HEX`.
+- Service `hex` must equal `PALETTE[service.palette]` (`server/src/cosmos/data/palette.ts`); every palette key needs a `--svc-<key>` token in `client/src/styles/tokens.css` (`client/src/__tests__/paletteTokens.test.ts` checks it). Topics always `TOPIC_COLOR`/`TOPIC_HEX`.
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
 

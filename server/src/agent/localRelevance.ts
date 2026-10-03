@@ -1,4 +1,4 @@
-import type { CosmosMapSnapshot } from './types/cosmosMapSnapshot.js';
+import type { CosmosMapSnapshot } from './mapSnapshot.js';
 
 const ARCHITECTURE_WORDS = [
   'architecture',

@@ -1,5 +1,5 @@
 import { OFF_TOPIC_ANSWERS } from './offTopicAnswers.js';
-import type { CosmosMapSnapshot } from './types/cosmosMapSnapshot.js';
+import type { CosmosMapSnapshot } from './mapSnapshot.js';
 
 export const INTENTS = ['explainFlow', 'findService', 'playScenario', 'incident', 'ownership'] as const;
 export type Intent = (typeof INTENTS)[number];

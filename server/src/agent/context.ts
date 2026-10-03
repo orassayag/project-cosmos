@@ -1,12 +1,12 @@
 import type { CosmosView, DriftEntry, ResolvedHealth } from '../cosmos/types.js';
-import { getMapSnapshot } from './mapSnapshot.js';
-import type {
-  SnapshotIncident,
-  SnapshotScenario,
-  SnapshotService,
-  SnapshotStep,
-  SnapshotTopic,
-} from './types/cosmosMapSnapshot.js';
+import {
+  getMapSnapshot,
+  type SnapshotIncident,
+  type SnapshotScenario,
+  type SnapshotService,
+  type SnapshotStep,
+  type SnapshotTopic,
+} from './mapSnapshot.js';
 
 const NONE = '-';
 

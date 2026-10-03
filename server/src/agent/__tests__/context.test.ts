@@ -10,7 +10,7 @@ function digestLineStartingWith(digest: string, prefix: string): string | undefi
 
 const view = getCosmosView();
 const cosmosMap = getMapSnapshot(view);
-// cosmos-map.json digest before Phase 6: 7,584 chars (1,942 cl100k tokens). The plan allows at most 50% growth.
+// Digest before Phase 6 (built from the old map snapshot file): 7,584 chars (1,942 cl100k tokens). The plan allows at most 50% growth.
 const DIGEST_CHAR_BUDGET = 11_376;
 
 describe('buildMapDigest', () => {

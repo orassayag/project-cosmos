@@ -35,7 +35,7 @@ describe('applier write boundary', () => {
     for (const requestedPath of [
       'client/src/scenarios/topics.ts',
       'client/src/incidents/data.ts',
-      'server/src/generated/cosmos-map.json',
+      'server/src/generated/map.json',
       'server/src/cosmos/apiTypes.ts',
       'server/src/cosmos/data',
       'server/src/cosmos/data-extra/topics.ts',

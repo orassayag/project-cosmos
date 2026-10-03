@@ -807,3 +807,46 @@ Phase 12.
 
 - Drift Sync dry run via `workflow_dispatch` and re-enabling it (I5). The job's `if: vars.DRIFT_SYNC_ENABLED == 'true'`
   gates manual dispatch too, so the variable must be `true` before the dry run.
+
+## Phase 11 — Delete the old sources
+
+- Deleted `client/src/scenarios/` (including `palette.ts` and `clusters.ts`, which the brief's list did not name but which
+  were part of the same frozen copy), `client/src/incidents/`, `server/src/generated/cosmos-map.json`,
+  `server/scripts/snapshot-map.ts`, the `snapshot` scripts (root and server) and the `stale-snapshot` check in
+  `npm run validate`, plus the client parity twin.
+- `server/src/agent/types/cosmosMapSnapshot.ts` held types the agent still uses (`CosmosMapSnapshot`, `Snapshot*`).
+  They moved, unchanged, into `server/src/agent/mapSnapshot.ts`, which builds that shape; the type names stay to keep
+  the diff small.
+- The frozen agent-snapshot fixture was renamed `baseline-cosmos-map.json` → `baseline-agent-snapshot.json` (content
+  unchanged) so the phase-11 rule "no `cosmos-map` outside `docs/`" holds without exempting the parity test.
+- The client parity twin also checked that every palette key has a `--svc-<key>` token in `tokens.css` (a `CLAUDE.md`
+  invariant). That check survives as `client/src/__tests__/paletteTokens.test.ts`, reading palette keys from the
+  response fixture. Its Phase 0 color half is already covered by `server/src/__tests__/phase2Equivalence.test.ts`.
+- `npx knip` could not be run (the download was not permitted). A script listed every client file no other file imports:
+  only `src/testing/vitestSetup.ts`, which `vitest.config.ts` loads. Unused exports are types or test-only helpers, so
+  no client helper was deleted.
+- The phase-11 `cosmos-map` grep excludes `docs/`, `versions/` (generated ledger), `.claude/status/` (run reports) and
+  `scripts/cosmos-check.ts` (holds the pattern). A new `files-absent` check type covers the deleted paths.
+
+## Phase 12 — Docs, live data in dev, forks
+
+- Dev polling lives in `cosmosClient.ts` (`startDevCosmosPolling`, `fetchCosmosIfChanged`) and is started by
+  `useCosmosLoad` once a response is ready; a new version replaces the ready state, so `App` re-renders
+  `CosmosProvider` with it. The guard is `!import.meta.env.DEV || import.meta.env.MODE === 'test'`: the test runner is
+  excluded so existing App tests stay deterministic, and `devPolling.test.ts` opts in by stubbing `DEV` and `MODE`.
+- The poll uses `cache: 'no-store'` with a manual `If-None-Match`, because the route's `max-age=60` would otherwise let
+  the browser answer from its cache for a minute. A failed poll (the dev server restarts on every data edit) is ignored
+  and retried on the next tick.
+- `noDevPollingInProd.test.ts` runs a real `vite build` in-process (`write: false`) with `NODE_ENV=production` (Vite
+  derives `DEV` from it; Vitest sets `test`) and asserts no `If-None-Match` / `no-store` in the JS, and that
+  `/api/cosmos` is still there.
+- `tsx watch` follows the dev server's import graph, including the dynamically imported app and so every file under
+  `server/src/cosmos/data/`; no watch-list change was needed (confirmed by the live edit check in the stage report).
+- **Carry-over 1 (parity test vs. Drift Sync):** kept the server parity test, as the plan says. Documented in
+  `CONTRIBUTING.md`, `drift-sync/README.md`, README and `CLAUDE.md` that a deliberate data change updates
+  `baseline-full.json` (and the client fixture) in the same PR. The applier does neither yet; raised to the owner.
+- **Carry-over 2 (`fresh` then `build`):** not fixed. In a scratch copy, after `npm run fresh` the server type-check
+  fails in the derive unit tests (their synthetic fixture names AstroMart team ids) and 126 of 290 server tests fail
+  (parity, agent eval, demo data, derived parity, and others). The client suite passes (194/194). Making `fresh` remove
+  or rewrite those suites is not a small, clearly correct change, so the README fork quickstart states the gap plainly;
+  raised to the owner.
