@@ -27,7 +27,7 @@ tsconfig.tsbuildinfo
 # cosmos-sync dry-run reports (kept locally for review, not committed)
 drift-sync/dry-runs/
 
-# demo videos from npm run record:demo
+# demo videos from pnpm record:demo
 recordings/
 
 # logs & coverage
@@ -42,9 +42,9 @@ docs/pre-plans/
 .env*
 !.env.example
 
-# screenshots + diffs from npm run parity:screens
+# screenshots + diffs from pnpm parity:screens
 parity-out/
 
-# Playwright output from npm run test:e2e
+# Playwright output from pnpm test:e2e
 e2e/test-results/
 e2e/playwright-report/

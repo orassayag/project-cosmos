@@ -8,10 +8,10 @@
  * that repo. Outputs a structured verdict.
  *
  * Usage:
- *   npm run sync:diff-repo -- <repo>                          # auto from baseline → origin
- *   npm run sync:diff-repo -- <repo> --from <sha> --to <sha>  # explicit range
- *   npm run sync:diff-repo -- <repo> --json                   # JSON-only output
- *   npm run sync:diff-repo -- <repo> --verbose                # show every turn + tool call
+ *   pnpm sync:diff-repo <repo>                          # auto from baseline → origin
+ *   pnpm sync:diff-repo <repo> --from <sha> --to <sha>  # explicit range
+ *   pnpm sync:diff-repo <repo> --json                   # JSON-only output
+ *   pnpm sync:diff-repo <repo> --verbose                # show every turn + tool call
  *
  * Env:
  *   ANTHROPIC_API_KEY (or VITE_ANTHROPIC_API_KEY) — required
@@ -57,7 +57,7 @@ const explicitFrom = fromIdx >= 0 ? args[fromIdx + 1] : undefined;
 const explicitTo = toIdx >= 0 ? args[toIdx + 1] : undefined;
 
 if (!repo || repo.startsWith('--')) {
-  console.error('Usage: npm run sync:diff-repo -- <repo> [--from <sha>] [--to <sha>] [--json] [--verbose]');
+  console.error('Usage: pnpm sync:diff-repo <repo> [--from <sha>] [--to <sha>] [--json] [--verbose]');
   process.exit(1);
 }
 
@@ -71,7 +71,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const statePath = path.resolve(here, '..', 'state.json');
 const state = loadSyncState(statePath);
 if (!state && (!explicitFrom || !explicitTo)) {
-  elog(`No drift-sync/state.json found at ${statePath}. Run \`npm run sync:bootstrap\` first, or pass --from/--to explicitly.`);
+  elog(`No drift-sync/state.json found at ${statePath}. Run \`pnpm sync:bootstrap\` first, or pass --from/--to explicitly.`);
   process.exit(1);
 }
 

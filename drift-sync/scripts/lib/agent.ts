@@ -96,7 +96,7 @@ function toolRunCommand(allowed: string[], cwd: string, args: { command: string 
   if (!allowed.includes(cmd)) {
     return `ERROR: command not in allowlist (${allowed.join(', ')})`;
   }
-  // Parse "npm run validate" → ['npm', ['run', 'validate']]
+  // Parse "pnpm validate" → ['pnpm', ['validate']]
   const parts = cmd.split(/\s+/);
   const bin = parts[0];
   const cmdArgs = parts.slice(1);
@@ -213,7 +213,7 @@ export const APPLIER_TOOL_DEFS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'run_command',
-    description: 'Run a pre-approved command in the cosmos repo. Currently allowed: "npm run validate". Use after writing edits to confirm Project Cosmos is still internally consistent.',
+    description: 'Run a pre-approved command in the cosmos repo. Currently allowed: "pnpm validate". Use after writing edits to confirm Project Cosmos is still internally consistent.',
     input_schema: {
       type: 'object',
       properties: {

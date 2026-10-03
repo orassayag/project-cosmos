@@ -3,10 +3,10 @@
  * parity-screens — screenshot every baseline view and diff it against
  * docs/plans/baseline-screens/ (the migration's visual parity oracle).
  *
- *   npm run parity:screens                 # build, preview, compare (exit 1 if any view is over threshold)
- *   npm run parity:screens -- --update     # rewrite the baseline PNGs
- *   npm run parity:screens -- --only default-map,blast-payments
- *   npm run parity:screens -- --skip-build # reuse client/dist
+ *   pnpm parity:screens                 # build, preview, compare (exit 1 if any view is over threshold)
+ *   pnpm parity:screens --update     # rewrite the baseline PNGs
+ *   pnpm parity:screens --only default-map,blast-payments
+ *   pnpm parity:screens --skip-build # reuse client/dist
  *
  * BASE_URL points at an already-running app instead of building and starting `vite preview`.
  * Diffs and the retaken shots land in parity-out/ (gitignored).
@@ -167,7 +167,7 @@ async function waitForServer(url, timeoutMs) {
 
 async function startPreview(skipBuild) {
   if (!skipBuild) {
-    const build = spawnSync('npm', ['run', 'build', '--workspace', 'client'], { cwd: root, stdio: 'inherit' });
+    const build = spawnSync('pnpm', ['--filter', '@project-cosmos/client', 'build'], { cwd: root, stdio: 'inherit' });
     if (build.status !== 0) fail('client build failed');
   }
   if (!existsSync(resolve(root, 'client/dist/index.html'))) fail('client/dist is missing — run without --skip-build');

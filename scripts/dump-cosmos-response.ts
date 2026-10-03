@@ -7,7 +7,7 @@ import app from '../server/src/app.js';
  * Writes the client test fixture from the real `GET /api/cosmos` route — never edit it by hand.
  * `scripts/__tests__/cosmosResponseFixture.test.ts` fails when the committed copy is stale.
  *
- *   npm run fixture:cosmos
+ *   pnpm fixture:cosmos
  */
 export const COSMOS_RESPONSE_FIXTURE_PATH = resolve(
   import.meta.dirname,

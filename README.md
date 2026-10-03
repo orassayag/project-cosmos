@@ -74,49 +74,49 @@ Every architecture diagram starts dying the moment it's born. The wiki page is f
 
 ## Quickstart
 
-Requires Node ≥ 22.
+Requires Node ≥ 22 and pnpm (`corepack enable` picks up the version pinned in `package.json`).
 
 ```bash
 git clone https://github.com/orassayag/project-cosmos.git
 cd project-cosmos
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open http://localhost:5173 — you're looking at **AstroMart**, a fictional space-gear e-commerce platform that ships with the repo as demo data. Pick a domain, choose a scenario (start with *Place an order*), press play.
 
-`npm run dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. The server is required — the client ships no map data of its own. Edit anything in `server/src/cosmos/data/` while it runs: the server restarts and the open map picks up the new data within about 2 seconds, no reload. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
+`pnpm dev` starts the client (Vite, `:5173`) and the API server (`:8787`) together, no account needed; Vite forwards `/api/*` to the server, and the map loads its data from `GET /api/cosmos`. The server is required — the client ships no map data of its own. Edit anything in `server/src/cosmos/data/` while it runs: the server restarts and the open map picks up the new data within about 2 seconds, no reload. Without AI keys the whole map works and the Ask box gives demo answers. To run the AI agent too, see [Run with AI locally](#run-with-ai-locally).
 
 ### Useful commands
 
-Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
+Run from the repo root — it is a pnpm workspace root (`client/`, `server/`).
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Client on `:5173` + API server on `:8787` (Vite proxies `/api` to it) |
-| `npm run dev:client` | Client only (Vite) — the map shows its error screen, since nothing answers `/api/cosmos` |
-| `npm run dev:server` | API server only, on `:8787` (`tsx watch`, restarts on any server or data change) |
-| `npm run build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
-| `npm run typecheck` | Type-checks every workspace, no emit |
-| `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
-| `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
-| `npm run test:e2e` | Playwright: boots `npm run dev` and loads the map through `/api/cosmos` in Chromium (first time: `npx playwright install chromium`; `BASE_URL` reuses an app that is already running) |
-| `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
-| `npm run validate` | Data sanity over `server/src/cosmos/data/` (`validateCosmos()`): ids resolve, `phaseId`s unique, spacing, palette, clusters, demo tours; `-- --source-check` also greps your cloned repos |
-| `npm run fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `npm test` fails on a stale copy |
-| `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
-| `npm run cosmos:check` | Runs the server-owned-data migration checks (`-- --phase N` for the checks up to phase `N`) |
-| `npm run fresh` | Replaces AstroMart in `server/src/cosmos/data/` with a minimal 2-star starter cosmos |
-| `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
-| `npm run sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
+| `pnpm dev` | Client on `:5173` + API server on `:8787` (Vite proxies `/api` to it) |
+| `pnpm dev:client` | Client only (Vite) — the map shows its error screen, since nothing answers `/api/cosmos` |
+| `pnpm dev:server` | API server only, on `:8787` (`tsx watch`, restarts on any server or data change) |
+| `pnpm build` | Builds every workspace (client: `tsc -b && vite build`) — the gate for every change |
+| `pnpm typecheck` | Type-checks every workspace, no emit |
+| `pnpm lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
+| `pnpm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`pnpm test:scripts`) |
+| `pnpm test:e2e` | Playwright: boots `pnpm dev` and loads the map through `/api/cosmos` in Chromium (first time: `pnpm exec playwright install chromium`; `BASE_URL` reuses an app that is already running) |
+| `pnpm types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
+| `pnpm validate` | Data sanity over `server/src/cosmos/data/` (`validateCosmos()`): ids resolve, `phaseId`s unique, spacing, palette, clusters, demo tours; `--source-check` also greps your cloned repos |
+| `pnpm fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `pnpm test` fails on a stale copy |
+| `pnpm parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`--update` to rebaseline) |
+| `pnpm cosmos:check` | Runs the server-owned-data migration checks (`--phase N` for the checks up to phase `N`) |
+| `pnpm fresh` | Replaces AstroMart in `server/src/cosmos/data/` with a minimal 2-star starter cosmos |
+| `pnpm record:demo ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
+| `pnpm sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
 
 ### Run with AI locally
 
-`npm run dev` already serves the AI routes. They need the variables below; the dev server reads them from `.env.local` at the repo root, then `server/.env` (no Vercel account needed):
+`pnpm dev` already serves the AI routes. They need the variables below; the dev server reads them from `.env.local` at the repo root, then `server/.env` (no Vercel account needed):
 
 ```bash
 cp server/.env.example server/.env   # then fill in the keys
-npm run dev
+pnpm dev
 ```
 
 Or run everything on one origin through the [Vercel CLI](https://vercel.com/docs/cli), linking the project and pulling its environment variables:
@@ -219,8 +219,8 @@ The tours drive the **real UI**: a human-like pointer glides along curved paths,
 Record a tour to video (with the dev server running):
 
 ```bash
-npm run record:demo -- ai
-npm run record:demo -- all
+pnpm record:demo ai
+pnpm record:demo all
 ```
 
 The recorder uses Playwright and fails if the tour aborts or runs over its time limit. It targets `http://localhost:5173` unless `BASE_URL` is set.
@@ -256,14 +256,14 @@ The entire universe lives in `server/src/cosmos/data/` — plain, typed TypeScri
 ```bash
 git clone https://github.com/<you>/<your-cosmos>.git
 cd <your-cosmos>
-npm install
-npm run fresh   # replaces AstroMart with a minimal 2-star starter cosmos
-npm run dev     # your galaxy, ready to grow
+pnpm install
+pnpm fresh   # replaces AstroMart with a minimal 2-star starter cosmos
+pnpm dev     # your galaxy, ready to grow
 ```
 
 Then deploy both Vercel services (see [Deployment](#deployment)). The server is required: it is where the map lives, and the client only renders what `GET /api/cosmos` returns.
 
-Known gap: after `npm run fresh`, `npm run dev`, `npm run validate` and the client tests work, but the server type-check (part of `npm run build`) and the server tests still assume AstroMart (its teams, services and the frozen parity fixtures). Delete or adapt those server tests in your fork before relying on `npm run build` in CI.
+Known gap: after `pnpm fresh`, `pnpm dev`, `pnpm validate` and the client tests work, but the server type-check (part of `pnpm build`) and the server tests still assume AstroMart (its teams, services and the frozen parity fixtures). Delete or adapt those server tests in your fork before relying on `pnpm build` in CI.
 
 Two ways to populate it:
 
@@ -285,11 +285,11 @@ You can also install the skills into any environment as a plugin, no clone neede
 
 The skills make Claude read your actual source — call sites, producers, consumers, schemas — and write verified entries. No guessing allowed; the skill files are the guardrails.
 
-**By hand** — copy any AstroMart entry, follow the shapes in `server/src/cosmos/apiTypes.ts`, and keep three invariants: unique ids, a service's `hex` equals `PALETTE[service.palette]` (`palette.ts`), and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that palettes, clusters, topic groups and the demo tours point at real entries. Run `npm run fixture:cosmos` after any data edit and commit the regenerated client test fixture with it. All of these run in CI on every PR (the **Validate** badge above), alongside `npm run lint` and `npm test`.
+**By hand** — copy any AstroMart entry, follow the shapes in `server/src/cosmos/apiTypes.ts`, and keep three invariants: unique ids, a service's `hex` equals `PALETTE[service.palette]` (`palette.ts`), and `phaseId`s are global and never reused. `pnpm build` type-checks everything, and `pnpm validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that palettes, clusters, topic groups and the demo tours point at real entries. Run `pnpm fixture:cosmos` after any data edit and commit the regenerated client test fixture with it. All of these run in CI on every PR (the **Validate** badge above), alongside `pnpm lint` and `pnpm test`.
 
 Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the `x`/`y` lines back into `server/src/cosmos/data/services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
 
-To start clean, run `npm run fresh`, then grow your own sky.
+To start clean, run `pnpm fresh`, then grow your own sky.
 
 ## Record a production incident
 
@@ -299,7 +299,7 @@ An incident is just a scenario frozen in time. Recordings live in `server/src/co
 2. **Copy the relevant steps** and replace the example payloads with the real ones from the logs — redact card/customer/token fields (`"[redacted]"`).
 3. **Add the title, date, and a one- or two-sentence note** describing what went wrong.
 4. **Give it a globally-unique `phaseId`** (incidents use `101+` so they never collide with scenarios) and set every step's `phase` to that same id.
-5. **Save the file** under `server/src/cosmos/data/incidents/`, import it in `server/src/cosmos/data/incidents/index.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it; the map and the AI agent both read it from the server.
+5. **Save the file** under `server/src/cosmos/data/incidents/`, import it in `server/src/cosmos/data/incidents/index.ts`, and drop it into the `INCIDENTS` array. `pnpm build` type-checks it; the map and the AI agent both read it from the server.
 
 Every step's `from` / `to` / `via` / `through` must match an existing `SERVICES[].id` or `TOPICS[].id` — incidents reuse the same map you already drew.
 
@@ -393,9 +393,9 @@ The old GitHub Pages address now serves only a redirect page (`pages-redirect/`)
 
 ## Testing and CI
 
-- **Vitest** in both workspaces (`npm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
-- **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `npm run test:e2e` (Playwright) loads the map through `/api/cosmos`, and `npm run parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
-- **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`npm run types:emit` + `git diff`), build, the drift-sync type-check, `npm test`, and `npm run validate` on every PR and push to `main`.
+- **Vitest** in both workspaces (`pnpm test`): the client suite covers the Ask box, the Connect window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, cookie crypto, config, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
+- **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `pnpm test:e2e` (Playwright) loads the map through `/api/cosmos`, and `pnpm parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
+- **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`pnpm types:emit` + `git diff`), build, the drift-sync type-check, `pnpm test`, and `pnpm validate` on every PR and push to `main`.
 
 ## Versioning
 
@@ -409,7 +409,7 @@ With Claude Code, `/update` writes the version note, commits, and pushes in one 
 
 ## Tech notes
 
-- **Client**: Vite 8 + React 19 + TypeScript (strict), Framer Motion for panels. It holds no domain data: it fetches `GET /api/cosmos` once at startup (polling it every 2s in dev only) and renders the response. The response types are emitted from the server (`npm run types:emit`).
+- **Client**: Vite 8 + React 19 + TypeScript (strict), Framer Motion for panels. It holds no domain data: it fetches `GET /api/cosmos` once at startup (polling it every 2s in dev only) and renders the response. The response types are emitted from the server (`pnpm types:emit`).
 - Comets glide on the **real rendered SVG paths** (GSAP MotionPath + `getPointAtLength()`), not approximations.
 - The hyperspace intro is a plain `<canvas>` and one perspective formula — no 3D library.
 - OKLCH color tokens, themeable (`cosmos`, `light`, `minimal`, `dark`).
@@ -438,7 +438,7 @@ On top of the original map, this project adds:
   pointer, plus a Playwright recorder.
 - **Presentation mode, an on-map step stepper, quick search, a live activity log**, and a richer
   visual layer (planet morphology, nebula fields, parallax panning, star explosions).
-- **A client/server npm-workspaces layout, Vitest suites in both workspaces, and a local
+- **A client/server pnpm-workspace layout, Vitest suites in both workspaces, and a local
   version ledger** with a version badge in the top bar.
 
 ## Contributing

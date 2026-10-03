@@ -1,4 +1,4 @@
-// Must stay self-contained (no imports, no runtime code): `npm run types:emit` copies it verbatim to client/src/api/cosmos-api.ts.
+// Must stay self-contained (no imports, no runtime code): `pnpm types:emit` copies it verbatim to client/src/api/cosmos-api.ts.
 
 export type Protocol = 'http' | 'ws' | 'kafka' | 'internal';
 
