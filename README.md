@@ -101,13 +101,13 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 | `npm run lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `npm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`npm run test:scripts`) |
 | `npm run test:e2e` | Playwright: boots `npm run dev` and loads the map through `/api/cosmos` in Chromium (first time: `npx playwright install chromium`; `BASE_URL` reuses an app that is already running) |
-| `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
+| `npm run snapshot` | Regenerates the legacy `server/src/generated/cosmos-map.json` from the frozen client copy (removed with that copy) |
 | `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
-| `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
+| `npm run validate` | Data sanity over `server/src/cosmos/data/` (`validateCosmos()`): ids resolve, `phaseId`s unique, spacing, palette, clusters, demo tours; `-- --source-check` also greps your cloned repos |
 | `npm run fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `npm test` fails on a stale copy |
 | `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
 | `npm run cosmos:check -- --phase N` | Runs the migration checks for phase `N` |
-| `npm run fresh` | Replaces AstroMart with a minimal 2-star starter cosmos |
+| `npm run fresh` | Replaces AstroMart in `server/src/cosmos/data/` with a minimal 2-star starter cosmos |
 | `npm run record:demo -- ai\|all` | Records a demo tour to `recordings/demo-<mode>.webm` |
 | `npm run sync`, `sync:*` | Drift Sync entry points — see [`drift-sync/README.md`](drift-sync/README.md) |
 
@@ -238,17 +238,19 @@ The app is built mobile-first and verified on a ~390px-wide phone first, then on
 
 ## Make it your cosmos
 
-The entire universe lives in `client/src/scenarios/` — plain, typed TypeScript:
+The entire universe lives in `server/src/cosmos/data/` — plain, typed TypeScript the server serves at `GET /api/cosmos` (the client holds no domain data):
 
 | Concept | What it is | Where |
 |---|---|---|
 | **Service** | A deployed process → a planet on the map | `services.ts` |
 | **Topic** | A Kafka topic used as an edge → an orbital node | `topics.ts` |
-| **Domain** | A group of related scenarios | `scenarios.ts` |
+| **Domain** | A group of related scenarios | `domains.ts` |
 | **Scenario** | A named, playable end-to-end flow | `scenarios.ts` |
 | **Step** | One hop: from → to, protocol, payload | `steps/*.ts` |
 | **Team** | An owner, for the ownership view and passports | `owners.ts` |
-| **Incident** | A past production incident, frozen in time and replayable | `client/src/incidents/*.ts` |
+| **Cluster** | A backdrop + nebula grouping services | `clusters.ts` |
+| **Demo tours** | What `?demo=all` and `?demo=ai` show | `demo.ts` |
+| **Incident** | A past production incident, frozen in time and replayable | `incidents/*.ts` |
 
 **Start from the template:** click **Use this template** on GitHub (or clone), then:
 
@@ -278,29 +280,29 @@ You can also install the skills into any environment as a plugin, no clone neede
 
 The skills make Claude read your actual source — call sites, producers, consumers, schemas — and write verified entries. No guessing allowed; the skill files are the guardrails.
 
-**By hand** — copy any AstroMart entry, follow the shapes in `types.ts`, and keep three invariants: unique ids, a service's `hex` equals `PALETTE[service.palette]` (`palette.ts`), and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that the committed map snapshot (`server/src/generated/cosmos-map.json`) is fresh — run `npm run snapshot` after any data edit and commit the snapshot with it. All of these run in CI on every PR (the **Validate** badge above), alongside `npm run lint` and `npm test`.
+**By hand** — copy any AstroMart entry, follow the shapes in `server/src/cosmos/apiTypes.ts`, and keep three invariants: unique ids, a service's `hex` equals `PALETTE[service.palette]` (`palette.ts`), and `phaseId`s are global and never reused. `npm run build` type-checks everything, and `npm run validate` is the data sanity gate — it checks that every `from`/`to`/`via`/`through` resolves to a real service or topic, that `phaseId`s are unique, that capsules keep their minimum spacing, and that palettes, clusters, topic groups and the demo tours point at real entries. Run `npm run fixture:cosmos` after any data edit and commit the regenerated client test fixture with it. All of these run in CI on every PR (the **Validate** badge above), alongside `npm run lint` and `npm test`.
 
-Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the numbers back into `services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
+Placing nodes is easiest visually: enter **Edit layout** mode, drag things into place, `Copy coords`, and paste the `x`/`y` lines back into `server/src/cosmos/data/services.ts` / `topics.ts`. Topics normally auto-arrange in a ring around their owning service — if a ring slot collides with a neighbor, set `pinned: true` on the topic and it fans out to your hand-placed coordinates instead.
 
-To start clean, empty the arrays in `services.ts`, `topics.ts`, `scenarios.ts`, and `steps/`, then grow your own sky.
+To start clean, run `npm run fresh`, then grow your own sky.
 
 ## Record a production incident
 
-An incident is just a scenario frozen in time. Recordings live in `client/src/incidents/` (one file per incident); the app discovers, lists, and plays them automatically — no AI, no backend, no database. Recording one takes 10–30 minutes for someone who already has the logs:
+An incident is just a scenario frozen in time. Recordings live in `server/src/cosmos/data/incidents/` (one file per incident); the app discovers, lists, and plays them automatically — no AI, no database. Recording one takes 10–30 minutes for someone who already has the logs:
 
-1. **Open the closest scenario** in `client/src/scenarios/steps/` (or start blank) and note the hops the failing request actually took.
+1. **Open the closest scenario** in `server/src/cosmos/data/steps/` (or start blank) and note the hops the failing request actually took.
 2. **Copy the relevant steps** and replace the example payloads with the real ones from the logs — redact card/customer/token fields (`"[redacted]"`).
 3. **Add the title, date, and a one- or two-sentence note** describing what went wrong.
 4. **Give it a globally-unique `phaseId`** (incidents use `101+` so they never collide with scenarios) and set every step's `phase` to that same id.
-5. **Save the file** under `client/src/incidents/`, import it in `client/src/incidents/data.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it. The AI agent reads the server's copy of the data, so add the same file under `server/src/cosmos/data/incidents/` and register it in `server/src/cosmos/index.ts`.
+5. **Save the file** under `server/src/cosmos/data/incidents/`, import it in `server/src/cosmos/data/incidents/index.ts`, and drop it into the `INCIDENTS` array. `npm run build` type-checks it; the map and the AI agent both read it from the server.
 
 Every step's `from` / `to` / `via` / `through` must match an existing `SERVICES[].id` or `TOPICS[].id` — incidents reuse the same map you already drew.
 
 A complete, copyable example (trimmed):
 
 ```ts
-// client/src/incidents/checkout-timeout-2026-08-01.ts
-import type { Incident } from './types';
+// server/src/cosmos/data/incidents/checkout-timeout-2026-08-01.ts
+import type { Incident } from '../../types.js';
 
 export const CHECKOUT_TIMEOUT_2026_08_01: Incident = {
   incident: true,
@@ -332,15 +334,15 @@ export const CHECKOUT_TIMEOUT_2026_08_01: Incident = {
 Then register it:
 
 ```ts
-// client/src/incidents/data.ts
-import { CHECKOUT_TIMEOUT_2026_08_01 } from './checkout-timeout-2026-08-01';
+// server/src/cosmos/data/incidents/index.ts
+import { CHECKOUT_TIMEOUT_2026_08_01 } from './checkout-timeout-2026-08-01.js';
 export const INCIDENTS: Incident[] = [
   CHECKOUT_TIMEOUT_2026_08_01,
-  // …existing incidents…
-].sort((a, b) => b.date.localeCompare(a.date));
+  // …existing incidents… (the server lists them newest first)
+];
 ```
 
-The three incidents that ship with AstroMart (`client/src/incidents/*.ts`) are working references — copy whichever is closest to your first real recording.
+The three incidents that ship with AstroMart (`server/src/cosmos/data/incidents/*.ts`) are working references — copy whichever is closest to your first real recording.
 
 ## Drift Sync
 
@@ -352,21 +354,22 @@ clone tracked repos → diff vs baseline SHA → regex prefilter (~95% exit free
    → applier edits the map, validates in-loop → one draft PR per team → Slack ping
 ```
 
-Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. The pipeline also refreshes the AI agent's map snapshot. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default; enable it when you're ready.
+Merging the PR bumps the baseline inside the same PR — merge means caught-up, no state cron needed. The applier may only write `server/src/cosmos/data/`; any other path is rejected. Full setup (GitHub PAT, Anthropic API key, optional Slack) in [`drift-sync/README.md`](drift-sync/README.md). It's off by default; enable it when you're ready.
 
 ## Project layout
 
 ```
 client/                 Vite + React app (the map)
-  src/scenarios/        the universe as typed data — most changes belong here
-  src/incidents/        recorded production incidents
+  src/scenarios/        frozen client copy of the old data (read by nothing at runtime; being removed)
+  src/incidents/        frozen client copy of the old incidents (being removed)
   src/map/              SVG map rendering, edges, planets, insight views
   src/components/       UI shell: intro, playback, step panel, Ask box, Connect window
   src/demo/             self-playing demo tours
   src/hooks/            viewport, deep links, map view, AI connection
   src/overlays/         overlay manager (one panel at a time)
   src/styles/           tokens, app, components, responsive.css (loaded last)
-server/                 Hono API for the AI agent (Vercel Function)
+server/                 Hono API: GET /api/cosmos and the AI agent (Vercel Function)
+  src/cosmos/data/      the universe as typed data — most changes belong here
   src/agent/            JEV triage, routing, LangGraph agent, map-action tools
   src/generated/        cosmos-map.json — committed snapshot of the map data
 drift-sync/             the nightly honesty pipeline (its own README)

@@ -246,6 +246,27 @@ function checkGroupings(data: CosmosData, nodes: NodeIndex): CosmosValidationIss
   return issues;
 }
 
+function checkDemo(data: CosmosData, nodes: NodeIndex): CosmosValidationIssue[] {
+  const { allTour, aiTour } = data.demo;
+  const domainIds = new Set(data.domains.map((domain) => domain.id));
+  const topLevelServiceIds = new Set(data.services.map((service) => service.id));
+  const driftEntryIds = new Set(data.drift.entries.map((entry) => entry.id));
+  const references: { field: string; id: string; exists: boolean }[] = [
+    { field: 'allTour.scenarioId', id: allTour.scenarioId, exists: data.scenarios.some((scenario) => scenario.id === allTour.scenarioId) },
+    ...(allTour.incidentId === null
+      ? []
+      : [{ field: 'allTour.incidentId', id: allTour.incidentId, exists: data.incidents.some((incident) => incident.id === allTour.incidentId) }]),
+    { field: 'allTour.browseDomainId', id: allTour.browseDomainId, exists: domainIds.has(allTour.browseDomainId) },
+    { field: 'aiTour.domainId', id: aiTour.domainId, exists: domainIds.has(aiTour.domainId) },
+    { field: 'aiTour.passportNodeId', id: aiTour.passportNodeId, exists: topLevelServiceIds.has(aiTour.passportNodeId) || nodes.topicIds.has(aiTour.passportNodeId) },
+    ...aiTour.highlightServiceIds.map((id) => ({ field: 'aiTour.highlightServiceIds', id, exists: topLevelServiceIds.has(id) })),
+    ...aiTour.citedDriftEntryIds.map((id) => ({ field: 'aiTour.citedDriftEntryIds', id, exists: driftEntryIds.has(id) })),
+  ];
+  return references
+    .filter((reference) => !reference.exists)
+    .map(({ field, id }) => error('unknown-demo-reference', `demo ${field} names unknown id "${id}"`, { field, id }));
+}
+
 /** Returns every invariant violation; an empty `errors` list means the data is safe to serve. */
 export function validateCosmos(data: CosmosData): { errors: CosmosValidationIssue[]; warnings: CosmosValidationIssue[] } {
   const nodes: NodeIndex = {
@@ -259,6 +280,7 @@ export function validateCosmos(data: CosmosData): { errors: CosmosValidationIssu
     ...checkReferences(data, nodes),
     ...checkPalette(data),
     ...checkGroupings(data, nodes),
+    ...checkDemo(data, nodes),
   ];
   return {
     errors: issues.filter((issue) => issue.severity === 'error'),

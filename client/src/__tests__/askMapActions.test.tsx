@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { startCosmosFetch } from '../api/cosmosClient';
 import type { AskAction } from '../components/AskPanel';
 import { INTRO_SEEN_STORAGE_KEY } from '../demo/demoMode';
@@ -74,6 +74,8 @@ async function askWithAgentAction(action: AskAction) {
   fireEvent.change(askInput, { target: { value: 'Show me' } });
   fireEvent.keyDown(askInput, { key: 'Enter' });
   await waitFor(() => expect(screen.getByText('Here it is on the map.')).toBeTruthy());
+  // The stream lands outside act(), so the answer can be on screen before the action's effects have run.
+  await act(async () => {});
 }
 
 describe('Ask map actions', () => {

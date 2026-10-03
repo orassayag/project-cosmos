@@ -1,13 +1,11 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Project Cosmos drift validator — Phase 0 deterministic checks.
+ * Project Cosmos drift validator.
  *
  * Internal checks (no source-repo access):
- *  - Every step.from / step.to / step.through resolves to a known service or topic id
- *  - Every step.via (kafka) resolves to a known topic id
- *  - Every step.phase matches a Scenario.phaseId
- *  - Every service has a resolvable owner
- *  - server/src/generated/cosmos-map.json matches a fresh in-memory snapshot
+ *  - validateCosmos() over the server data (server/src/cosmos/data/): ids resolve, phaseIds
+ *    unique, spacing, palette, clusters, topic groups, demo references, owners
+ *  - the legacy map snapshot matches a fresh in-memory one (until Phase 11 deletes it)
  *
  * External checks (greps source repos):
  *  - Every service.repo exists locally
@@ -24,12 +22,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
-import { SERVICES, SERVICES_BY_ID } from '../../client/src/scenarios/services.js';
-import { TOPICS, TOPICS_BY_ID } from '../../client/src/scenarios/topics.js';
-import { SCENARIOS } from '../../client/src/scenarios/scenarios.js';
-import { STEPS } from '../../client/src/scenarios/data.js';
-import { resolveOwner } from '../../client/src/scenarios/owners.js';
-import type { Service, Step, SubService, Topic } from '../../client/src/scenarios/types.js';
+import { getCosmosData } from '../../server/src/cosmos/index.js';
+import type { Service, SubService, Topic } from '../../server/src/cosmos/types.js';
+import { validateCosmos } from '../../server/src/cosmos/validate.js';
 import { COSMOS_MAP_PATH, serializeCosmosMap } from '../../server/scripts/snapshot-map.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
@@ -112,13 +107,9 @@ const add = (f: Finding) => {
 // ──────────────────────────────────────────────────────────────────
 //  Helpers
 // ──────────────────────────────────────────────────────────────────
-const allServiceIds = new Set<string>(SERVICES.map(s => s.id));
+const cosmosData = getCosmosData();
+const { services: SERVICES, topics: TOPICS, steps: STEPS, scenarios: SCENARIOS } = cosmosData;
 const allSubServices: SubService[] = SERVICES.flatMap(s => s.subServices ?? []);
-allSubServices.forEach(ss => allServiceIds.add(ss.id));
-const allTopicIds = new Set<string>(TOPICS.map(t => t.id));
-const allScenarioPhaseIds = new Set<number>(
-  SCENARIOS.map(s => s.phaseId).filter((p): p is number => p != null),
-);
 
 function serviceRepoPath(repo: string): string {
   return path.join(reposRoot, repo);
@@ -207,7 +198,7 @@ function reposContaining(needle: string): Set<string> {
  * it includes echo + its subServices' repos.
  */
 function reposForService(serviceId: string): string[] {
-  const svc = SERVICES_BY_ID[serviceId] as Service | undefined;
+  const svc: Service | undefined = SERVICES.find(s => s.id === serviceId);
   if (!svc) {
     const sub = allSubServices.find(s => s.id === serviceId);
     return sub?.repo ? [sub.repo] : [];
@@ -223,81 +214,10 @@ function reposForService(serviceId: string): string[] {
 // ──────────────────────────────────────────────────────────────────
 //  Internal checks
 // ──────────────────────────────────────────────────────────────────
-function checkStepReferences(): void {
-  for (let i = 0; i < STEPS.length; i++) {
-    const step: Step = STEPS[i];
-    const ctx = { stepIndex: i, phase: step.phase, label: step.label };
-
-    if (!allScenarioPhaseIds.has(step.phase)) {
-      add({
-        severity: 'error',
-        code: 'unknown-phase',
-        message: `step.phase ${step.phase} has no matching Scenario.phaseId`,
-        context: ctx,
-      });
-    }
-
-    const fromKnown = allServiceIds.has(step.from) || allTopicIds.has(step.from);
-    if (!fromKnown) {
-      add({
-        severity: 'error',
-        code: 'unknown-step-from',
-        message: `step.from "${step.from}" is not a known service or topic`,
-        context: ctx,
-      });
-    }
-
-    const toKnown = allServiceIds.has(step.to) || allTopicIds.has(step.to);
-    if (!toKnown) {
-      add({
-        severity: 'error',
-        code: 'unknown-step-to',
-        message: `step.to "${step.to}" is not a known service or topic`,
-        context: ctx,
-      });
-    }
-
-    if (step.through && !allServiceIds.has(step.through)) {
-      add({
-        severity: 'error',
-        code: 'unknown-step-through',
-        message: `step.through "${step.through}" is not a known service`,
-        context: ctx,
-      });
-    }
-
-    if (step.type === 'kafka') {
-      if (!step.via) {
-        add({
-          severity: 'error',
-          code: 'kafka-step-missing-via',
-          message: `Kafka step has no "via" topic id`,
-          context: ctx,
-        });
-      } else if (!allTopicIds.has(step.via)) {
-        add({
-          severity: 'error',
-          code: 'unknown-step-via',
-          message: `step.via "${step.via}" is not a known topic id`,
-          context: ctx,
-        });
-      }
-    }
-  }
-}
-
-function checkServiceOwners(): void {
-  for (const svc of SERVICES) {
-    const owner = resolveOwner(svc);
-    if (owner.source === 'fallback' && svc.repo) {
-      // Has a repo but no team → drift-sync PRs would fall through.
-      add({
-        severity: 'warn',
-        code: 'service-no-owner',
-        message: `Service "${svc.id}" (repo: ${svc.repo}) has no team — drift PRs will hit the fallback owner`,
-        context: { service: svc.id, team: svc.team ?? null },
-      });
-    }
+function checkCosmosInvariants(): void {
+  const { errors, warnings } = validateCosmos(cosmosData);
+  for (const issue of [...errors, ...warnings]) {
+    add({ severity: issue.severity, code: issue.code, message: issue.message, context: issue.context });
   }
 }
 
@@ -307,7 +227,7 @@ function checkSnapshotFreshness(): void {
   add({
     severity: 'error',
     code: 'stale-snapshot',
-    message: 'cosmos-map.json is stale — run npm run snapshot',
+    message: 'the legacy map snapshot is stale — run npm run snapshot',
     context: { path: path.relative(process.cwd(), COSMOS_MAP_PATH), missing: committedSnapshot === null },
   });
 }
@@ -365,7 +285,7 @@ function checkKafkaStepProducerConsumer(): void {
   for (let i = 0; i < STEPS.length; i++) {
     const step = STEPS[i];
     if (step.type !== 'kafka' || !step.via) continue;
-    const topic: Topic | undefined = TOPICS_BY_ID[step.via];
+    const topic: Topic | undefined = TOPICS.find(t => t.id === step.via);
     if (!topic) continue; // already flagged by internal check
     const needle = topic.name;
     const reposWithTopic = reposContaining(needle);
@@ -418,8 +338,7 @@ function checkKafkaStepProducerConsumer(): void {
 // ──────────────────────────────────────────────────────────────────
 function run(): void {
   // Internal checks — always run, fast, no source-repo dependency.
-  checkStepReferences();
-  checkServiceOwners();
+  checkCosmosInvariants();
   checkSnapshotFreshness();
   // Cross-repo checks — require the tracked source repos cloned at reposRoot.
   // Skipped by default; opt in with --source-check for the deeper sweep.

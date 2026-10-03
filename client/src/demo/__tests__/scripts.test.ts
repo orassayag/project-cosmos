@@ -4,18 +4,23 @@ import { shotTimelineMs } from '../../map/CometPackets';
 import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { typingDurationMs } from '../humanMotion';
 import { POINTER_MOVE_MS } from '../runDemo';
-import { DEMO_QUESTION, DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
+import { buildDemoScriptedAnswer } from '../scriptedAnswer';
 import {
-  ALL_DEMO_SCENARIO_ID,
-  buildDemoScript,
+  buildDemoScript as buildDemoScriptFor,
   DEMO_TIME_LIMITS_MS,
-  playbackDurationMs,
+  playbackDurationMs as playbackDurationMsFor,
   scriptDurationMs,
   scriptedAnswerDurationMs,
 } from '../scripts';
 import { DEMO_TARGETS, type DemoModeName, type DemoScript, type DemoTarget } from '../types';
+import type { DemoLayout } from '../scripts';
 
 const { playableById: PLAYABLE_BY_ID } = indexCosmos(COSMOS_FIXTURE);
+const { allTour, aiTour } = COSMOS_FIXTURE.data.demo;
+const ALL_DEMO_SCENARIO_ID = allTour.scenarioId;
+const DOMAIN_IDS = COSMOS_FIXTURE.data.domains.map((domain) => domain.id);
+const buildDemoScript = (mode: DemoModeName, layout: DemoLayout) => buildDemoScriptFor(COSMOS_FIXTURE, mode, layout);
+const playbackDurationMs = (playableId: string) => playbackDurationMsFor(COSMOS_FIXTURE, playableId);
 const INCIDENTS = COSMOS_FIXTURE.data.incidents;
 const MODES: DemoModeName[] = ['ai', 'all'];
 const LAYOUTS = [{ isPhone: false }, { isPhone: true }];
@@ -27,6 +32,8 @@ function targetsOf(script: DemoScript): DemoTarget[] {
 
 function isKnownTarget(target: DemoTarget): boolean {
   if ((DEMO_TARGETS as readonly string[]).includes(target)) return true;
+  const domainId = target.match(/^domain-(.+)$/)?.[1];
+  if (domainId) return DOMAIN_IDS.includes(domainId);
   const scenarioId = target.match(/^scenario-(.+)$/)?.[1];
   if (scenarioId) return PLAYABLE_BY_ID[scenarioId] !== undefined;
   const incidentId = target.match(/^incident-(.+)$/)?.[1];
@@ -51,7 +58,7 @@ describe('demo scripts', () => {
     }
   });
 
-  it.each(VARIANTS)('connects with fake keys, types the question and searches in the %s demo (%s)', (_mode, _layout, script) => {
+  it.each(VARIANTS)('connects with fake keys, types the question and searches in the %s demo (%s)', (_mode, layout, script) => {
     const connectAt = targetsOf(script).indexOf('connect-submit');
     const typeStep = script.find((step) => step.kind === 'type');
     const searchIndex = script.findIndex((step) => step.kind === 'click' && step.target === 'ask-search');
@@ -60,9 +67,10 @@ describe('demo scripts', () => {
     for (const step of script) {
       if (step.kind === 'paste') expect(step.text).toContain('demo');
     }
-    expect(typeStep).toMatchObject({ target: 'ask-input', text: DEMO_QUESTION });
+    expect(typeStep).toMatchObject({ target: 'ask-input', text: aiTour.question });
     expect(script[searchIndex + 1]).toMatchObject({ kind: 'wait' });
-    expect(script[searchIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(DEMO_SCRIPTED_ANSWER));
+    const answer = buildDemoScriptedAnswer(aiTour, { isPhone: layout === 'phone' });
+    expect(script[searchIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(answer));
   });
 
   it.each(MODES)('opens the phone drawer before the %s demo reaches for a domain', (mode) => {
@@ -89,6 +97,7 @@ describe('demo=all script', () => {
 
   it('picks the scenario and the newest incident from their menus, then presses Play for their full length', () => {
     const incidentId = INCIDENTS[0].id;
+    expect(allTour.incidentId).toBe(incidentId);
     for (const [pickTarget, playableId] of [[`scenario-${ALL_DEMO_SCENARIO_ID}`, ALL_DEMO_SCENARIO_ID], [`incident-${incidentId}`, incidentId]]) {
       const pickIndex = targets.indexOf(pickTarget as DemoTarget);
       expect(pickIndex, pickTarget).toBeGreaterThan(-1);
@@ -102,6 +111,23 @@ describe('demo=all script', () => {
   it('steps back twice and forward twice', () => {
     expect(targets.filter((target) => target === 'playback-step-back')).toHaveLength(2);
     expect(targets.filter((target) => target === 'playback-step-forward')).toHaveLength(2);
+  });
+
+  it('browses the scenario\'s domain, the tour\'s other domain, then the scenario\'s domain again', () => {
+    const scenarioDomain = `domain-${PLAYABLE_BY_ID[ALL_DEMO_SCENARIO_ID].domain}`;
+    expect(targets.filter((target) => target.startsWith('domain-'))).toEqual([
+      scenarioDomain,
+      `domain-${allTour.browseDomainId}`,
+      scenarioDomain,
+    ]);
+  });
+
+  it('skips the incident replay when the tour names no incident', () => {
+    const withoutIncident = { ...COSMOS_FIXTURE, data: { ...COSMOS_FIXTURE.data, demo: { ...COSMOS_FIXTURE.data.demo, allTour: { ...allTour, incidentId: null } } } };
+    const phoneTargets = targetsOf(buildDemoScriptFor(withoutIncident, 'all', { isPhone: true }));
+
+    expect(phoneTargets.filter((target) => target === 'incidents-open' || target.startsWith('incident-'))).toEqual([]);
+    expect(phoneTargets.filter((target) => target === 'menu-open')).toHaveLength(1);
   });
 
   it('turns the ownership legend on and back off', () => {

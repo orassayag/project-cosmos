@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { APPLIER_WRITABLE_PATHS, resolveWritePath } from './write-boundary.js';
 
 // ──────────────────────────────────────────────────────────────────
 //  Env loader
@@ -74,33 +75,16 @@ function toolList(reposRoot: string, args: { path: string }): string {
 }
 
 /**
- * Sandboxed write_file — only allowed under a specific writable root.
- * Used by the applier agent which must write to the Project Cosmos repo but not
- * any source repo.
+ * Sandboxed write_file — only allowed inside the applier's writable surface
+ * (`APPLIER_WRITABLE_PATHS` under the write root), never a source repo.
  */
 function toolWrite(writeRoot: string, args: { path: string; content: string }): string {
-  // Documented footgun: the model sometimes prefixes the Project Cosmos repo name
-  // (e.g. "<repo-name>/client/src/scenarios/…"). Left as-is that resolves to a bogus
-  // nested dir INSIDE writeRoot — it passes the root check below, so the write
-  // "succeeds" but the REAL file is never touched. The resulting empty diff
-  // makes the applier thrash to its iteration cap. Strip a leading
-  // "<writeRoot-basename>/" so the edit lands on the real file.
-  const rootName = path.basename(path.resolve(writeRoot));
-  let reqPath = args.path;
-  if (!path.isAbsolute(reqPath) && reqPath.startsWith(rootName + '/')) {
-    reqPath = reqPath.slice(rootName.length + 1);
-  }
-  // Resolve relative to writeRoot (NOT to reposRoot).
-  const abs = path.isAbsolute(reqPath) ? reqPath : path.join(writeRoot, reqPath);
-  const resolved = path.resolve(abs);
-  const root = path.resolve(writeRoot);
-  if (!(resolved.startsWith(root + path.sep) || resolved === root)) {
-    return `ERROR: write path outside write root: ${resolved}`;
-  }
+  const target = resolveWritePath(writeRoot, args.path, APPLIER_WRITABLE_PATHS);
+  if (!target.ok) return `ERROR: ${target.reason}`;
   try {
-    mkdirSync(path.dirname(resolved), { recursive: true });
-    writeFileSync(resolved, args.content);
-    return `OK: wrote ${args.content.length} bytes to ${resolved}`;
+    mkdirSync(path.dirname(target.absolutePath), { recursive: true });
+    writeFileSync(target.absolutePath, args.content);
+    return `OK: wrote ${args.content.length} bytes to ${target.absolutePath}`;
   } catch (err) {
     return `ERROR: ${String(err)}`;
   }
@@ -217,7 +201,7 @@ export const APPLIER_TOOL_DEFS: Anthropic.Messages.Tool[] = [
   ...TOOL_DEFS,
   {
     name: 'write_file',
-    description: 'Overwrite a file in the Project Cosmos repo. Use after read_file to apply edits. Path is relative to the Project Cosmos repo root, e.g. "client/src/scenarios/topics.ts".',
+    description: 'Overwrite a file in the Project Cosmos repo. Use after read_file to apply edits. Path is relative to the Project Cosmos repo root and must be under server/src/cosmos/data/, e.g. "server/src/cosmos/data/topics.ts".',
     input_schema: {
       type: 'object',
       properties: {

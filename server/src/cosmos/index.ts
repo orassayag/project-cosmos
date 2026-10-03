@@ -1,18 +1,15 @@
 import { BRAND } from './data/brand.js';
 import { CLUSTERS } from './data/clusters.js';
+import { DEMO } from './data/demo.js';
 import { DOMAINS } from './data/domains.js';
-import { DRIFT_ENTRIES, DRIFT_RUN_TIME_UTC } from './data/drift.js';
-import { HEALTH_AS_OF, ON_CALL_BY_TEAM, SERVICE_HEALTH } from './data/health.js';
-import { HUB_SILENCE_2026_07_19 } from './data/incidents/hub-silence-2026-07-19.js';
-import { INVENTORY_OVERSELL_2026_05_04 } from './data/incidents/inventory-oversell-2026-05-04.js';
-import { PAYMENT_CASCADE_2026_03_12 } from './data/incidents/payment-cascade-2026-03-12.js';
+import { DRIFT_ENTRIES, DRIFT_RUN_TIME_UTC, DRIFT_SOURCE } from './data/drift.js';
+import { HEALTH_AS_OF, HEALTH_SOURCE, ON_CALL_BY_TEAM, SERVICE_HEALTH } from './data/health.js';
+import { INCIDENTS } from './data/incidents/index.js';
 import { FALLBACK_OWNER, SERVICE_OVERRIDES, TEAM_OWNERS } from './data/owners.js';
 import { PALETTE } from './data/palette.js';
 import { SCENARIOS } from './data/scenarios.js';
 import { SERVICES } from './data/services.js';
-import { ENGAGEMENT_STEPS } from './data/steps/engagement.js';
-import { FULFILLMENT_STEPS } from './data/steps/fulfillment.js';
-import { SHOPPING_STEPS } from './data/steps/shopping.js';
+import { STEPS } from './data/steps/index.js';
 import { TOPICS } from './data/topics.js';
 import type { CosmosData } from './types.js';
 
@@ -35,14 +32,13 @@ function buildCosmosData(): CosmosData {
     services: SERVICES,
     topics: TOPICS,
     scenarios: SCENARIOS,
-    steps: [...SHOPPING_STEPS, ...FULFILLMENT_STEPS, ...ENGAGEMENT_STEPS],
+    steps: STEPS,
     // Newest first — the order the UI lists incidents.
-    incidents: [PAYMENT_CASCADE_2026_03_12, INVENTORY_OVERSELL_2026_05_04, HUB_SILENCE_2026_07_19].sort((first, second) =>
-      second.date.localeCompare(first.date),
-    ),
+    incidents: [...INCIDENTS].sort((first, second) => second.date.localeCompare(first.date)),
     owners: { teams: TEAM_OWNERS, fallback: FALLBACK_OWNER, serviceOverrides: SERVICE_OVERRIDES },
-    drift: { runTimeUtc: DRIFT_RUN_TIME_UTC, entries: DRIFT_ENTRIES },
-    health: { asOf: HEALTH_AS_OF, services: SERVICE_HEALTH, onCallByTeam: ON_CALL_BY_TEAM },
+    drift: { runTimeUtc: DRIFT_RUN_TIME_UTC, entries: DRIFT_ENTRIES, source: DRIFT_SOURCE },
+    health: { asOf: HEALTH_AS_OF, services: SERVICE_HEALTH, onCallByTeam: ON_CALL_BY_TEAM, source: HEALTH_SOURCE },
+    demo: DEMO,
   };
 }
 

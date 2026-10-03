@@ -10,8 +10,9 @@ npm run test:e2e   # Playwright: boots npm run dev, loads the map via /api/cosmo
 npm run build      # every workspace (client: tsc -b && vite build) — the gate for every change
 npm run typecheck  # every workspace, no emit
 npm run lint       # eslint over client/, server/, drift-sync/, scripts/
-npm run snapshot   # regenerate server/src/generated/cosmos-map.json from the map data
-npm run validate   # data sanity: ids resolve, phaseIds unique, spacing ok, snapshot fresh
+npm run snapshot   # regenerate the legacy server/src/generated/cosmos-map.json (frozen client copy; removed with it)
+npm run validate   # validateCosmos() over server/src/cosmos/data: ids resolve, phaseIds unique, spacing, palette, demo refs
+npm run fixture:cosmos # regenerate the client test fixture after any data edit
 ```
 
 Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
@@ -20,11 +21,12 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 
 ## Layout
 
-- `client/src/scenarios/` — the entire universe as typed data: `services.ts`, `topics.ts`, `scenarios.ts` (domains + scenarios), `owners.ts` (teams), `steps/<domain>.ts`, barrel in `data.ts`. **Most changes belong here.**
-- `client/src/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/data.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
+- `server/src/cosmos/data/` — the entire universe as typed data, served at `GET /api/cosmos`: `services.ts`, `topics.ts`, `domains.ts`, `scenarios.ts`, `clusters.ts`, `palette.ts`, `owners.ts` (teams), `drift.ts`, `health.ts`, `demo.ts` (tour data), `steps/<domain>.ts` (barrel `steps/index.ts`). **Most changes belong here.** The client holds no domain data.
+- `server/src/cosmos/data/incidents/` — recorded production incidents (frozen scenarios with inline steps). One file per incident, registered in `incidents/index.ts`; discovered, listed, and played automatically. `phaseId` `101+` so they never collide with scenarios.
+- `client/src/scenarios/`, `client/src/incidents/` — frozen old client copy of the data, read by nothing at runtime; never edit (deleted in Phase 11).
 - `client/src/map/` — SVG map rendering: `Map.tsx` (orchestration, layout edit mode), `edge-resolver.ts` (how a step becomes edges; special-cases the expandable `realtime-hub`), `edge-builder.ts` (bezier geometry).
 - `client/src/components/` — UI shell: intro, playback controls, step panel, tech icons.
-- `server/` — Node service workspace. `server/src/generated/cosmos-map.json` is a committed snapshot of the map data (written by `npm run snapshot`, checked by `npm run validate`); commit it with every data edit.
+- `server/` — Node service workspace: the cosmos data, derivations, `GET /api/cosmos` and the AI agent. After a data edit run `npm run fixture:cosmos` and commit the client test fixture with it.
 - `drift-sync/` — the nightly honesty pipeline (its own README).
 - `.claude/skills/` — `add-service`, `add-scenario` (plus `update`): THE documented procedures for growing the map. Follow them rather than improvising.
 
@@ -56,7 +58,7 @@ commit `vX.Y.Z`. That tag is what **`/revert <x.y.z>`** restores the whole repo 
 
 - `phaseId` global, unique, never reused; every step's `phase` equals its scenario's `phaseId`.
 - Step `from`/`to`/`via`/`through` must exactly match `SERVICES[].id` / `TOPICS[].id`.
-- Service `hex` must equal `PALETTE[service.palette]` (`client/src/scenarios/palette.ts`, server twin in `server/src/cosmos/data/`); every palette key needs a `--svc-<key>` token in `client/src/styles/tokens.css`. Topics always `TOPIC_COLOR`/`TOPIC_HEX`.
+- Service `hex` must equal `PALETTE[service.palette]` (`server/src/cosmos/data/palette.ts`); every palette key needs a `--svc-<key>` token in `client/src/styles/tokens.css`. Topics always `TOPIC_COLOR`/`TOPIC_HEX`.
 - World is 2400×1400; capsules ≥150px apart center-to-center.
 - Demo data is fictional (AstroMart). Keep it that way — no real company names/endpoints.
 

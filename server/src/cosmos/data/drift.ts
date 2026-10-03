@@ -1,4 +1,7 @@
-import type { DriftEntry } from '../types.js';
+import type { DataSource, DriftEntry } from '../types.js';
+
+/** Hand-written AstroMart demo history. Drift Sync does not write entries here yet. */
+export const DRIFT_SOURCE: DataSource = 'fixture';
 
 /** The nightly Drift Sync cron fires at 04:17 UTC — every run is stamped with it. */
 export const DRIFT_RUN_TIME_UTC = '04:17';

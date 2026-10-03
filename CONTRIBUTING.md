@@ -2,7 +2,7 @@
 
 Thanks for wanting to make the galaxy bigger. Two rules of the universe before you start:
 
-1. **The map is data.** Almost everything lives in `client/src/scenarios/` — services, topics, scenarios, steps. If your change is "the demo should show X", it's probably a data change, not a code change.
+1. **The map is data.** Almost everything lives in `server/src/cosmos/data/` — services, topics, scenarios, steps; the client renders it from `GET /api/cosmos`. If your change is "the demo should show X", it's probably a data change, not a code change.
 2. **Never run `tsc` without `--noEmit`** (or `-b`). Stray `.js` files shadow `.tsx` in Vite (`client/`) and the app silently serves stale code.
 
 ## Dev setup
@@ -12,8 +12,8 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build (all workspaces) — must pass before a PR
 npm run typecheck  # typecheck only (all workspaces)
-npm run snapshot   # regenerate server/src/generated/cosmos-map.json after any data edit
-npm run validate   # data sanity checks (ids resolve, phaseIds unique, snapshot fresh, …)
+npm run validate   # data sanity checks (ids resolve, phaseIds unique, spacing, palette, …)
+npm run fixture:cosmos  # regenerate the client test fixture after any data edit
 npm run lint       # eslint — must pass before a PR
 ```
 
@@ -21,7 +21,7 @@ npm run lint       # eslint — must pass before a PR
 
 - `phaseId` is **global and never reused** — steps are filtered by phase; a collision plays the wrong steps.
 - Every step's `from`/`to`/`via`/`through` must exactly match a `SERVICES[].id` or `TOPICS[].id` — typos silently drop edges.
-- A service's `hex` must visually match its `color` CSS token (SVG gradients can't read CSS vars).
+- A service's `hex` must equal `PALETTE[service.palette]` (SVG gradients can't read CSS vars).
 - Keep ≥150px center-to-center spacing between capsules.
 
 If you use [Claude Code](https://claude.com/claude-code), the repo ships with two skills that enforce all of this: `/add-service` and `/add-scenario`.

@@ -1,4 +1,7 @@
-import type { OnCall, ServiceHealthInput, TeamId } from '../types.js';
+import type { DataSource, OnCall, ServiceHealthInput, TeamId } from '../types.js';
+
+/** Hand-written AstroMart demo metrics; no external health source feeds this yet. */
+export const HEALTH_SOURCE: DataSource = 'fixture';
 
 /** The date the snapshot below was captured — the anchor commit-age is measured from. */
 export const HEALTH_AS_OF = '2026-08-14';

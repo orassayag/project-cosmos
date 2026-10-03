@@ -75,7 +75,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pathspecs: ['server/src'],
   },
   {
-    // The plan's Phase 2 grep. Data files, tests and client/src/demo/ (until Phase 9) may still name services.
+    // The plan's Phase 2 grep. Only the old data files and tests may still name services.
     name: 'client rendering code names no AstroMart service, topic or domain',
     phase: 2,
     type: 'grep-absent',
@@ -85,7 +85,6 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
       ':(glob)client/src/**/*.tsx',
       ':(exclude)client/src/scenarios',
       ':(exclude)client/src/incidents',
-      ':(exclude)client/src/demo',
       ':(exclude,glob)client/src/**/__tests__/**',
     ],
   },
@@ -249,7 +248,7 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     ],
   },
   {
-    // The plan's Phase 8 grep: only the old data files may still name them. client/src/demo/ moves in Phase 9.
+    // The plan's Phase 8 grep: only the old data files may still name them.
     name: 'client code outside the old data files never imports scenarios/ or incidents/',
     phase: 8,
     type: 'grep-absent',
@@ -259,7 +258,6 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
       ':(glob)client/src/**/*.tsx',
       ':(exclude)client/src/scenarios',
       ':(exclude)client/src/incidents',
-      ':(exclude)client/src/demo',
       ':(exclude,glob)client/src/**/__tests__/**',
     ],
   },
@@ -275,6 +273,59 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
       ':(exclude)client/src/incidents',
       ':(exclude,glob)client/src/**/__tests__/**',
     ],
+  },
+  {
+    name: 'demo tour data and its staleness test exist',
+    phase: 9,
+    type: 'files-exist',
+    paths: ['server/src/cosmos/data/demo.ts', 'server/src/__tests__/demoData.test.ts'],
+  },
+  {
+    name: 'drift and health carry their data source',
+    phase: 9,
+    type: 'grep-present',
+    pattern: 'source: DataSource',
+    pathspecs: ['server/src/cosmos/apiTypes.ts'],
+  },
+  {
+    name: 'the demo tours read data.demo',
+    phase: 9,
+    type: 'grep-present',
+    pattern: 'data\\.demo',
+    pathspecs: ['client/src/demo/scripts.ts'],
+  },
+  {
+    // The plan's Phase 10 grep, scoped to writers and readers. The old data copies, the legacy snapshot
+    // script and the parity tests that still read them go in Phase 11; prose docs are finished in Phase 12.
+    name: 'tools, skills and workflows read and write server/src/cosmos/data, not the old copies',
+    phase: 10,
+    type: 'grep-absent',
+    pattern: 'client/src/scenarios|client/src/incidents|scenarios/data|scenarios/services|cosmos-map',
+    pathspecs: [
+      'drift-sync',
+      'scripts',
+      'server/scripts',
+      'e2e',
+      '.claude/skills',
+      'skills',
+      '.github',
+      ':(exclude)scripts/cosmos-check.ts',
+      ':(exclude)server/scripts/snapshot-map.ts',
+      ':(exclude)drift-sync/scripts/__tests__/applyEditsPaths.test.ts',
+    ],
+  },
+  {
+    name: 'the applier write boundary and its test exist',
+    phase: 10,
+    type: 'files-exist',
+    paths: ['drift-sync/scripts/lib/write-boundary.ts', 'drift-sync/scripts/__tests__/applyEditsPaths.test.ts'],
+  },
+  {
+    name: 'npm run validate runs validateCosmos()',
+    phase: 10,
+    type: 'grep-present',
+    pattern: 'validateCosmos\\(cosmosData\\)',
+    pathspecs: ['drift-sync/scripts/validate.ts'],
   },
 ];
 

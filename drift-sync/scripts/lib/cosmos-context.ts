@@ -4,11 +4,9 @@
  * prompt so Claude knows what to compare the source diff against.
  */
 
-import { SERVICES } from '../../../client/src/scenarios/services.js';
-import { TOPICS_BY_ID } from '../../../client/src/scenarios/topics.js';
-import { STEPS } from '../../../client/src/scenarios/data.js';
-import { resolveOwner } from '../../../client/src/scenarios/owners.js';
-import type { Service, Step, SubService, Topic } from '../../../client/src/scenarios/types.js';
+import { resolveOwner } from '../../../server/src/cosmos/derive/ownership.js';
+import { getCosmosData } from '../../../server/src/cosmos/index.js';
+import type { Service, Step, SubService, Topic } from '../../../server/src/cosmos/types.js';
 
 export interface ProjectCosmosRepoSlice {
   /** Services whose repo (or subService repo) equals the target. */
@@ -24,9 +22,10 @@ export interface ProjectCosmosRepoSlice {
 }
 
 export function buildRepoSlice(repo: string): ProjectCosmosRepoSlice {
+  const data = getCosmosData();
   // Services whose repo == this repo (top-level OR sub-service).
   const services: ProjectCosmosRepoSlice['services'] = [];
-  for (const svc of SERVICES) {
+  for (const svc of data.services) {
     if (svc.repo === repo) {
       services.push({ id: svc.id, service: svc, subServices: [] });
       continue;
@@ -44,7 +43,7 @@ export function buildRepoSlice(repo: string): ProjectCosmosRepoSlice {
   }
 
   // Steps where any service is from/to/through.
-  const steps: Step[] = STEPS.filter(step =>
+  const steps: Step[] = data.steps.filter(step =>
     serviceIds.has(step.from) ||
     serviceIds.has(step.to) ||
     (step.through ? serviceIds.has(step.through) : false),
@@ -56,7 +55,7 @@ export function buildRepoSlice(repo: string): ProjectCosmosRepoSlice {
     if (step.via) topicIds.add(step.via);
   }
   const topics: Topic[] = [...topicIds]
-    .map(id => TOPICS_BY_ID[id] as Topic | undefined)
+    .map(id => data.topics.find(topic => topic.id === id))
     .filter((t): t is Topic => Boolean(t));
 
   // Producer/consumer role per topic for this repo's services.
@@ -85,7 +84,7 @@ export function buildRepoSlice(repo: string): ProjectCosmosRepoSlice {
   // Teams + owner resolution.
   const teamMap = new Map<string, ProjectCosmosRepoSlice['teams'][number]>();
   for (const s of services) {
-    const owner = resolveOwner(s.service);
+    const owner = resolveOwner(data.owners, s.service);
     const team = s.service.team ?? '(unknown)';
     if (!teamMap.has(team)) {
       teamMap.set(team, {

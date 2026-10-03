@@ -30,7 +30,7 @@
     "fixture:cosmos": "tsx scripts/dump-cosmos-response.ts",
     "parity:screens": "node scripts/parity-screens.mjs",
     "cosmos:check": "tsx scripts/cosmos-check.ts",
-    "test:scripts": "tsx --test scripts/__tests__/*.test.ts",
+    "test:scripts": "tsx --test scripts/__tests__/*.test.ts drift-sync/scripts/__tests__/*.test.ts",
     "test:e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "devDependencies": {

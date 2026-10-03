@@ -107,6 +107,16 @@ describe('agent eval (mocked LLM)', () => {
     expect(entries[1].title).toContain('giftWrap');
   });
 
+  it('answers the demo=ai question with the same drift entries the scripted answer cites', async () => {
+    const { aiTour } = view.data.demo;
+    const { resultOf } = await ask(aiTour.question, [
+      { name: DRIFT_TOOL_NAME, args: { query: aiTour.domainId, since: dayBefore(view.derived.asOf) } },
+    ]);
+
+    const entries = resultOf(DRIFT_TOOL_NAME) as { id: string }[];
+    expect(entries.map((entry) => entry.id)).toEqual(aiTour.citedDriftEntryIds);
+  });
+
   it('"What breaks if payments goes down?" → exactly blastRadius["payments"], shown on the map', async () => {
     const { events, resultOf } = await ask('What breaks if payments goes down?', [
       { name: BLAST_RADIUS_TOOL_NAME, args: { nodeId: 'payments' } },

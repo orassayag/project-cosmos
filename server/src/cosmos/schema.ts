@@ -5,6 +5,7 @@ import type {
   Brand,
   Cluster,
   CosmosData,
+  CosmosDemo,
   CosmosDerived,
   CosmosDrift,
   CosmosHealth,
@@ -225,16 +226,40 @@ export const CosmosOwnersSchema = z.strictObject({
   serviceOverrides: z.record(z.string(), z.strictObject({ reviewers: z.array(z.string()) })),
 }) satisfies z.ZodType<CosmosOwners>;
 
+const DataSourceSchema = z.literal('fixture');
+
 export const CosmosDriftSchema = z.strictObject({
   runTimeUtc: z.string().regex(/^\d{2}:\d{2}$/),
   entries: z.array(DriftEntrySchema),
+  source: DataSourceSchema,
 }) satisfies z.ZodType<CosmosDrift>;
 
 export const CosmosHealthSchema = z.strictObject({
   asOf: z.string().regex(ISO_DATE),
   services: z.array(ServiceHealthInputSchema),
   onCallByTeam: z.record(TeamIdSchema, OnCallSchema),
+  source: DataSourceSchema,
 }) satisfies z.ZodType<CosmosHealth>;
+
+export const CosmosDemoSchema = z.strictObject({
+  allTour: z.strictObject({
+    scenarioId: z.string().min(1),
+    incidentId: z.string().min(1).nullable(),
+    browseDomainId: z.string().min(1),
+  }),
+  aiTour: z.strictObject({
+    domainId: z.string().min(1),
+    question: z.string().min(1),
+    scriptedAnswer: z.strictObject({
+      text: z.string().min(1),
+      thinkingMs: z.number().int().nonnegative(),
+      wordMs: z.number().int().positive(),
+    }),
+    highlightServiceIds: z.array(z.string().min(1)).min(1),
+    passportNodeId: z.string().min(1),
+    citedDriftEntryIds: z.array(z.string().min(1)),
+  }),
+}) satisfies z.ZodType<CosmosDemo>;
 
 export const CosmosDataSchema = z.strictObject({
   brand: BrandSchema,
@@ -249,6 +274,7 @@ export const CosmosDataSchema = z.strictObject({
   owners: CosmosOwnersSchema,
   drift: CosmosDriftSchema,
   health: CosmosHealthSchema,
+  demo: CosmosDemoSchema,
 }) satisfies z.ZodType<CosmosData>;
 
 const idList = z.array(z.string().min(1));

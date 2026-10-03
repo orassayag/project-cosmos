@@ -13,9 +13,8 @@
  * substantive change.
  *
  * Pre-conditions:
- *   - Project Cosmos working tree must be clean under client/src/scenarios/,
- *     drift-sync/cosmos-confirmed.json and server/src/generated/cosmos-map.json
- *     (the applier-writable surface).
+ *   - Project Cosmos working tree must be clean under server/src/cosmos/data/
+ *     (the applier-writable surface, enforced by write_file).
  *     Otherwise the applier refuses to run.
  */
 
@@ -28,6 +27,7 @@ import { loadEnv } from './lib/agent.js';
 loadEnv();
 
 import { runAgent, extractJsonReport, APPLIER_TOOL_DEFS } from './lib/agent.js';
+import { APPLIER_WRITABLE_PATHS } from './lib/write-boundary.js';
 
 // ──────────────────────────────────────────────────────────────────
 //  Args
@@ -54,7 +54,7 @@ const maxIter = maxIterIdx >= 0 ? Number(args[maxIterIdx + 1]) : 50;
 const here = path.dirname(fileURLToPath(import.meta.url));
 // here = drift-sync/scripts → the cosmos repo root is TWO levels up. Was '..',
 // which resolved to drift-sync/ — so read_file / write_file / run_command / git
-// were all rooted there, the applier could never read or edit client/src/scenarios,
+// were all rooted there, the applier could never read or edit the map data,
 // and it skipped every edit (empty diff, no PR). reposRoot is then the
 // workspace dir that holds all repos.
 const projectCosmosRoot = path.resolve(here, '..', '..');
@@ -85,11 +85,7 @@ if (items.length === 0) {
 // ──────────────────────────────────────────────────────────────────
 //  Pre-check: cosmos repo must be clean on writable surface
 // ──────────────────────────────────────────────────────────────────
-const WRITABLE_PATHS = [
-  'client/src/scenarios/',
-  'drift-sync/cosmos-confirmed.json',
-  'server/src/generated/cosmos-map.json',
-];
+const WRITABLE_PATHS = APPLIER_WRITABLE_PATHS;
 
 function gitStatusWritable(): string {
   try {
@@ -117,7 +113,7 @@ const systemPrompt = `You are the Project Cosmos Applier — your job is to tran
 You will receive a bundle of "drift" verdicts for one team's services. For each verdict, apply the suggested edits (proposed_cosmos_edits) to the actual Project Cosmos files using read_file + write_file.
 
 ## Working directory
-All paths (read_file, write_file, list_dir, grep, run_command) are relative to the COSMOS REPO ROOT (the repository that holds the map). So use \`client/src/scenarios/topics.ts\`, NOT \`<repo-name>/client/src/scenarios/topics.ts\`.
+All paths (read_file, write_file, list_dir, grep, run_command) are relative to the COSMOS REPO ROOT (the repository that holds the map). So use \`server/src/cosmos/data/topics.ts\`, NOT \`<repo-name>/server/src/cosmos/data/topics.ts\`.
 
 ## Turn structure (READ THIS)
 Every turn before the final MUST include exactly one tool_use block. Text in a turn is for chain-of-thought ONLY — it does NOT count as performing the edit. To apply a change you MUST call write_file in that SAME turn. Saying "Let me apply" or "Now I'll write" without calling the tool is a bug.
@@ -132,36 +128,35 @@ Example correct sequence:
 If you emit a turn with ONLY text and no tool_use BEFORE the final JSON, you have failed. NEVER do this. Keep calling tools until all edits are applied and validate passes.
 
 ## Files you MAY modify (writable surface)
-- client/src/scenarios/services.ts
-- client/src/scenarios/topics.ts
-- client/src/scenarios/scenarios.ts
-- client/src/scenarios/data.ts
-- client/src/scenarios/owners.ts
-- client/src/scenarios/steps/*.ts (the per-domain step files)
-- drift-sync/cosmos-confirmed.json
+- server/src/cosmos/data/services.ts
+- server/src/cosmos/data/topics.ts
+- server/src/cosmos/data/scenarios.ts
+- server/src/cosmos/data/owners.ts
+- server/src/cosmos/data/clusters.ts
+- server/src/cosmos/data/steps/*.ts (the per-domain step files)
 
 ## Files you MUST NOT modify
-- Any file under scripts/ (e.g., validate.ts, sync.ts, diff-repo.ts)
-- Any file under client/src/ other than the scenarios files listed above
+- Anything outside server/src/cosmos/data/ (scripts, client code, the server's types/schema/validation)
 - Any file outside this repository (source repos)
 
-If you accidentally try to write outside the writable surface, write_file will reject with an error — that's expected.
+write_file rejects every path outside server/src/cosmos/data/ with an error.
 
 ## How the data is shaped
-- Topics live in client/src/scenarios/topics.ts as a const array of Topic objects.
-- Services live in client/src/scenarios/services.ts as a const array of Service objects.
-- Steps live under client/src/scenarios/steps/*.ts (one file per domain) as const arrays of Step objects.
-- Scenarios live in client/src/scenarios/scenarios.ts.
-- types.ts defines the Service / Topic / Step / Scenario interfaces. READ types.ts first if you need to confirm field names.
+- server/src/cosmos/apiTypes.ts defines the Service / Topic / Step / Scenario / Cluster interfaces. READ it first to confirm field names (do not edit it).
+- Services live in server/src/cosmos/data/services.ts. Each service has a \`palette\` key (one of the keys in data/palette.ts) and a \`hex\` that must equal that palette entry's hex. A service whose inner flow can be expanded carries an \`ecosystem\` (intake topic, intake/egress sub-services, internal edges between its sub-services).
+- Clusters live in server/src/cosmos/data/clusters.ts: each lists its \`serviceIds\` and its nebula's \`anchorServiceIds\`. A new service joins the cluster of its domain.
+- Topics live in server/src/cosmos/data/topics.ts. Every topic has a required \`groupServiceId\`: the service whose topic group it orbits (normally its producer).
+- Steps live under server/src/cosmos/data/steps/*.ts (one file per domain) as const arrays of Step objects.
+- Scenarios live in server/src/cosmos/data/scenarios.ts.
 
 ## Process
-1. Read types.ts to confirm field shapes.
+1. Read server/src/cosmos/apiTypes.ts to confirm field shapes.
 2. For each verdict in the bundle:
-   a. Identify the target Project Cosmos file(s) from proposed_cosmos_edits.
+   a. Identify the target Project Cosmos file(s) from proposed_cosmos_edits (a verdict that names a data file elsewhere means the file of the same name under server/src/cosmos/data/).
    b. read_file to see the current content.
    c. Apply the smallest possible edit that satisfies the verdict.
    d. write_file with the full new content. Preserve exact formatting (indentation, quotes, trailing commas).
-3. After applying ALL edits, run \`npm run snapshot\` and then \`npm run validate\` via run_command (validate fails on a stale server/src/generated/cosmos-map.json until the snapshot is regenerated — never write that file by hand).
+3. After applying ALL edits, run \`npm run validate\` via run_command.
 4. If validator fails (errors > 0): inspect the output, fix, re-run.
 5. When validator passes, emit the final JSON report.
 
@@ -175,7 +170,7 @@ If you accidentally try to write outside the writable surface, write_file will r
 Output a single JSON object in a markdown code block tagged 'json':
 {
   "applied": [
-    { "verdict_service": "orders", "file": "client/src/scenarios/topics.ts", "summary": "added 'orders' to producers in order-events desc" }
+    { "verdict_service": "orders", "file": "server/src/cosmos/data/topics.ts", "summary": "added 'orders' to producers in order-events desc" }
   ],
   "skipped": [
     { "verdict_service": "...", "reason": "..." }
@@ -192,7 +187,7 @@ ${items.length} drift verdict(s) to apply. Apply each one to Project Cosmos file
 ${JSON.stringify(items, null, 2)}
 \`\`\`
 
-Begin. Start by reading types.ts to confirm field shapes.`;
+Begin. Start by reading server/src/cosmos/apiTypes.ts to confirm field shapes.`;
 
 // ──────────────────────────────────────────────────────────────────
 //  Run the applier agent
@@ -215,7 +210,7 @@ const result = await runAgent({
   tools: APPLIER_TOOL_DEFS,
   writeRoot: projectCosmosRoot,
   runCommandRoot: projectCosmosRoot,
-  runCommandAllowed: ['npm run snapshot', 'npm run validate'],
+  runCommandAllowed: ['npm run validate'],
   requireJsonReport: true,
   // Applier writes full-file content via write_file — Project Cosmos files can be
   // 200+ lines, well above the default 4096-token budget. 16k is the
@@ -223,15 +218,6 @@ const result = await runAgent({
   maxTokens: 16_000,
   verbose,
 });
-
-// ──────────────────────────────────────────────────────────────────
-//  Regenerate the server's map snapshot from the edited data
-// ──────────────────────────────────────────────────────────────────
-try {
-  execFileSync('npm', ['run', 'snapshot'], { cwd: projectCosmosRoot, stdio: 'ignore' });
-} catch (err) {
-  console.error(`Failed to regenerate cosmos-map.json (npm run snapshot): ${String(err)}`);
-}
 
 // ──────────────────────────────────────────────────────────────────
 //  Capture diff

@@ -29,9 +29,9 @@ Read `git diff`, `git diff --cached`, and any untracked files from `git status`.
 files that look like secrets (`.env*`, keys) or debris you didn't create — list them and ask
 before including them.
 
-If the diff touched code, run `npm run build` (and `npm run snapshot` then `npm run validate` if
-`client/src/scenarios/` or `client/src/incidents/` changed; include the regenerated
-`server/src/generated/cosmos-map.json`). A failure is a stop condition — report the output, don't commit.
+If the diff touched code, run `npm run build` (and `npm run validate` then `npm run fixture:cosmos` if
+`server/src/cosmos/data/` changed; include the regenerated
+`client/src/__tests__/fixtures/cosmos-response.json`). A failure is a stop condition — report the output, don't commit.
 
 Check whether the change makes `README.md` stale — a new or removed feature, command, script,
 env var, API route, keyboard shortcut, folder, or deploy step. If so, update `README.md` and

@@ -1,26 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { indexCosmos } from '../../api/cosmosIndex';
 import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
-import { DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
+import { buildDemoScriptedAnswer } from '../scriptedAnswer';
 
-const SERVICES_BY_ID = indexCosmos(COSMOS_FIXTURE).servicesById;
+const { aiTour } = COSMOS_FIXTURE.data.demo;
 
-const highlightedIds = (DEMO_SCRIPTED_ANSWER.actions ?? []).flatMap((action) =>
-  action.kind === 'highlight' ? action.serviceIds : [],
-);
+describe('buildDemoScriptedAnswer', () => {
+  it('plays the tour\'s text and timing and highlights the services it names', () => {
+    const answer = buildDemoScriptedAnswer(aiTour, { isPhone: false });
 
-describe('DEMO_SCRIPTED_ANSWER', () => {
-  it('highlights only services that exist on the map', () => {
-    expect(highlightedIds.length).toBeGreaterThan(0);
-    for (const serviceId of highlightedIds) expect(SERVICES_BY_ID[serviceId], serviceId).toBeDefined();
+    expect(answer).toMatchObject(aiTour.scriptedAnswer);
+    expect(answer.actions?.[0]).toEqual({ type: 'action', kind: 'highlight', serviceIds: aiTour.highlightServiceIds });
   });
 
-  it('names every service it highlights', () => {
-    for (const serviceId of highlightedIds) expect(DEMO_SCRIPTED_ANSWER.text).toContain(serviceId);
-  });
+  it('opens the passport beside the answer on desktop only', () => {
+    const openPassport = { type: 'action', kind: 'openPassport', nodeId: aiTour.passportNodeId };
 
-  it('uses the planned timing', () => {
-    expect(DEMO_SCRIPTED_ANSWER.thinkingMs).toBe(1500);
-    expect(DEMO_SCRIPTED_ANSWER.wordMs).toBe(90);
+    expect(buildDemoScriptedAnswer(aiTour, { isPhone: false }).actions).toContainEqual(openPassport);
+    expect(buildDemoScriptedAnswer(aiTour, { isPhone: true }).actions).toEqual([
+      { type: 'action', kind: 'highlight', serviceIds: aiTour.highlightServiceIds },
+    ]);
   });
 });

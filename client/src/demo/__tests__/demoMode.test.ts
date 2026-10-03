@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from '../demoMode';
-import { DEMO_TARGETS } from '../types';
 
 const BASE_URL = 'http://localhost:5173/';
 
@@ -62,13 +60,5 @@ describe('shouldShowIntro', () => {
     shouldShowIntro(null, storage);
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(storage.removeItem).not.toHaveBeenCalled();
-  });
-});
-
-describe('DEMO_TARGETS', () => {
-  it('names a target for every domain button', () => {
-    for (const domain of COSMOS_FIXTURE.data.domains) {
-      expect(DEMO_TARGETS).toContain(`domain-${domain.id}`);
-    }
   });
 });

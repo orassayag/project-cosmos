@@ -682,3 +682,128 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
 - **Desktop behaviour of view-opening actions:** kept as built. Blast radius, health, ownership and changelog open
   above the Ask panel (`keepBeneath`), and the answer returns when the view closes. `openPassport` opens beside the
   answer.
+
+## Phase 9 — Drift, health and demo data (2026-10-03)
+
+### Data source marker
+
+- `CosmosDrift` and `CosmosHealth` carry `source: DataSource`, where `DataSource = 'fixture'` is the only value today
+  (`DRIFT_SOURCE` in `data/drift.ts`, `HEALTH_SOURCE` in `data/health.ts`). The UI does not read it.
+- The system prompt now says the drift and health data are AstroMart demo data and to still answer from them.
+- **Intended future producers (not built):**
+  - Drift: Drift Sync appends a `DriftEntry` to `data/drift.ts` in the same PR as its map edit, so the entry lands on
+    merge; `source` then gains a `'drift-sync'` value.
+  - Health: an external source fills `data/health.ts` — last commit and open PRs from the GitHub API, the on-call
+    rotation from a PagerDuty/Opsgenie export; `source` then gains a value for it.
+
+### `data.demo`
+
+- `data/demo.ts` holds `allTour { scenarioId, incidentId, browseDomainId }` and
+  `aiTour { domainId, question, scriptedAnswer { text, thinkingMs, wordMs }, highlightServiceIds, passportNodeId, citedDriftEntryIds }`.
+- Fields beyond the plan, each replacing an id that `client/src/demo/` hard-coded:
+  - `allTour.browseDomainId` — the second domain the tour browses (`fulfillment`). The first and third clicks are the
+    scenario's own domain, read from the scenario.
+  - `aiTour.domainId` — the domain the AI tour opens (`fulfillment`); its caption uses the domain's label.
+  - `aiTour.passportNodeId` — the Ask map action (below).
+  - `aiTour.citedDriftEntryIds` — the drift entries the scripted answer reports, so a test can check they are current.
+- `allTour.incidentId` is the explicit `hub-silence-2026-07-19` (the newest; a test checks it stays the newest). It is
+  `string | null`: `null` skips the incident replay, for a cosmos with no incidents (`npm run fresh`).
+- `validateCosmos()` reports `unknown-demo-reference` for any demo id that does not exist. The 24h staleness rule is
+  **only** in `server/src/__tests__/demoData.test.ts`, not in `validateCosmos()`: once Drift Sync records drift, a new
+  run moves `asOf`, and the scripted answer then needs a deliberate rewrite rather than blocking validation.
+- `DEMO_TARGETS` no longer lists `domain-shopping|fulfillment|engagement`; `DemoTarget` allows `domain-${string}`.
+  `client/src/demo/` names no AstroMart id, so the Phase 2 and Phase 8 greps no longer exclude it.
+- `App` builds the script and the scripted answer once the response is ready (memoized on the response object and the
+  layout read at load). The demo pointer/caption mount whenever a demo mode is set, as before.
+
+### Ask map action in `demo=ai` (owner decision deferred from Phase 8)
+
+- The scripted answer now fires `openPassport` for `aiTour.passportNodeId` (`shipping`) **on desktop only**, together
+  with the existing highlight, when the answer starts typing. On desktop the passport opens on the right beside the
+  answer (Phase 8 behaviour), so the typed answer stays visible — screenshot-checked at 1440×900: Ask panel at
+  x 14–354, passport at x 1086–1426.
+- On phones every surface an action opens joins the one-panel stack and would cover the answer for the rest of the
+  tour, so the phone answer keeps only the highlight (checked at 390×844: Ask panel visible, no passport). This is the
+  smallest change that shows an action without covering the answer; nothing else in the tour changed.
+- Recorded with `npm run record:demo` against `npm run dev` on `:5175` (5173/5174 held by unrelated Vite):
+  `demo=ai` 28.0s (limit 60s), `demo=all` 117.6s (limit 120s).
+
+### Tests
+
+- `demoData.test.ts`: every demo id exists, the tour plays the newest incident, highlighted ids are services named in
+  the answer, cited drift entries exist and sit within 24h before `asOf`, and moving a cited entry's date by ±2 days
+  fails the staleness check. `agentEval.test.ts`: the agent's `drift` call for `aiTour.question` returns exactly
+  `aiTour.citedDriftEntryIds`.
+- `askMapActions.test.tsx` was flaky under full-suite load (reproduced with the pre-Phase-9 `App.tsx`, 1 in 5 runs):
+  the streamed answer lands outside `act()`, so the test could read the DOM before the action's effects ran. The
+  helper now flushes with `await act(async () => {})`; 6/6 full-suite runs green after.
+
+### Bundle
+
+- `client/src/demo/scripts.ts` was the last client importer of the old data; the bundle no longer contains it
+  (`index-*.js` 609,220 B raw / 199,420 B gzip, was 666,249 / 213,087 at Phase 0). Still over Vite's 500 kB warning.
+
+## Phase 10 — Retarget every writer (2026-10-03)
+
+### Readers
+
+- `drift-sync/scripts/lib/cosmos-context.ts`, `sync.ts` (investigate-topic), `bootstrap-state.ts` and
+  `sync-nightly.ts` (team owners) read `getCosmosData()` from `server/src/cosmos/` (and `resolveOwner` from
+  `derive/ownership.ts`). Topic order in the repo slice is unchanged (step order).
+- `npm run validate` runs `validateCosmos()` over the server data instead of its own internal checks; `--source-check`
+  (repo existence, topic-name greps) stays in Drift Sync. The legacy snapshot freshness check stays until Phase 11
+  deletes the snapshot (it compares the frozen client copy, which nothing writes any more).
+- `server/src/cosmos/index.ts` now reads `data/steps/index.ts` (`STEPS`) and `data/incidents/index.ts` (`INCIDENTS`)
+  barrels, so `npm run fresh` can replace the step and incident files without editing `index.ts`. Same data, same
+  order (incidents are still sorted newest first in `index.ts`).
+
+### Write boundary
+
+- `drift-sync/scripts/lib/write-boundary.ts`: `APPLIER_WRITABLE_PATHS = ['server/src/cosmos/data/']` and
+  `resolveWritePath()`. The applier's `write_file` now rejects every path outside it. Before, it only checked the repo
+  root, although the prompt said other paths were rejected.
+- `drift-sync/cosmos-confirmed.json` and the snapshot are no longer on the applier surface (plan: data only). The
+  applier no longer runs `npm run snapshot`; its run-command allowlist is `npm run validate` only.
+- `apply-edits.ts` prompt: new paths, reads `apiTypes.ts` for shapes, and describes `palette`/`hex`, `clusters`,
+  `groupServiceId` and `ecosystem`. `diff-repo.ts`/`sync.ts` example edits name `server/src/cosmos/data/topics.ts`.
+- `drift-sync/scripts/__tests__/applyEditsPaths.test.ts` (run by `npm run test:scripts`, now also part of `npm test`).
+
+### `npm run fresh`
+
+- Writes the starter cosmos into `server/src/cosmos/data/`: brand, one domain, one cluster, two services, no topics,
+  one scenario + steps, no incidents, empty drift and health rows, demo tours (`incidentId: null`, no cited drift).
+  `ON_CALL_BY_TEAM` keeps one placeholder rotation because the type requires one per team. It narrows `TeamId` in
+  `apiTypes.ts` and `TeamIdSchema` in `schema.ts` to `team-core`, then runs `npm run types:emit`.
+- `citedDriftEntryIds` may now be empty in the schema (the starter has no drift).
+- Checked in a scratch copy outside the repo (node_modules linked): `npm run fresh` → `npm run validate` 0 errors,
+  client build passes, `npm run dev` serves 2 services from `/api/cosmos`, and the map renders both planets with no
+  page errors (also `?demo=all`).
+- **Known gap:** after `fresh`, the server typecheck (and so `npm run build`) fails in AstroMart-specific server tests
+  (they name `team-shopping` etc.), and parity tests fail. Forks need a decision in Phase 12 (see stage 9 open
+  questions).
+
+### Other writers
+
+- Layout edit mode **Copy coords** now copies `x: …, y: …,  // <id>` lines under `// server/src/cosmos/data/services.ts`
+  and `topics.ts` headers (topics with `pinned: true`); the button title names those files.
+- `.claude/skills/add-service`, `add-scenario`, `update` name the server paths, `palette`/clusters/`groupServiceId`/
+  `ecosystem`, `npm run validate` and `npm run fixture:cosmos`. The `skills/` plugin copies were stale since Phase 2;
+  they are now byte copies of `.claude/skills/`.
+- `scripts/record-demo.mjs` already defaulted to `:5173` (the `npm run dev` setup). `scripts/parity-screens.mjs` keeps
+  building and serving its own preview with the exact `/api/cosmos` body — pointing it at the dev server by default
+  would make the oracle depend on a running server and unbuilt code; `BASE_URL` still overrides it.
+- README, `drift-sync/README.md`, `CONTRIBUTING.md` and `CLAUDE.md` got the data path fixes needed so nothing points
+  editors at the old copy; the full docs pass stays in Phase 12.
+
+### A3 check scope
+
+The `phase 10` grep runs the plan's pattern over the writers and readers only: `drift-sync/`, `scripts/`,
+`server/scripts/`, `e2e/`, `.claude/skills/`, `skills/`, `.github/`. Excluded: `scripts/cosmos-check.ts` (holds the
+pattern), `server/scripts/snapshot-map.ts` (Phase 11 deletes it) and the write-boundary test (it asserts those paths
+are rejected). The old client data copies, the parity tests and `cosmos-map.json` itself go in Phase 11; prose docs in
+Phase 12.
+
+### Not done here (outward-facing, owner)
+
+- Drift Sync dry run via `workflow_dispatch` and re-enabling it (I5). The job's `if: vars.DRIFT_SYNC_ENABLED == 'true'`
+  gates manual dispatch too, so the variable must be `true` before the dry run.

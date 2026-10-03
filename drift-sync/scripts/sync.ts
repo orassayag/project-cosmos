@@ -47,13 +47,12 @@ import { fileURLToPath } from 'node:url';
     process.env.ANTHROPIC_API_KEY = process.env.VITE_ANTHROPIC_API_KEY;
   }
 }
-import { SERVICES, SERVICES_BY_ID } from '../../client/src/scenarios/services.js';
-import { TOPICS, TOPICS_BY_ID } from '../../client/src/scenarios/topics.js';
-import { STEPS } from '../../client/src/scenarios/data.js';
-import type { Service, Step, SubService, Topic } from '../../client/src/scenarios/types.js';
+import { getCosmosData } from '../../server/src/cosmos/index.js';
+import type { Service, Step, SubService, Topic } from '../../server/src/cosmos/types.js';
 import { loadDriftSyncConfig, topicRegistryLocalPath } from './lib/config.js';
 
 const config = loadDriftSyncConfig();
+const { services: SERVICES, topics: TOPICS, steps: STEPS } = getCosmosData();
 
 // ──────────────────────────────────────────────────────────────────
 //  Args
@@ -78,7 +77,7 @@ function usage(): never {
 
 if (cmd !== 'investigate-topic' || !args[1]) usage();
 const topicId = args[1];
-const topic = TOPICS_BY_ID[topicId] as Topic | undefined;
+const topic: Topic | undefined = TOPICS.find(t => t.id === topicId);
 if (!topic) {
   console.error(`Unknown topic id: ${topicId}`);
   usage();
@@ -88,7 +87,7 @@ if (!topic) {
 //  Gather context: which services Project Cosmos says produce/consume this topic
 // ──────────────────────────────────────────────────────────────────
 function reposForService(serviceId: string): string[] {
-  const svc = SERVICES_BY_ID[serviceId] as Service | undefined;
+  const svc: Service | undefined = SERVICES.find(s => s.id === serviceId);
   if (svc) {
     const repos: string[] = [];
     if (svc.repo) repos.push(svc.repo);
@@ -254,7 +253,7 @@ When you have enough evidence (typically after 3-8 tool calls), output ONE JSON 
   "actual_producers": [...],          // service ids or repo names
   "actual_consumers": [...],
   "proposed_cosmos_edits": [          // empty array if no edits needed
-    { "file": "client/src/scenarios/topics.ts", "change": "rename Topic.name from X to Y", "rationale": "..." }
+    { "file": "server/src/cosmos/data/topics.ts", "change": "rename Topic.name from X to Y", "rationale": "..." }
   ],
   "evidence": [                        // file:line refs that back the verdict
     "<repo>/path/to/file.ts:42 — producer.send('orders.order-created')"

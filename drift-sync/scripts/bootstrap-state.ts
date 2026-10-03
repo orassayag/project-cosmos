@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SERVICES } from '../../client/src/scenarios/services.js';
+import { getCosmosData } from '../../server/src/cosmos/index.js';
 import { loadDriftSyncConfig } from './lib/config.js';
 
 const config = loadDriftSyncConfig();
@@ -41,7 +41,7 @@ if (existsSync(confirmedPath)) {
 
 // Enumerate every repo referenced by Project Cosmos.
 const repos = new Set<string>();
-for (const svc of SERVICES) {
+for (const svc of getCosmosData().services) {
   if (svc.repo) repos.add(svc.repo);
   for (const sub of svc.subServices ?? []) {
     if (sub.repo) repos.add(sub.repo);

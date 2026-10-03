@@ -224,15 +224,53 @@ export interface CosmosOwners {
   serviceOverrides: Record<string, ServiceOwnerOverride>;
 }
 
+/** Where a dataset comes from. `fixture` = hand-written demo data, not produced by any pipeline yet. */
+export type DataSource = 'fixture';
+
 export interface CosmosDrift {
   runTimeUtc: string;
   entries: DriftEntry[];
+  source: DataSource;
 }
 
 export interface CosmosHealth {
   asOf: string;
   services: ServiceHealthInput[];
   onCallByTeam: Record<TeamId, OnCall>;
+  source: DataSource;
+}
+
+/** The `?demo=all` tour: browse two domains, play a scenario, then replay an incident. */
+export interface DemoAllTour {
+  scenarioId: string;
+  /** null skips the incident replay (a cosmos with no recorded incidents). */
+  incidentId: string | null;
+  /** The domain shown between two visits to the scenario's own domain. */
+  browseDomainId: string;
+}
+
+export interface DemoAnswerScript {
+  text: string;
+  thinkingMs: number;
+  wordMs: number;
+}
+
+/** The `?demo=ai` tour: open a domain, ask a question, play a scripted answer. */
+export interface DemoAiTour {
+  domainId: string;
+  question: string;
+  scriptedAnswer: DemoAnswerScript;
+  /** The services the answer names, in the order it mentions them. */
+  highlightServiceIds: string[];
+  /** Opened beside the answer on desktop to show an Ask map action. */
+  passportNodeId: string;
+  /** The drift entries the answer reports; they must sit within 24h of `asOf`. */
+  citedDriftEntryIds: string[];
+}
+
+export interface CosmosDemo {
+  allTour: DemoAllTour;
+  aiTour: DemoAiTour;
 }
 
 export interface CosmosData {
@@ -248,6 +286,7 @@ export interface CosmosData {
   owners: CosmosOwners;
   drift: CosmosDrift;
   health: CosmosHealth;
+  demo: CosmosDemo;
 }
 
 /** A drawable hop between two map nodes. Path geometry stays client-side. */

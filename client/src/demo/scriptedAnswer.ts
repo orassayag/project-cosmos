@@ -1,19 +1,17 @@
+import type { DemoAiTour } from '../api/cosmos-api';
+import type { DemoLayout } from './scripts';
 import type { DemoScriptedAnswer } from './types';
 
-export const DEMO_QUESTION = 'What changed in the Fulfillment Galaxy over the past 24 hours?';
-
-/** The services the answer names, in the order it mentions them. */
-export const DEMO_ANSWER_SERVICE_IDS = ['shipping', 'notifications', 'orders'];
-
-/** Facts come from the newest Fulfillment-team run in `scenarios/drift.ts` (2026-08-13). */
-export const DEMO_SCRIPTED_ANSWER: DemoScriptedAnswer = {
-  text:
-    "Last night's Drift Sync caught two changes in Fulfillment, both owned by its team. " +
-    'First, shipping now publishes a new shipping.dispatched event when a parcel leaves the depot, ' +
-    'and notifications subscribes to it to tell the shopper. ' +
-    'Second, the orders.created event from orders gained a giftWrap flag. ' +
-    'Both changes are in draft PR #128.',
-  thinkingMs: 1500,
-  wordMs: 90,
-  actions: [{ type: 'action', kind: 'highlight', serviceIds: DEMO_ANSWER_SERVICE_IDS }],
-};
+/**
+ * The `?demo=ai` answer: highlight the services it names, and on desktop open the first one's
+ * passport beside the answer. On a phone the passport would cover the answer, so it is left out.
+ */
+export function buildDemoScriptedAnswer(aiTour: DemoAiTour, { isPhone }: DemoLayout): DemoScriptedAnswer {
+  return {
+    ...aiTour.scriptedAnswer,
+    actions: [
+      { type: 'action', kind: 'highlight', serviceIds: aiTour.highlightServiceIds },
+      ...(isPhone ? [] : [{ type: 'action', kind: 'openPassport', nodeId: aiTour.passportNodeId } as const]),
+    ],
+  };
+}

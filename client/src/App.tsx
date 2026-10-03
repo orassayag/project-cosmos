@@ -37,7 +37,7 @@ import { useAiConnection } from './hooks/useAiConnection';
 import type { AiConnection } from './hooks/useAiConnection';
 import { INTRO_SEEN_STORAGE_KEY, readDemoMode, shouldShowIntro } from './demo/demoMode';
 import { buildDemoScript } from './demo/scripts';
-import { DEMO_SCRIPTED_ANSWER } from './demo/scriptedAnswer';
+import { buildDemoScriptedAnswer } from './demo/scriptedAnswer';
 import type { DemoScriptedAnswer } from './demo/types';
 import { useDemoAiConnection } from './demo/useDemoAiConnection';
 import { useDemoRunner } from './demo/useDemoRunner';
@@ -52,10 +52,8 @@ interface ActivityEntry { idx: number; step: Step }
 export function App() {
   const initial = useMemo(readInitialDeepLink, []);
   const demoMode = useMemo(() => readDemoMode(window.location.href), []);
-  // Built once for the layout at load: a script that changed mid-run would restart it.
-  const [demoScript] = useState(() => demoMode
-    ? buildDemoScript(demoMode.mode, { isPhone: window.matchMedia(MOBILE_QUERY).matches })
-    : undefined);
+  // The layout is read once at load: a script that changed mid-run would restart it.
+  const [demoLayout] = useState(() => ({ isPhone: window.matchMedia(MOBILE_QUERY).matches }));
   const demoSpeed = demoMode?.speed ?? 1;
   const [showIntro, setShowIntro] = useState(() => shouldShowIntro(
     demoMode,
@@ -68,6 +66,14 @@ export function App() {
   const cosmosResponse = cosmosLoad.state.status === 'ready' ? cosmosLoad.state.response : null;
   const cosmosIndex = cosmosResponse ? indexCosmos(cosmosResponse) : null;
   const isCosmosReady = cosmosResponse !== null;
+  const demoScript = useMemo(
+    () => (demoMode && cosmosResponse ? buildDemoScript(cosmosResponse, demoMode.mode, demoLayout) : undefined),
+    [demoMode, cosmosResponse, demoLayout],
+  );
+  const demoScriptedAnswer = useMemo(
+    () => (demoMode && cosmosResponse ? buildDemoScriptedAnswer(cosmosResponse.data.demo.aiTour, demoLayout) : undefined),
+    [demoMode, cosmosResponse, demoLayout],
+  );
   const defaultDomainId = cosmosResponse?.data.domains[0]?.id ?? null;
   // null = no pick yet, which shows the first domain once the data has loaded.
   const [pickedDomain, setActiveDomain] = useState<string | null>(() => initial.domain);
@@ -352,13 +358,13 @@ export function App() {
 
   const demoAi = useDemoAiConnection(demoSpeed);
   const demoRunner = useDemoRunner({
-    script: isCosmosReady ? demoScript : undefined,
+    script: demoScript,
     speed: demoSpeed,
     // A run cut short can leave the Connect window open with the fake keys in it.
     onEnd: () => overlay.close(OVERLAY.connect),
   });
   const isDemoActive = demoRunner.isActive;
-  const demoOverlays = demoScript && (
+  const demoOverlays = demoMode && (
     <>
       <DemoPointer pointer={demoRunner.pointer} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
       <DemoCaption caption={demoRunner.caption} isVisible={demoRunner.isOverlayVisible} speed={demoSpeed} />
@@ -371,13 +377,13 @@ export function App() {
   const isAiConnected = aiConnection.status === 'connected';
   const handleAsk = useCallback((question: string) => {
     // The demo's question goes through the real Search; only the answer is scripted.
-    if (isDemoActive) openAskPanel(question, [], DEMO_SCRIPTED_ANSWER);
+    if (isDemoActive) openAskPanel(question, [], demoScriptedAnswer);
     else if (isAiConnected || !cosmosResponse) openAskPanel(question, []);
     else {
       const { services } = cosmosResponse.data;
       openAskPanel(question, [services[Math.floor(Math.random() * services.length)].id]);
     }
-  }, [openAskPanel, isAiConnected, isDemoActive, cosmosResponse]);
+  }, [openAskPanel, isAiConnected, isDemoActive, demoScriptedAnswer, cosmosResponse]);
 
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow

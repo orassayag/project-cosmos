@@ -11,7 +11,7 @@ import { ProjectCosmosMap } from '../../map/Map';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { RunnerApi } from '../../player/runner';
 import type { Scenario, Step } from '../../api/cosmos-api';
-import { renderWithCosmos } from '../../__tests__/renderWithCosmos';
+import { COSMOS_FIXTURE, renderWithCosmos } from '../../__tests__/renderWithCosmos';
 import { buildDemoScript } from '../scripts';
 import { DEMO_TARGETS } from '../types';
 
@@ -79,7 +79,7 @@ describe('data-demo-target attributes', () => {
   ] as const)('resolves every target the %s demo script (phone: %s) points at to exactly one element', (mode, isPhone) => {
     renderDemoSurfaces();
 
-    const script = buildDemoScript(mode, { isPhone });
+    const script = buildDemoScript(COSMOS_FIXTURE, mode, { isPhone });
     const scriptTargets = script.flatMap((step) => (step.kind === 'wait' ? [] : [step.target]));
     expect(scriptTargets.length).toBeGreaterThan(0);
     for (const target of scriptTargets) {
@@ -95,6 +95,12 @@ describe('data-demo-target attributes', () => {
       expect(matches, target).toHaveLength(1);
       expect(['BUTTON', 'INPUT', 'TEXTAREA'], target).toContain(matches[0].tagName);
     }
+  });
+
+  it('marks every domain button', () => {
+    renderDemoSurfaces();
+
+    for (const domain of COSMOS_FIXTURE.data.domains) expect(findTargets(`domain-${domain.id}`), domain.id).toHaveLength(1);
   });
 
   it('gives each provider and domain button its own id', () => {

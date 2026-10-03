@@ -856,13 +856,17 @@ export function ProjectCosmosMap({
     localStorage.removeItem('cosmos-layout');
   }
   function copyCoordinates() {
-    const lines = Object.entries(overridesRef.current)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([id, { x, y }]) => {
-        const isTopic = !!topicsById[id];
-        return `'${id}': x=${x}, y=${y}${isTopic ? '  (topic — also set pinned: true so the fan-out uses these coords)' : ''}`;
-      })
-      .join('\n');
+    const entries = Object.entries(overridesRef.current).sort(([a], [b]) => a.localeCompare(b));
+    const linesFor = (isTopic: boolean) => entries
+      .filter(([id]) => !!topicsById[id] === isTopic)
+      .map(([id, { x, y }]) => `x: ${x}, y: ${y},${isTopic ? ' pinned: true,' : ''}  // ${id}`);
+    const serviceLines = linesFor(false);
+    // A topic only keeps its coordinates when pinned; otherwise the fan-out places it.
+    const topicLines = linesFor(true);
+    const lines = [
+      ...(serviceLines.length > 0 ? ['// server/src/cosmos/data/services.ts', ...serviceLines] : []),
+      ...(topicLines.length > 0 ? ['// server/src/cosmos/data/topics.ts', ...topicLines] : []),
+    ].join('\n');
     navigator.clipboard.writeText(lines || '(no overrides yet)');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -1151,7 +1155,7 @@ export function ProjectCosmosMap({
               <button type="button" className="lc-layout-btn lc-layout-btn--done" onClick={() => overlay.close(OVERLAY.mapLayout)}>
                 Done
               </button>
-              <button type="button" className={`lc-layout-btn lc-layout-btn--copy${copied ? ' lc-layout-btn--done' : ''}`} onClick={copyCoordinates} title="Copy overridden coordinates to clipboard">
+              <button type="button" className={`lc-layout-btn lc-layout-btn--copy${copied ? ' lc-layout-btn--done' : ''}`} onClick={copyCoordinates} title="Copy the moved positions as x/y lines for server/src/cosmos/data/services.ts and topics.ts">
                 {copied ? 'Copied!' : 'Copy coords'}
               </button>
               {Object.keys(overrides).length > 0 && (

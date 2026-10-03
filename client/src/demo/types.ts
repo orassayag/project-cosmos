@@ -1,14 +1,11 @@
 import type { AskAction } from '../components/AskPanel';
 
-/** Every fixed `data-demo-target`; scenario and incident menu items add `scenario-<id>` / `incident-<id>`. */
+/** Every fixed `data-demo-target`; domain, scenario and incident buttons add `domain-<id>` / `scenario-<id>` / `incident-<id>`. */
 export const DEMO_TARGETS = [
   'intro-start',
   'menu-open',
   'menu-close',
   'galaxy-reset',
-  'domain-shopping',
-  'domain-fulfillment',
-  'domain-engagement',
   'incidents-open',
   'ask-input',
   'ask-search',
@@ -25,7 +22,11 @@ export const DEMO_TARGETS = [
 ] as const;
 
 /** Value of a `data-demo-target` attribute the pointer can move to and press. */
-export type DemoTarget = (typeof DEMO_TARGETS)[number] | `scenario-${string}` | `incident-${string}`;
+export type DemoTarget =
+  | (typeof DEMO_TARGETS)[number]
+  | `domain-${string}`
+  | `scenario-${string}`
+  | `incident-${string}`;
 
 export const DEMO_STEP_KINDS = ['click', 'type', 'paste', 'wait'] as const;
 

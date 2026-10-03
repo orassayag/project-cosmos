@@ -5,63 +5,93 @@
  *
  *   npm run fresh
  *
- * Overwrites client/src/scenarios/{services,topics,scenarios,owners}.ts and
- * steps/, and rewrites the data.ts barrel. Irreversible except via git.
+ * Overwrites the server-owned data in server/src/cosmos/data/ (brand, domains, clusters,
+ * services, topics, scenarios, owners, steps/, incidents/, demo tours, and empty drift and
+ * health), narrows the TeamId union to the starter team, then re-emits the client API types.
+ * Irreversible except via git.
  */
-import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dir = (p) => resolve(root, 'client/src/scenarios', p);
+const dataPath = (relativePath) => resolve(root, 'server/src/cosmos/data', relativePath);
+const cosmosPath = (relativePath) => resolve(root, 'server/src/cosmos', relativePath);
 
-writeFileSync(dir('services.ts'), `import type { Service } from './types';
+writeFileSync(dataPath('brand.ts'), `import type { Brand } from '../types.js';
 
+/** Universe branding — the strings that name YOUR system in the UI. */
+export const BRAND: Brand = {
+  /** Description on the intro screen under the logo. */
+  tagline:
+    'A live map of your architecture. Pick a domain, pick a scenario, watch the request travel along constellations of services and topics.',
+  /** Headline of the help overlay. */
+  helpTitle: 'A live map of your platform.',
+  /** Base URL for \`Service.repo\` links (no trailing slash). */
+  repoBaseUrl: 'https://github.com/your-org',
+  /** Link to the nightly Drift Sync workflow runs (the "last run" summary). */
+  driftSyncUrl: 'https://github.com/your-org/your-cosmos/actions/workflows/cosmos-sync.yml',
+};
+`);
+
+writeFileSync(dataPath('domains.ts'), `import type { Domain } from '../types.js';
+
+export const DOMAINS: Domain[] = [
+  { id: 'core', label: 'Core', glyph: '·', short: 'Your first domain — rename or add more.' },
+];
+`);
+
+writeFileSync(dataPath('clusters.ts'), `import type { Cluster } from '../types.js';
+
+// Array order is the backdrop paint order and the nebula's drift-phase order.
+export const CLUSTERS: Cluster[] = [
+  {
+    id: 'core',
+    label: 'Core',
+    serviceIds: ['web-app', 'api'],
+    nebula: { anchorServiceIds: ['web-app', 'api'], base: 'cyan', hot: 'blue' },
+  },
+];
+`);
+
+writeFileSync(dataPath('services.ts'), `import type { Service } from '../types.js';
+
+// \`palette\` names a key of data/palette.ts; \`hex\` must equal that key's value.
 export const SERVICES: Service[] = [
   {
     id: 'web-app',
     x: 500, y: 700, width: 220, height: 66,
     palette: 'cyan', hex: '#22d3ee',
     name: 'web-app', sub: 'Your frontend',
-    code: 'WEB-01', lang: 'TypeScript',
+    code: 'WEB-01', lang: 'TypeScript', team: 'team-core',
     role: 'The browser-facing surface',
     desc: \`Replace me: your user-facing app. Calls api over HTTP.
 Use the /add-service skill (or copy this shape) to grow the map.\`,
     tech: ['typescript', 'react'],
-    team: 'team-core',
   },
   {
     id: 'api',
     x: 1300, y: 700, width: 220, height: 66,
     palette: 'blue', hex: '#4f8ff7',
     name: 'api', sub: 'Your first backend',
-    code: 'API-01', lang: 'TypeScript',
+    code: 'API-01', lang: 'TypeScript', team: 'team-core',
     role: 'First star of your galaxy',
     desc: \`Replace me: your first backend service. Receives HTTP from web-app.\`,
     tech: ['typescript', 'nodejs'],
-    team: 'team-core',
   },
 ];
-
-export const SERVICES_BY_ID = Object.fromEntries(SERVICES.map(s => [s.id, s]));
 `);
 
-writeFileSync(dir('topics.ts'), `import type { Topic } from './types';
+writeFileSync(dataPath('topics.ts'), `import type { Topic } from '../types.js';
 
-export const TOPIC_HEX = '#fb923c';
-export const TOPIC_COLOR = 'var(--svc-orange)';
-
+// Every topic names its \`groupServiceId\`: the service whose topic group it orbits.
 export const TOPICS: Topic[] = [];
-
-export const TOPICS_BY_ID = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 `);
 
-writeFileSync(dir('scenarios.ts'), `import type { Domain, Scenario } from './types';
+writeFileSync(dataPath('scenarios.ts'), `import type { Scenario } from '../types.js';
 
-export const DOMAINS: Domain[] = [
-  { id: 'core', label: 'Core', glyph: '·', short: 'Your first domain — rename or add more.' },
-];
-
+// \`phaseId\` is global and unique across scenarios and incidents; every step's \`phase\` equals it.
 export const SCENARIOS: Scenario[] = [
   {
     id: 'core.hello-cosmos', domain: 'core', phaseId: 1,
@@ -69,63 +99,88 @@ export const SCENARIOS: Scenario[] = [
     short: 'The starter flow — one request from your web app to your API.',
   },
 ];
-
-export const SCENARIOS_BY_ID = Object.fromEntries(SCENARIOS.map(s => [s.id, s]));
-export const scenariosForDomain = (d: string) => SCENARIOS.filter(s => s.domain === d);
-export const readyScenariosForDomain = (d: string) => scenariosForDomain(d).filter(s => s.status === 'ready');
 `);
 
-writeFileSync(dir('owners.ts'), `import type { Service } from './types';
+writeFileSync(dataPath('owners.ts'), `import type { TeamId, TeamOwner } from '../types.js';
 
-export interface TeamOwner {
-  githubTeam: string;
-  reviewers: string[];
-  slack?: string;
-}
-
-export type TeamId = NonNullable<Service['team']>;
-
+/** Team → reviewer mapping Drift Sync uses when it opens Project Cosmos PRs. */
 export const TEAM_OWNERS: Record<TeamId, TeamOwner> = {
-  'team-core': { githubTeam: 'your-org/team-core', reviewers: [], slack: '#team-core' },
+  'team-core': {
+    label: 'Core team',
+    color: 'var(--svc-cyan)',
+    hex: '#22d3ee',
+    githubTeam: 'your-org/team-core',
+    reviewers: [],
+    slack: '#team-core',
+  },
 };
 
 export const SERVICE_OVERRIDES: Record<string, { reviewers: string[] }> = {};
 
+/** Owner for services without a team, so Drift Sync PRs always reach someone. */
 export const FALLBACK_OWNER: TeamOwner = {
+  label: 'Platform · unowned',
+  color: 'var(--text-3)',
+  hex: '#8a94a6',
   githubTeam: 'your-org/cosmos-maintainers',
   reviewers: [],
 };
-
-export interface ResolvedOwner {
-  reviewers: string[];
-  githubTeam?: string;
-  slack?: string;
-  source: 'override' | 'team' | 'fallback';
-}
-
-export function resolveOwner(service: Service): ResolvedOwner {
-  const override = SERVICE_OVERRIDES[service.id];
-  if (override) return { reviewers: override.reviewers, source: 'override' };
-  if (service.team) {
-    const team = TEAM_OWNERS[service.team];
-    return { reviewers: team.reviewers, githubTeam: team.githubTeam, slack: team.slack, source: 'team' };
-  }
-  return { reviewers: FALLBACK_OWNER.reviewers, githubTeam: FALLBACK_OWNER.githubTeam, source: 'fallback' };
-}
 `);
 
-// The Service.team union is demo-specific — narrow it to the starter team.
-{
-  const typesPath = dir('types.ts');
-  const { readFileSync } = await import('node:fs');
-  let types = readFileSync(typesPath, 'utf8');
-  types = types.replace(/team\?: '[^;]*';/, "team?: 'team-core';");
-  writeFileSync(typesPath, types);
-}
+writeFileSync(dataPath('drift.ts'), `import type { DataSource, DriftEntry } from '../types.js';
 
-rmSync(dir('steps'), { recursive: true, force: true });
-mkdirSync(dir('steps'));
-writeFileSync(dir('steps/core.ts'), `import type { Step } from '../types';
+export const DRIFT_SOURCE: DataSource = 'fixture';
+
+/** The nightly Drift Sync cron time (UTC) every run is stamped with. */
+export const DRIFT_RUN_TIME_UTC = '04:17';
+
+/** Drift history, newest run first. Empty until you record your own. */
+export const DRIFT_ENTRIES: DriftEntry[] = [];
+`);
+
+writeFileSync(dataPath('health.ts'), `import type { DataSource, OnCall, ServiceHealthInput, TeamId } from '../types.js';
+
+export const HEALTH_SOURCE: DataSource = 'fixture';
+
+/** The date the health rows below were captured — commit age is measured from it. */
+export const HEALTH_AS_OF = '${new Date().toISOString().slice(0, 10)}';
+
+/** One rotation per team (the type requires it). Replace the placeholder with your own. */
+export const ON_CALL_BY_TEAM: Record<TeamId, OnCall> = {
+  'team-core': { handle: 'your-handle', until: '${new Date().toISOString().slice(0, 10)}T18:00:00Z', slack: '#team-core' },
+};
+
+/** Health rows, one per repo-backed service. Empty until you record your own. */
+export const SERVICE_HEALTH: ServiceHealthInput[] = [];
+`);
+
+writeFileSync(dataPath('demo.ts'), `import type { CosmosDemo } from '../types.js';
+
+/** What the scripted \`?demo=all\` and \`?demo=ai\` tours show. */
+export const DEMO: CosmosDemo = {
+  allTour: {
+    scenarioId: 'core.hello-cosmos',
+    incidentId: null,
+    browseDomainId: 'core',
+  },
+  aiTour: {
+    domainId: 'core',
+    question: 'What does the api service do?',
+    scriptedAnswer: {
+      text: 'The api service is the first backend of this cosmos: web-app calls it over HTTP with GET /hello. Replace both with your own services.',
+      thinkingMs: 1500,
+      wordMs: 90,
+    },
+    highlightServiceIds: ['api', 'web-app'],
+    passportNodeId: 'api',
+    citedDriftEntryIds: [],
+  },
+};
+`);
+
+rmSync(dataPath('steps'), { recursive: true, force: true });
+mkdirSync(dataPath('steps'));
+writeFileSync(dataPath('steps/core.ts'), `import type { Step } from '../../types.js';
 
 export const CORE_STEPS: Step[] = [
   // ─── Phase 1 — Core · Hello, cosmos ────────────────────────────────
@@ -144,37 +199,35 @@ Headers:
     plain: \`An internal step — rendered as a self-loop pulse on the capsule.\` },
 ];
 `);
-
-writeFileSync(dir('brand.ts'), `/**
- * Universe branding — the strings that name YOUR system in the UI.
- */
-export const BRAND = {
-  tagline:
-    'A live map of your architecture. Pick a domain, pick a scenario, watch the request travel along constellations of services and topics.',
-  helpTitle: 'A live map of your platform.',
-  /** Base URL for \\\`Service.repo\\\` links (no trailing slash). */
-  repoBaseUrl: 'https://github.com/your-org',
-};
-`);
-
-writeFileSync(dir('data.ts'), `/** Barrel — re-exports every named symbol consumers import from this path. */
-export { SERVICES, SERVICES_BY_ID } from './services';
-export { TOPICS, TOPICS_BY_ID } from './topics';
-export { DOMAINS, SCENARIOS, SCENARIOS_BY_ID, scenariosForDomain, readyScenariosForDomain } from './scenarios';
-
-import type { Scenario, Step } from './types';
-import { CORE_STEPS } from './steps/core';
+writeFileSync(dataPath('steps/index.ts'), `import type { Step } from '../../types.js';
+import { CORE_STEPS } from './core.js';
 
 export const STEPS: Step[] = [...CORE_STEPS];
-
-export function stepsForScenario(scenario: Scenario): Step[] {
-  if (scenario.phaseId == null) return [];
-  return STEPS.filter(s => s.phase === scenario.phaseId);
-}
 `);
+
+rmSync(dataPath('incidents'), { recursive: true, force: true });
+mkdirSync(dataPath('incidents'));
+writeFileSync(dataPath('incidents/index.ts'), `import type { Incident } from '../../types.js';
+
+/** Recorded production incidents (frozen scenarios with inline steps). None yet. */
+export const INCIDENTS: Incident[] = [];
+`);
+
+// TeamId is a closed union in the API types and its Zod enum — narrow both to the starter team.
+const narrowTeamIds = (relativePath, pattern, replacement) => {
+  const filePath = cosmosPath(relativePath);
+  const source = readFileSync(filePath, 'utf8');
+  if (!pattern.test(source)) throw new Error(`fresh-start: could not find the TeamId declaration in ${relativePath}`);
+  writeFileSync(filePath, source.replace(pattern, replacement));
+};
+narrowTeamIds('apiTypes.ts', /export type TeamId = [^;]*;/, "export type TeamId = 'team-core';");
+narrowTeamIds('schema.ts', /export const TeamIdSchema = z\.enum\(\[[^\]]*\]\)/, "export const TeamIdSchema = z.enum(['team-core'])");
+
+execFileSync('npm', ['run', 'types:emit'], { cwd: root, stdio: 'inherit' });
 
 console.log(`✦ Fresh cosmos ready: 2 services, 1 scenario ("Hello, cosmos").
   Next:
-    client/src/scenarios/brand.ts  # name your universe + set your GitHub org
-    npm run dev             # see your minimal galaxy
-    /add-service <name>     # grow it with Claude Code`);
+    server/src/cosmos/data/brand.ts  # name your universe + set your GitHub org
+    npm run validate                 # check the data's invariants
+    npm run dev                      # see your minimal galaxy
+    /add-service <name>              # grow it with Claude Code`);
