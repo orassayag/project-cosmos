@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 
-import { STEPS } from '../scenarios/data';
-import type { Protocol } from '../scenarios/types';
+import type { Protocol } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
 import { PROTO_COLOR } from './Edge';
 import { useEdgeRegistry } from './edge-registry';
 import { legsForStep } from './edge-resolver';
@@ -34,13 +34,14 @@ const PROTO_DURATION: Record<Protocol, number> = {
 
 /**
  * Idle/ambient traffic layer. While no scenario is active, this picks
- * random edges (sampled from the global STEPS list) and flies a small
+ * random edges (sampled from the scenario steps) and flies a small
  * 2-layer comet along them — head dot + soft halo trail. Multiple
  * packets can be in flight concurrently. The whole system is alive
  * even when nobody's playing anything.
  */
 export function AmbientPackets({ active, density = 1 }: AmbientPacketsProps) {
   const registry = useEdgeRegistry();
+  const { steps } = useCosmos().data;
   const layerRef = useRef<SVGGElement>(null);
   const flightsRef = useRef<Flight[]>([]);
   const cancelledRef = useRef(false);
@@ -71,7 +72,7 @@ export function AmbientPackets({ active, density = 1 }: AmbientPacketsProps) {
       if (flightsRef.current.length >= cap) return;
 
       // Pick a random non-internal step (internal hops have weird self-loops).
-      const candidates = STEPS.filter((s) => s.type !== 'internal');
+      const candidates = steps.filter((s) => s.type !== 'internal');
       if (candidates.length === 0) return;
       const step = candidates[Math.floor(Math.random() * candidates.length)];
       const legs = legsForStep(step);
@@ -143,7 +144,7 @@ export function AmbientPackets({ active, density = 1 }: AmbientPacketsProps) {
       flightsRef.current.forEach(cleanupFlight);
       flightsRef.current = [];
     };
-  }, [active, registry]);
+  }, [active, registry, steps]);
 
   return <g ref={layerRef} className="lc-ambient-packets" />;
 }

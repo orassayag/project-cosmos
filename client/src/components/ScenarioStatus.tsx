@@ -1,4 +1,6 @@
-import { SCENARIOS_BY_ID, INCIDENTS_BY_ID, INCIDENT_COMET_HEX, scenariosForDomain } from '../scenarios/data';
+import { useCosmos } from '../api/CosmosProvider';
+import { useCosmosIndex } from '../api/cosmosIndex';
+import { INCIDENT_COMET_HEX } from '../theme/statusMeta';
 
 interface ScenarioStatusProps {
   domainId: string;
@@ -15,10 +17,12 @@ export function ScenarioStatus({ domainId, activeScenarioId }: ScenarioStatusPro
   // An incident replay wins over the scenario lookup — its id lives in the same
   // runner slot but isn't a member of any domain's scenario list, so without
   // this it would fall through to "No scenario selected" while clearly playing.
-  const incident = activeScenarioId ? INCIDENTS_BY_ID[activeScenarioId] ?? null : null;
-  const scenario = activeScenarioId ? SCENARIOS_BY_ID[activeScenarioId] ?? null : null;
+  const { incidentsById, scenariosById } = useCosmosIndex();
+  const allScenarios = useCosmos().data.scenarios;
+  const incident = activeScenarioId ? incidentsById[activeScenarioId] ?? null : null;
+  const scenario = activeScenarioId ? scenariosById[activeScenarioId] ?? null : null;
   const isActiveInDomain = scenario?.domain === domainId;
-  const scenarios = scenariosForDomain(domainId);
+  const scenarios = allScenarios.filter((candidate) => candidate.domain === domainId);
 
   const active = incident != null || isActiveInDomain;
   const label = incident

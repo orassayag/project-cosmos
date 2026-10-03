@@ -1,7 +1,7 @@
-import type { Service, SubService } from '../scenarios/types';
+import type { Service, SubService } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
 import { TechChip } from '../components/TechIcon';
-import { BRAND } from '../scenarios/brand';
-import { paletteVar } from '../scenarios/palette';
+import { paletteVar } from '../theme/statusMeta';
 
 interface SubServicePanelProps {
   sub: SubService;
@@ -10,6 +10,7 @@ interface SubServicePanelProps {
 
 /** Inspector for a sub-service inside an expanded ecosystem. */
 export function SubServicePanel({ sub, parent }: SubServicePanelProps) {
+  const { brand } = useCosmos().data;
   return (
     <>
       <div className="lc-map-panel-head">
@@ -24,7 +25,7 @@ export function SubServicePanel({ sub, parent }: SubServicePanelProps) {
         {sub.repo && (
           <a
             className="lc-map-panel-repo"
-            href={`${BRAND.repoBaseUrl}/${sub.repo}`}
+            href={`${brand.repoBaseUrl}/${sub.repo}`}
             target="_blank"
             rel="noopener noreferrer"
             title="Open on GitHub"

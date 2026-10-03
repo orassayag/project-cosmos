@@ -104,7 +104,7 @@ Run from the repo root — it is an npm workspaces root (`client/`, `server/`).
 | `npm run snapshot` | Regenerates `server/src/generated/cosmos-map.json` from the map data |
 | `npm run types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
 | `npm run validate` | Data sanity: ids resolve, `phaseId`s unique, spacing ok, snapshot fresh |
-| `npm run baseline:dump` | Writes the frozen data + derived-values baseline to `server/src/__tests__/fixtures/` |
+| `npm run fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `npm test` fails on a stale copy |
 | `npm run parity:screens` | Compares 16 map views against `docs/plans/baseline-screens/` (`-- --update` to rebaseline) |
 | `npm run cosmos:check -- --phase N` | Runs the migration checks for phase `N` |
 | `npm run fresh` | Replaces AstroMart with a minimal 2-star starter cosmos |
@@ -186,8 +186,8 @@ question → JEV triage (site's or visitor's AI Gateway key; free keyword fallba
                                            ├─ highlight_services → lights up every service it names
                                            ├─ play_scenario      → starts the matching flow
                                            └─ show_blast_radius, open_passport, show_health, show_ownership,
-                                              open_changelog_entry → map actions (the Ask panel ignores
-                                              these until it learns to run them)
+                                              open_changelog_entry → opens that view above the answer,
+                                              which comes back when the view is closed
 ```
 
 - **JEV** (`typesafe-ai/jev` on Vercel AI Gateway, zero data retention) decides whether the question is about the map, what the visitor wants, and which scenario they mean — with a 3-second budget. If it is slow, unconfigured or unavailable, a free local keyword check decides on-topic vs. off-topic instead. Triage never calls the visitor's model.

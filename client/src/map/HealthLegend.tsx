@@ -1,5 +1,6 @@
-import type { HealthStatus } from '../scenarios/health';
-import { HEALTH_STATUS_META, HEALTH_STATUS_COUNTS } from '../scenarios/health';
+import type { HealthStatus } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { HEALTH_STATUS_META } from '../theme/statusMeta';
 import { PanelCloseButton } from '../components/PanelCloseButton';
 
 const ORDER: HealthStatus[] = ['fresh', 'warm', 'hot'];
@@ -15,6 +16,7 @@ interface HealthLegendProps {
  * opens the on-call card.
  */
 export function HealthLegend({ onClose }: HealthLegendProps) {
+  const statusCounts = useCosmos().derived.healthStatus.counts;
   return (
     <div className="lc-health-legend" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
       {onClose && <PanelCloseButton onClose={onClose} label="Close health" />}
@@ -34,7 +36,7 @@ export function HealthLegend({ onClose }: HealthLegendProps) {
                 {meta.label}
                 <span className="lc-health-legend-blurb">{meta.blurb}</span>
               </span>
-              <span className="lc-health-legend-count">{HEALTH_STATUS_COUNTS[status]}</span>
+              <span className="lc-health-legend-count">{statusCounts[status]}</span>
             </li>
           );
         })}

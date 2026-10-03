@@ -1,6 +1,5 @@
-import type { Topic } from '../scenarios/types';
-import type { DriftKind } from '../scenarios/drift';
-import { DRIFT_KIND_META } from '../scenarios/drift';
+import type { DriftKind, Topic } from '../api/cosmos-api';
+import { DRIFT_KIND_META } from '../theme/statusMeta';
 
 const LABEL_FONT_SIZE = 13;
 // Monospace glyph width plus the label's 0.16em letter-spacing, as a fraction of font size.

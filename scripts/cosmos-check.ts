@@ -237,6 +237,45 @@ export const COSMOS_CHECKS: CosmosCheck[] = [
     pattern: 'npm run test:e2e',
     pathspecs: ['.github/workflows/validate-on-pr.yml'],
   },
+  {
+    name: 'response fixture, its generator, renderWithCosmos and the Ask map-action test exist',
+    phase: 8,
+    type: 'files-exist',
+    paths: [
+      'scripts/dump-cosmos-response.ts',
+      'client/src/__tests__/fixtures/cosmos-response.json',
+      'client/src/__tests__/renderWithCosmos.tsx',
+      'client/src/__tests__/askMapActions.test.tsx',
+    ],
+  },
+  {
+    // The plan's Phase 8 grep: only the old data files may still name them. client/src/demo/ moves in Phase 9.
+    name: 'client code outside the old data files never imports scenarios/ or incidents/',
+    phase: 8,
+    type: 'grep-absent',
+    pattern: 'scenarios/|incidents/',
+    pathspecs: [
+      ':(glob)client/src/**/*.ts',
+      ':(glob)client/src/**/*.tsx',
+      ':(exclude)client/src/scenarios',
+      ':(exclude)client/src/incidents',
+      ':(exclude)client/src/demo',
+      ':(exclude,glob)client/src/**/__tests__/**',
+    ],
+  },
+  {
+    name: 'module-load derivations are gone from the client; values come from `derived`',
+    phase: 8,
+    type: 'grep-absent',
+    pattern: 'DEPENDENTS_OF|TOPIC_GROUPS|CONNECTED_NODE_IDS|deriveEdges|computeBlastRadius|driftEntryMatches',
+    pathspecs: [
+      ':(glob)client/src/**/*.ts',
+      ':(glob)client/src/**/*.tsx',
+      ':(exclude)client/src/scenarios',
+      ':(exclude)client/src/incidents',
+      ':(exclude,glob)client/src/**/__tests__/**',
+    ],
+  },
 ];
 
 // `--untracked` so files a phase just created count before they are committed.

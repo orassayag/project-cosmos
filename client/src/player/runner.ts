@@ -11,8 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { PLAYABLE_BY_ID, stepsForScenario } from './data';
-import type { Scenario, Step } from './types';
+import type { CosmosResponse, Scenario, Step } from '../api/cosmos-api';
+import { indexCosmos, stepsFor } from '../api/cosmosIndex';
 
 export interface Shot {
   /** Scenario being played. */
@@ -90,7 +90,8 @@ function buildShotsFromIdx(steps: Step[], fromIdx: number): { startIdx: number; 
   return shots;
 }
 
-export function useScenarioRunner(): RunnerApi {
+/** `response` is null until `/api/cosmos` has loaded; nothing can play before then. */
+export function useScenarioRunner(response: CosmosResponse | null): RunnerApi {
   const [state, setState] = useState<RunnerState>(DEFAULT_STATE);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -98,8 +99,11 @@ export function useScenarioRunner(): RunnerApi {
   const tokenRef = useRef(0);
   const listenersRef = useRef<Set<ShotListener>>(new Set());
 
-  const scenario = state.scenarioId ? PLAYABLE_BY_ID[state.scenarioId] ?? null : null;
-  const steps = useMemo<Step[]>(() => (scenario ? stepsForScenario(scenario) : []), [scenario]);
+  const scenario = state.scenarioId && response ? indexCosmos(response).playableById[state.scenarioId] ?? null : null;
+  const steps = useMemo<Step[]>(
+    () => (scenario && response ? stepsFor(response, scenario.id) : []),
+    [scenario, response],
+  );
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
 

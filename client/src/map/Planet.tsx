@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 
-import type { Service } from '../scenarios/types';
+import type { Service } from '../api/cosmos-api';
 import { hashId, makeRng, planetHasRing, planetRadius, planetType } from './planetMorphology';
 
 // Relative-color helpers: shift a service's own hue lighter/darker so a

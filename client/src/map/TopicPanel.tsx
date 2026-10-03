@@ -1,4 +1,4 @@
-import type { Service, Step, Topic } from '../scenarios/types';
+import type { Service, Step, Topic } from '../api/cosmos-api';
 
 interface TopicPanelProps {
   topic: Topic;

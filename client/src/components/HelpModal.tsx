@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BRAND } from '../scenarios/brand';
+import { useCosmos } from '../api/CosmosProvider';
 
 interface HelpModalProps {
   open: boolean;
@@ -10,6 +10,7 @@ interface HelpModalProps {
 
 /** Modal explaining what the cosmos is, what's clickable, and how to run a flow. */
 export function HelpModal({ open, onClose }: HelpModalProps) {
+  const { brand } = useCosmos().data;
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -55,7 +56,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
             </button>
 
             <div className="lc-help-eyebrow">Welcome to Project Cosmos</div>
-            <h2 className="lc-help-title">{BRAND.helpTitle}</h2>
+            <h2 className="lc-help-title">{brand.helpTitle}</h2>
             <p className="lc-help-lede">
               Every star is a service, every dashed ring is a Kafka topic, every
               line is a connection. Pick a scenario and watch a real request

@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { DriftEntry } from '../scenarios/drift';
-import { DRIFT_KIND_META, driftPrUrl } from '../scenarios/drift';
+import type { DriftEntry } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { DRIFT_KIND_META } from '../theme/statusMeta';
+import type { DriftRun } from '../theme/driftRuns';
 import { PanelCloseButton } from '../components/PanelCloseButton';
-
-interface DriftRun {
-  /** ISO date of the run. */
-  date: string;
-  entries: DriftEntry[];
-}
 
 interface DriftOverlayProps {
   /** Every recorded run, newest first — the overlay pages through them. */
@@ -54,6 +50,7 @@ function groupByRun(items: DatedEntry[]): DriftRun[] {
  * finding's kind color while this overlay is active.
  */
 export function DriftOverlay({ runs, onSelect, onClose }: DriftOverlayProps) {
+  const { driftLinks } = useCosmos().derived;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadTimer = useRef<number | null>(null);
@@ -101,7 +98,7 @@ export function DriftOverlay({ runs, onSelect, onClose }: DriftOverlayProps) {
             <ul className="lc-drift-overlay-list">
               {run.entries.map((entry) => {
                 const meta = DRIFT_KIND_META[entry.kind];
-                const prUrl = driftPrUrl(entry);
+                const prUrl = driftLinks[entry.id]?.prUrl ?? null;
                 return (
                   <li key={entry.id}>
                     <button

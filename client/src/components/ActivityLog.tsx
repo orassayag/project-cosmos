@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import type { Step } from '../scenarios/types';
+import type { Step } from '../api/cosmos-api';
 
 interface ActivityLogProps {
   /** Steps fired so far in the current scenario, in order. */

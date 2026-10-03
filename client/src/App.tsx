@@ -10,8 +10,10 @@ import { ActivityLog } from './components/ActivityLog';
 import { IntroOverlay } from './components/IntroOverlay';
 import { WarpTransition } from './components/WarpTransition';
 import { CosmosLoadError } from './components/CosmosLoadError';
-import { CosmosProvider } from './api/CosmosProvider';
+import { CosmosProvider, useCosmos } from './api/CosmosProvider';
 import { useCosmosLoad } from './api/useCosmosLoad';
+import { indexCosmos, nodeKindOf, useCosmosIndex } from './api/cosmosIndex';
+import type { DriftEntry, Incident, Step } from './api/cosmos-api';
 import { HelpButton } from './components/HelpButton';
 import { HelpModal } from './components/HelpModal';
 import { DriftFooter } from './components/DriftFooter';
@@ -24,7 +26,7 @@ import { DemoPointer } from './components/DemoPointer';
 import { IncidentBar } from './components/IncidentBar';
 import { IncidentBanner } from './components/IncidentBanner';
 import { ChangelogPanel, projectCosmosStateFor } from './components/ChangelogPanel';
-import type { ChangelogActivation, ProjectCosmosState } from './components/ChangelogPanel';
+import type { ChangelogActivation, ChangelogFocus, ProjectCosmosState } from './components/ChangelogPanel';
 import { Spotlight } from './components/Spotlight';
 import type { SpotlightTarget } from './components/Spotlight';
 import { BrandStarfield } from './map/BrandStarfield';
@@ -40,12 +42,10 @@ import type { DemoScriptedAnswer } from './demo/types';
 import { useDemoAiConnection } from './demo/useDemoAiConnection';
 import { useDemoRunner } from './demo/useDemoRunner';
 
-import { DOMAINS, INCIDENTS_BY_ID, SERVICES, SERVICES_BY_ID, TOPICS_BY_ID, driftRunDateTime } from './scenarios/data';
-import type { Incident, DriftEntry } from './scenarios/data';
-import type { Step } from './scenarios/types';
-import { useScenarioRunner } from './scenarios/runner';
-import type { Shot } from './scenarios/runner';
+import { useScenarioRunner } from './player/runner';
+import type { Shot } from './player/runner';
 import { readInitialDeepLink, resolvePlayableId, useDeepLink } from './hooks/useDeepLink';
+import { driftRunDateTime } from './theme/driftRuns';
 
 interface ActivityEntry { idx: number; step: Step }
 
@@ -65,10 +65,15 @@ export function App() {
   // Plays the hyperspace warp between the intro CTA and the cosmos shell.
   const [warping, setWarping] = useState(false);
   const cosmosLoad = useCosmosLoad();
-  const isCosmosReady = cosmosLoad.state.status === 'ready';
-  const [activeDomain, setActiveDomain] = useState(() => initial.domain ?? DOMAINS[0].id);
+  const cosmosResponse = cosmosLoad.state.status === 'ready' ? cosmosLoad.state.response : null;
+  const cosmosIndex = cosmosResponse ? indexCosmos(cosmosResponse) : null;
+  const isCosmosReady = cosmosResponse !== null;
+  const defaultDomainId = cosmosResponse?.data.domains[0]?.id ?? null;
+  // null = no pick yet, which shows the first domain once the data has loaded.
+  const [pickedDomain, setActiveDomain] = useState<string | null>(() => initial.domain);
+  const activeDomain = pickedDomain ?? defaultDomainId ?? '';
 
-  const runner = useScenarioRunner();
+  const runner = useScenarioRunner(cosmosResponse);
   const { state, steps, scenario, setScenario, jumpTo, completeCurrentShot, onShot } = runner;
 
   // Hydrate from deep link on the shell's first paint (it mounts once the data is ready),
@@ -77,9 +82,10 @@ export function App() {
   const isShellShown = isCosmosReady && !showIntro && !warping;
   const hasHydratedDeepLinkRef = useRef(false);
   useEffect(() => {
-    if (!isShellShown || hasHydratedDeepLinkRef.current) return;
+    if (!isShellShown || !cosmosIndex || hasHydratedDeepLinkRef.current) return;
     hasHydratedDeepLinkRef.current = true;
-    const deepLinkId = resolvePlayableId(initial.incident) ?? resolvePlayableId(initial.scenario);
+    const deepLinkId =
+      resolvePlayableId(initial.incident, cosmosIndex) ?? resolvePlayableId(initial.scenario, cosmosIndex);
     if (deepLinkId) {
       setScenario(deepLinkId);
       if (initial.step != null) {
@@ -92,7 +98,7 @@ export function App() {
 
   // The active playable resolved as an incident (null for scenarios / idle).
   const activeIncident: Incident | null =
-    state.scenarioId != null ? INCIDENTS_BY_ID[state.scenarioId] ?? null : null;
+    state.scenarioId != null ? cosmosIndex?.incidentsById[state.scenarioId] ?? null : null;
 
   // Push UI state into the URL — incidents use `?incident=`, scenarios `?scenario=`.
   useDeepLink({
@@ -100,6 +106,7 @@ export function App() {
     scenario: activeIncident ? null : state.scenarioId,
     incident: activeIncident ? activeIncident.id : null,
     step: state.idx >= 0 ? state.idx : null,
+    defaultDomainId,
   });
 
   // Latest shot from the runner — drives the comet animation in Map.
@@ -190,7 +197,7 @@ export function App() {
 
   const handlePlayScenario = useCallback(
     (id: string) => {
-      const playableId = resolvePlayableId(id);
+      const playableId = cosmosIndex ? resolvePlayableId(id, cosmosIndex) : null;
       if (!playableId) return;
       if (playableId === state.scenarioId) {
         navRestart();
@@ -199,7 +206,7 @@ export function App() {
       pendingAutoplayIdRef.current = playableId;
       handlePickScenario(playableId);
     },
-    [state.scenarioId, navRestart, handlePickScenario],
+    [cosmosIndex, state.scenarioId, navRestart, handlePickScenario],
   );
 
   const handlePickDomain = useCallback(
@@ -238,8 +245,8 @@ export function App() {
   // When the entry touches no live node, fall back to just stamping the cursor.
   const handleSelectDrift = useCallback((entry: DriftEntry) => {
     const nodeId = entry.nodeIds[0];
-    const target: SpotlightTarget | null = nodeId
-      ? { id: nodeId, kind: TOPICS_BY_ID[nodeId] ? 'topic' : 'service' }
+    const target: SpotlightTarget | null = nodeId && cosmosIndex
+      ? { id: nodeId, kind: nodeKindOf(cosmosIndex, nodeId) === 'topic' ? 'topic' : 'service' }
       : null;
     if (target) {
       setWarp({ target, state: projectCosmosStateFor(entry), date: entry.date });
@@ -247,7 +254,7 @@ export function App() {
       setProjectCosmosState(projectCosmosStateFor(entry));
       setDriftDate(entry.date);
     }
-  }, []);
+  }, [cosmosIndex]);
 
   // The "Project Cosmos" title resets the galaxy to its initial state: no scenario,
   // no domain tab selected, cleared history/URL params, every overlay closed,
@@ -302,13 +309,41 @@ export function App() {
     [overlay],
   );
   const handleAnswerStart = useCallback(() => setAskAnswering(true), []);
+  // Surfaces an Ask action opens sit above the answer, which keeps streaming beneath them
+  // (buried on phones, hidden on desktop) and comes back when they close. Unknown ids are no-ops.
+  const [blastRequest, setBlastRequest] = useState<{ nodeId: string } | null>(null);
+  const [changelogFocus, setChangelogFocus] = useState<ChangelogFocus | null>(null);
+  const handleBlastRequestConsumed = useCallback(() => setBlastRequest(null), []);
   const handleAskAction = useCallback((action: AskAction) => {
-    if (action.kind === 'highlight') {
-      setAskFocusIds(action.serviceIds.filter((id) => SERVICES_BY_ID[id] || TOPICS_BY_ID[id]));
-    } else {
-      handlePlayScenario(action.scenarioId);
+    if (!cosmosIndex) return;
+    switch (action.kind) {
+      case 'highlight':
+        setAskFocusIds(action.serviceIds.filter((id) => nodeKindOf(cosmosIndex, id) !== null));
+        return;
+      case 'playScenario':
+        handlePlayScenario(action.scenarioId);
+        return;
+      case 'showBlastRadius':
+        if (nodeKindOf(cosmosIndex, action.nodeId)) setBlastRequest({ nodeId: action.nodeId });
+        return;
+      case 'openPassport': {
+        const kind = nodeKindOf(cosmosIndex, action.nodeId);
+        if (kind) setSpotlightTarget({ id: action.nodeId, kind, keepAsk: true });
+        return;
+      }
+      case 'showHealth':
+        overlay.open(OVERLAY.mapHealth, { keepBeneath: true });
+        return;
+      case 'showOwnership':
+        overlay.open(OVERLAY.mapOwnership, { keepBeneath: true });
+        return;
+      case 'openChangelogEntry':
+        if (!cosmosResponse?.data.drift.entries.some((entry) => entry.id === action.entryId)) return;
+        setChangelogFocus((previous) => ({ entryId: action.entryId, requestId: (previous?.requestId ?? 0) + 1 }));
+        overlay.open(OVERLAY.changelog, { keepBeneath: true });
+        return;
     }
-  }, [handlePlayScenario]);
+  }, [cosmosIndex, cosmosResponse, handlePlayScenario, overlay]);
 
   const handleIntroStart = useCallback(() => {
     if (!demoMode) localStorage.setItem(INTRO_SEEN_STORAGE_KEY, '1');
@@ -337,8 +372,12 @@ export function App() {
   const handleAsk = useCallback((question: string) => {
     // The demo's question goes through the real Search; only the answer is scripted.
     if (isDemoActive) openAskPanel(question, [], DEMO_SCRIPTED_ANSWER);
-    else openAskPanel(question, isAiConnected ? [] : [SERVICES[Math.floor(Math.random() * SERVICES.length)].id]);
-  }, [openAskPanel, isAiConnected, isDemoActive]);
+    else if (isAiConnected || !cosmosResponse) openAskPanel(question, []);
+    else {
+      const { services } = cosmosResponse.data;
+      openAskPanel(question, [services[Math.floor(Math.random() * services.length)].id]);
+    }
+  }, [openAskPanel, isAiConnected, isDemoActive, cosmosResponse]);
 
   // Any active scenario isolates the map — the moment a scenario is
   // picked, fade everything outside its touch set so the active flow
@@ -357,6 +396,7 @@ export function App() {
         )}
         {showIntro && (
           <IntroOverlay
+            tagline={cosmosResponse?.data.brand.tagline}
             onStart={handleIntroStart}
             onExitComplete={() => setShowIntro(false)}
           />
@@ -404,6 +444,9 @@ export function App() {
           navRestart={navRestart}
           spotlightTarget={spotlightTarget}
           setSpotlightTarget={setSpotlightTarget}
+          blastRequest={blastRequest}
+          onBlastRequestConsumed={handleBlastRequestConsumed}
+          changelogFocus={changelogFocus}
           warping={!!warp}
           onWarpDone={handleWarpDone}
           onActivateChangelogItem={handleActivateChangelogItem}
@@ -450,6 +493,9 @@ interface ProjectCosmosShellProps {
   navRestart: () => void;
   spotlightTarget: SpotlightTarget | null;
   setSpotlightTarget: (t: SpotlightTarget | null) => void;
+  blastRequest: { nodeId: string } | null;
+  onBlastRequestConsumed: () => void;
+  changelogFocus: ChangelogFocus | null;
   warping: boolean;
   onWarpDone: () => void;
   onActivateChangelogItem: (activation: ChangelogActivation) => void;
@@ -481,7 +527,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     activeDomain, runner, state, steps, scenario, shot, history,
     panelOpen, setPanelOpen, handlePickDomain, handlePickScenario,
     handleShotComplete, isolate, setHistory, navPlay, navPrev, navNext, navJump, navRestart,
-    spotlightTarget, setSpotlightTarget,
+    spotlightTarget, setSpotlightTarget, blastRequest, onBlastRequestConsumed, changelogFocus,
     warping, onWarpDone, onActivateChangelogItem, onResetGalaxy, projectCosmosState, resetNonce,
     driftDate, onSelectDrift,
     activeIncident,
@@ -508,6 +554,8 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
   // inspector or any other surface — opening one closes the rest.
   const isAiConnected = aiConnection.status === 'connected';
   const { disconnect: disconnectAi } = aiConnection;
+  const { servicesById } = useCosmosIndex();
+  const { runTimeUtc: driftRunTimeUtc } = useCosmos().data.drift;
   const handleConnectRequest = useCallback(() => overlay.open(OVERLAY.connect), [overlay]);
   const handleDisconnect = useCallback(() => {
     void disconnectAi();
@@ -526,10 +574,10 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     if (!activeIncident || steps.length === 0) return null;
     if (state.idx !== steps.length - 1) return null;
     const last = steps[steps.length - 1];
-    if (SERVICES_BY_ID[last.to]) return last.to;
-    if (SERVICES_BY_ID[last.from]) return last.from;
+    if (servicesById[last.to]) return last.to;
+    if (servicesById[last.from]) return last.from;
     return null;
-  }, [activeIncident, state.idx, steps]);
+  }, [activeIncident, state.idx, steps, servicesById]);
 
   // The star that HAS detonated — set only when the meteor reaches it. Cleared
   // whenever the target changes (new incident, moved off the last step) so a
@@ -615,7 +663,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
                       <circle cx={6} cy={6} r={4.6} fill="none" stroke="currentColor" strokeWidth={1} />
                       <path d="M6 3.4 V6 L7.8 7.2" fill="none" stroke="currentColor" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    {driftRunDateTime(driftDate)}
+                    {driftRunDateTime(driftDate, driftRunTimeUtc)}
                   </span>
                 )}
                 {projectCosmosState && (
@@ -759,6 +807,8 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           presentation={presentation}
           spotlightTarget={spotlightTarget}
           onSpotlightConsumed={() => setSpotlightTarget(null)}
+          blastRequest={blastRequest}
+          onBlastRequestConsumed={onBlastRequestConsumed}
           resetNonce={resetNonce}
           askFocusIds={askFocusIds}
           incidentActive={!!activeIncident}
@@ -859,6 +909,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
           if (!isMobile) overlay.close(OVERLAY.changelog);
         }}
         onActivateItem={onActivateChangelogItem}
+        focus={changelogFocus}
       />
 
       {/* Hyperspace warp played when a changelog item is clicked — lands on

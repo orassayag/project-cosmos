@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 
-import { CLUSTERS } from '../scenarios/clusters';
-import { SERVICES_BY_ID, TOPICS_BY_ID } from '../scenarios/data';
-import { PALETTE } from '../scenarios/palette';
+import type { Cluster, PaletteKey, Service } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { useCosmosIndex } from '../api/cosmosIndex';
+import type { CosmosIndex } from '../api/cosmosIndex';
 
 // A region is a broad zone of the map — one per cluster. Its center and
 // size are derived from the services that anchor it, so the nebula tracks the
@@ -14,13 +15,6 @@ interface RegionSpec {
   base: string;
   hot: string;
 }
-
-const REGION_SPECS: RegionSpec[] = CLUSTERS.map((cluster) => ({
-  id: cluster.id,
-  anchorServiceIds: cluster.nebula.anchorServiceIds,
-  base: PALETTE[cluster.nebula.base],
-  hot: PALETTE[cluster.nebula.hot],
-}));
 
 // A single-service zone collapses to a point without this floor, so give
 // every cloud a broad minimum reach — nebulae are diffuse, not tight.
@@ -34,39 +28,45 @@ interface Region extends RegionSpec {
   ry: number;
 }
 
-const REGIONS: Region[] = REGION_SPECS.map((spec) => {
-  const nodes = spec.anchorServiceIds.map((id) => SERVICES_BY_ID[id]).filter(Boolean);
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const n of nodes) {
-    minX = Math.min(minX, n.x - n.width / 2);
-    minY = Math.min(minY, n.y - n.height / 2);
-    maxX = Math.max(maxX, n.x + n.width / 2);
-    maxY = Math.max(maxY, n.y + n.height / 2);
-  }
-  return {
-    ...spec,
-    cx: (minX + maxX) / 2,
-    cy: (minY + maxY) / 2,
-    rx: Math.max(MIN_RADIUS, (maxX - minX) / 2 + REGION_PADDING),
-    ry: Math.max(MIN_RADIUS, (maxY - minY) / 2 + REGION_PADDING),
-  };
-});
+function buildRegions(
+  clusters: readonly Cluster[],
+  servicesById: Record<string, Service>,
+  palette: Record<PaletteKey, string>,
+): Region[] {
+  return clusters.map((cluster) => {
+    const nodes = cluster.nebula.anchorServiceIds.map((id) => servicesById[id]).filter(Boolean);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      minX = Math.min(minX, n.x - n.width / 2);
+      minY = Math.min(minY, n.y - n.height / 2);
+      maxX = Math.max(maxX, n.x + n.width / 2);
+      maxY = Math.max(maxY, n.y + n.height / 2);
+    }
+    return {
+      id: cluster.id,
+      anchorServiceIds: cluster.nebula.anchorServiceIds,
+      base: palette[cluster.nebula.base],
+      hot: palette[cluster.nebula.hot],
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      rx: Math.max(MIN_RADIUS, (maxX - minX) / 2 + REGION_PADDING),
+      ry: Math.max(MIN_RADIUS, (maxY - minY) / 2 + REGION_PADDING),
+    };
+  });
+}
 
-const nodePosition = (id: string): { x: number; y: number } | null => {
-  const svc = SERVICES_BY_ID[id];
-  if (svc) return { x: svc.x, y: svc.y };
-  const topic = TOPICS_BY_ID[id];
-  if (topic) return { x: topic.x, y: topic.y };
-  return null;
-};
+function nodePosition(index: CosmosIndex, id: string): { x: number; y: number } | null {
+  const node = index.servicesById[id] ?? index.topicsById[id];
+  return node ? { x: node.x, y: node.y } : null;
+}
 
 // Attribute a node to the region whose center it sits closest to — covers
 // topics and any node the anchor lists don't name, so every bit of activity
 // lands in exactly one zone.
-const nearestRegionId = (x: number, y: number): string => {
-  let bestId = REGIONS[0].id;
+function nearestRegionId(regions: readonly Region[], x: number, y: number): string {
+  let bestId = regions[0].id;
   let bestDist = Infinity;
-  for (const r of REGIONS) {
+  for (const r of regions) {
     const d = (r.cx - x) ** 2 + (r.cy - y) ** 2;
     if (d < bestDist) {
       bestDist = d;
@@ -74,7 +74,7 @@ const nearestRegionId = (x: number, y: number): string => {
     }
   }
   return bestId;
-};
+}
 
 interface NebulaFieldProps {
   /** Path nodes of the active scenario — the flow currently laid out. */
@@ -105,12 +105,17 @@ const FLOOR = 0.06;
  * Pure atmosphere — pointer-events off, no labels, no information.
  */
 export function NebulaField({ scenarioNodes, shotNodes, hoverId, selectionId, density }: NebulaFieldProps) {
+  const { version, data } = useCosmos();
+  const index = useCosmosIndex();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the layout changes only with a new response version
+  const regions = useMemo(() => buildRegions(data.clusters, index.servicesById, data.palette), [version]);
   const intensityByRegion = useMemo(() => {
-    const intensity = new Map<string, number>(REGIONS.map((r) => [r.id, FLOOR]));
+    const intensity = new Map<string, number>(regions.map((r) => [r.id, FLOOR]));
+    if (regions.length === 0) return intensity;
     const add = (id: string, amount: number) => {
-      const pos = nodePosition(id);
+      const pos = nodePosition(index, id);
       if (!pos) return;
-      const regionId = nearestRegionId(pos.x, pos.y);
+      const regionId = nearestRegionId(regions, pos.x, pos.y);
       intensity.set(regionId, (intensity.get(regionId) ?? FLOOR) + amount);
     };
 
@@ -122,23 +127,23 @@ export function NebulaField({ scenarioNodes, shotNodes, hoverId, selectionId, de
     // Busy ambient traffic lifts the whole sky gently — flows are firing
     // everywhere, not in one zone.
     const ambient = Math.max(0, (density - 1) * 0.09);
-    for (const r of REGIONS) {
+    for (const r of regions) {
       intensity.set(r.id, Math.min(1, (intensity.get(r.id) ?? FLOOR) + ambient));
     }
     return intensity;
-  }, [scenarioNodes, shotNodes, hoverId, selectionId, density]);
+  }, [regions, index, scenarioNodes, shotNodes, hoverId, selectionId, density]);
 
   return (
     <g className="lc-nebula" pointerEvents="none" aria-hidden="true">
       <defs>
-        {REGIONS.map((r) => (
+        {regions.map((r) => (
           <radialGradient key={`base-${r.id}`} id={`cosmos-nebula-base-${r.id}`} cx="0.5" cy="0.5" r="0.5">
             <stop offset="0%" stopColor={r.base} stopOpacity="0.16" />
             <stop offset="55%" stopColor={r.base} stopOpacity="0.05" />
             <stop offset="100%" stopColor={r.base} stopOpacity="0" />
           </radialGradient>
         ))}
-        {REGIONS.map((r) => (
+        {regions.map((r) => (
           <radialGradient key={`hot-${r.id}`} id={`cosmos-nebula-hot-${r.id}`} cx="0.5" cy="0.5" r="0.5">
             <stop offset="0%" stopColor={r.hot} stopOpacity="0.34" />
             <stop offset="45%" stopColor={r.hot} stopOpacity="0.14" />
@@ -147,7 +152,7 @@ export function NebulaField({ scenarioNodes, shotNodes, hoverId, selectionId, de
         ))}
       </defs>
 
-      {REGIONS.map((r, i) => {
+      {regions.map((r, i) => {
         const intensity = intensityByRegion.get(r.id) ?? FLOOR;
         return (
           <g

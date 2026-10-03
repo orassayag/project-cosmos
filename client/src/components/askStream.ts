@@ -57,6 +57,15 @@ export function parseAskStreamLine(line: string): AskStreamEvent | null {
       if (parsed.kind === 'playScenario' && typeof parsed.scenarioId === 'string') {
         return { type: 'action', kind: 'playScenario', scenarioId: parsed.scenarioId };
       }
+      if ((parsed.kind === 'showBlastRadius' || parsed.kind === 'openPassport') && typeof parsed.nodeId === 'string') {
+        return { type: 'action', kind: parsed.kind, nodeId: parsed.nodeId };
+      }
+      if (parsed.kind === 'showHealth' || parsed.kind === 'showOwnership') {
+        return { type: 'action', kind: parsed.kind };
+      }
+      if (parsed.kind === 'openChangelogEntry' && typeof parsed.entryId === 'string') {
+        return { type: 'action', kind: 'openChangelogEntry', entryId: parsed.entryId };
+      }
       return null;
     case 'usage':
       return Number.isFinite(parsed.inputTokens) && Number.isFinite(parsed.outputTokens)

@@ -11,8 +11,7 @@
  * WS hop in a 3-hop broadcast is cyan, etc).
  */
 
-import { SERVICES_BY_ID } from '../scenarios/data';
-import type { Protocol, Step } from '../scenarios/types';
+import type { Protocol, Service, Step } from '../api/cosmos-api';
 
 export interface EdgeLeg {
   /** Same key shape used in Map.tsx so we can look up the rendered <path>. */
@@ -26,10 +25,14 @@ function edgeKey(from: string, to: string, proto: Protocol): string {
   return `${from}→${to}|${proto}`;
 }
 
-export function legsForStep(step: Step, expanded?: Set<string> | null): EdgeLeg[] {
+export function legsForStep(
+  step: Step,
+  expanded?: Set<string> | null,
+  servicesById: Record<string, Service> = {},
+): EdgeLeg[] {
   // 3-hop broadcast through a service whose ecosystem is currently expanded →
   // reroute through its sub-services so the packet visibly traverses them.
-  const ecosystem = step.through ? SERVICES_BY_ID[step.through]?.ecosystem : undefined;
+  const ecosystem = step.through ? servicesById[step.through]?.ecosystem : undefined;
   if (step.via && step.through && ecosystem && expanded?.has(step.through)) {
     return [
       { key: edgeKey(step.from, step.via, 'kafka'), proto: 'kafka', from: step.from, to: step.via },

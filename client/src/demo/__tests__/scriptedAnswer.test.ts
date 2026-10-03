@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SERVICES_BY_ID } from '../../scenarios/data';
+import { indexCosmos } from '../../api/cosmosIndex';
+import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
+
+const SERVICES_BY_ID = indexCosmos(COSMOS_FIXTURE).servicesById;
 
 const highlightedIds = (DEMO_SCRIPTED_ANSWER.actions ?? []).flatMap((action) =>
   action.kind === 'highlight' ? action.serviceIds : [],

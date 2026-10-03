@@ -1,5 +1,4 @@
-import { ALL_STEPS } from '../scenarios/data';
-import type { EcosystemEdge, Protocol, Service, ServiceEcosystem } from '../scenarios/types';
+import type { EcosystemEdge, Protocol, Service, ServiceEcosystem, Step } from '../api/cosmos-api';
 import { buildPathBetween, subPosition } from './edge-builder';
 import type { PosOverrides } from './edge-builder';
 import { edgeKey } from './edge-resolver';
@@ -26,8 +25,8 @@ export function ecosystemPathSubIds(ecosystem: ServiceEcosystem): Set<string> {
 }
 
 /** Every node any step delivers to through this service. */
-export function ecosystemDestinationIds(serviceId: string): Set<string> {
-  return new Set(ALL_STEPS.filter((step) => step.through === serviceId).map((step) => step.to));
+export function ecosystemDestinationIds(serviceId: string, steps: readonly Step[]): Set<string> {
+  return new Set(steps.filter((step) => step.through === serviceId).map((step) => step.to));
 }
 
 // A hop that has a return hop bows to one side and the return to the other, so the pair never overlaps.
@@ -45,8 +44,8 @@ export function buildEcosystemEdges(
   intakeTopic: Point | undefined,
   destinations: Point[],
 ): EcosystemEdgePath[] | null {
-  const intake = subPosition(service.id, ecosystem.intakeSubServiceId, overrides);
-  const egress = subPosition(service.id, ecosystem.egressSubServiceId, overrides);
+  const intake = subPosition(service, ecosystem.intakeSubServiceId, overrides);
+  const egress = subPosition(service, ecosystem.egressSubServiceId, overrides);
   if (!intake || !egress || !intakeTopic) return null;
 
   const edges: EcosystemEdgePath[] = [
@@ -57,8 +56,8 @@ export function buildEcosystemEdges(
     },
   ];
   for (const edge of ecosystem.internalEdges) {
-    const from = subPosition(service.id, edge.from, overrides);
-    const to = subPosition(service.id, edge.to, overrides);
+    const from = subPosition(service, edge.from, overrides);
+    const to = subPosition(service, edge.to, overrides);
     if (!from || !to) return null;
     edges.push({
       key: edgeKey(edge.from, edge.to, edge.proto),

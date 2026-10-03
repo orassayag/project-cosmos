@@ -2,12 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 
-import type { Shot } from '../scenarios/runner';
+import type { Shot } from '../player/runner';
+import { useCosmosIndex } from '../api/cosmosIndex';
 import { PROTO_COLOR } from './Edge';
 import { useEdgeRegistry } from './edge-registry';
 import { legsForStep } from './edge-resolver';
 import type { EdgeLeg } from './edge-resolver';
-import type { Protocol, Step } from '../scenarios/types';
+import type { Protocol, Service, Step } from '../api/cosmos-api';
 
 gsap.registerPlugin(MotionPathPlugin);
 
@@ -63,10 +64,14 @@ const STARDUST_MAX_LIFE_S = 1.7;
  * Upper bound, in ms at speed 1, of one shot's timeline — the time until the runner
  * advances. The last leg's stardust outlives every other trailing effect, splash included.
  */
-export function shotTimelineMs(steps: readonly Step[], expanded?: Set<string> | null): number {
+export function shotTimelineMs(
+  steps: readonly Step[],
+  expanded?: Set<string> | null,
+  servicesById?: Record<string, Service>,
+): number {
   let longestBranchS = 0;
   for (const step of steps) {
-    const legs = legsForStep(step, expanded);
+    const legs = legsForStep(step, expanded, servicesById);
     if (legs.length === 0) continue;
     const flightS = legs.reduce((totalS, leg) => totalS + PROTO_DURATION[leg.proto], 0) + LEG_GAP_S * (legs.length - 1);
     longestBranchS = Math.max(longestBranchS, flightS + STARDUST_FADE_IN_S + STARDUST_MAX_LIFE_S);
@@ -81,6 +86,7 @@ export function shotTimelineMs(steps: readonly Step[], expanded?: Set<string> | 
  */
 export function CometPackets({ shot, speed, onShotComplete, expanded, cometScale = 1, tint = null, explodeTargetId = null, onStarHit }: CometPacketsProps) {
   const registry = useEdgeRegistry();
+  const { servicesById } = useCosmosIndex();
   // Read the latest hit target/handler inside the shot-scoped timeline without
   // rebuilding it — the timeline effect only re-runs per shot.
   const explodeTargetRef = useRef(explodeTargetId);
@@ -118,7 +124,7 @@ export function CometPackets({ shot, speed, onShotComplete, expanded, cometScale
     tl.timeScale(speed);
 
     for (const step of renderedShot.steps) {
-      const legs = legsForStep(step, expanded);
+      const legs = legsForStep(step, expanded, servicesById);
       if (legs.length === 0) continue;
 
       // Chain legs sequentially within this step's branch — but the branch

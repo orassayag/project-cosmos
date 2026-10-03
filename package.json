@@ -27,7 +27,7 @@
     "sync:clone-repos": "tsx drift-sync/scripts/clone-repos.ts",
     "fresh": "node scripts/fresh-start.mjs",
     "record:demo": "node scripts/record-demo.mjs",
-    "baseline:dump": "tsx scripts/dump-baseline.ts",
+    "fixture:cosmos": "tsx scripts/dump-cosmos-response.ts",
     "parity:screens": "node scripts/parity-screens.mjs",
     "cosmos:check": "tsx scripts/cosmos-check.ts",
     "test:scripts": "tsx --test scripts/__tests__/*.test.ts",

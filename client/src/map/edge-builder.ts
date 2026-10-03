@@ -1,7 +1,11 @@
-import { SERVICES_BY_ID, TOPICS_BY_ID, ALL_STEPS, PLAYABLE_BY_ID, stepsForScenario } from '../scenarios/data';
-import type { Protocol, Step } from '../scenarios/types';
-import type { Shot } from '../scenarios/runner';
+import type { LogicalEdge, Playable, Protocol, Service, Step, Topic } from '../api/cosmos-api';
+import type { Shot } from '../player/runner';
 import { planetRadius } from './planetMorphology';
+
+export interface NodeLookup {
+  servicesById: Record<string, Service>;
+  topicsById: Record<string, Topic>;
+}
 
 export type PosOverrides = Record<string, { x: number; y: number }>;
 
@@ -21,8 +25,8 @@ export interface EdgeRecord {
   to: string;
 }
 
-export function nodeRef(id: string, ov: PosOverrides = {}): NodeRef | null {
-  const svc = SERVICES_BY_ID[id];
+export function nodeRef(id: string, lookup: NodeLookup, ov: PosOverrides = {}): NodeRef | null {
+  const svc = lookup.servicesById[id];
   if (svc) {
     const pos = ov[id] ?? svc;
     // Services render as spheres; edges anchor to that circle (hw === hh),
@@ -30,7 +34,7 @@ export function nodeRef(id: string, ov: PosOverrides = {}): NodeRef | null {
     const radius = planetRadius(id);
     return { x: pos.x, y: pos.y, hw: radius, hh: radius, isCapsule: true };
   }
-  const topic = TOPICS_BY_ID[id];
+  const topic = lookup.topicsById[id];
   if (topic) {
     const pos = ov[id] ?? topic;
     return { x: pos.x, y: pos.y, hw: 11, hh: 11, isCapsule: false };
@@ -88,9 +92,15 @@ export function anchor(from: NodeRef, to: NodeRef): { x: number; y: number } {
   return { x: from.x + sx * ax * t, y: from.y + sy * ay * t };
 }
 
-export function buildEdgePath(fromId: string, toId: string, sideIdx: number, ov: PosOverrides = {}): string | null {
-  const a = nodeRef(fromId, ov);
-  const b = nodeRef(toId, ov);
+export function buildEdgePath(
+  fromId: string,
+  toId: string,
+  sideIdx: number,
+  lookup: NodeLookup,
+  ov: PosOverrides = {},
+): string | null {
+  const a = nodeRef(fromId, lookup, ov);
+  const b = nodeRef(toId, lookup, ov);
   if (!a || !b) return null;
   if (fromId === toId) {
     const cx = a.x;
@@ -122,14 +132,13 @@ export function buildEdgePath(fromId: string, toId: string, sideIdx: number, ov:
  * MUST mirror the orbit math in `ServiceNode.tsx > Ecosystem` — same
  * radius, same starting angle, same spacing.
  */
-export function subPosition(parentId: string, subId: string, ov: PosOverrides = {}): { x: number; y: number } | null {
-  const parent = SERVICES_BY_ID[parentId];
-  if (!parent || !parent.subServices) return null;
+export function subPosition(parent: Service, subId: string, ov: PosOverrides = {}): { x: number; y: number } | null {
+  if (!parent.subServices) return null;
   const idx = parent.subServices.findIndex((s) => s.id === subId);
   if (idx < 0) return null;
   const radius = 95; // keep in sync with Ecosystem radius
   const angle = (idx / parent.subServices.length) * Math.PI * 2 - Math.PI / 4;
-  const pos = ov[parentId] ?? parent;
+  const pos = ov[parent.id] ?? parent;
   return {
     x: pos.x + Math.cos(angle) * radius,
     y: pos.y + Math.sin(angle) * radius,
@@ -153,37 +162,21 @@ export function buildPathBetween(
   return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
 }
 
-export function deriveEdges(ov: PosOverrides = {}): EdgeRecord[] {
-  const map = new Map<string, EdgeRecord>();
-  let counter = 0;
-  const addEdge = (from: string, to: string, type: Protocol) => {
-    const key = `${from}→${to}|${type}`;
-    if (map.has(key)) return;
-    const d = buildEdgePath(from, to, counter++, ov);
-    if (!d) return;
-    map.set(key, { key, d, type, from, to });
-  };
-  for (const step of ALL_STEPS) {
-    if (step.via && step.through) {
-      addEdge(step.from, step.via, 'kafka');
-      addEdge(step.via, step.through, 'kafka');
-      addEdge(step.through, step.to, 'ws');
-    } else if (step.via) {
-      addEdge(step.from, step.via, 'kafka');
-      addEdge(step.via, step.to, 'kafka');
-    } else {
-      addEdge(step.from, step.to, step.type);
-    }
-  }
-  return Array.from(map.values());
+/** Curve geometry for the server's logical edges; the bend side alternates in edge order. */
+export function buildEdges(logicalEdges: readonly LogicalEdge[], lookup: NodeLookup, ov: PosOverrides = {}): EdgeRecord[] {
+  const records: EdgeRecord[] = [];
+  logicalEdges.forEach((edge, sideIdx) => {
+    const d = buildEdgePath(edge.from, edge.to, sideIdx, lookup, ov);
+    if (d) records.push({ ...edge, d });
+  });
+  return records;
 }
 
-export function activeNodeSet(scenarioId: string | null | undefined): Set<string> | null {
-  if (!scenarioId) return null;
-  const scenario = PLAYABLE_BY_ID[scenarioId];
-  if (!scenario || scenario.status !== 'ready') return null;
+/** Every node a ready playable's steps touch; null when nothing ready is active. */
+export function activeNodeSet(playable: Playable | null | undefined, steps: readonly Step[]): Set<string> | null {
+  if (!playable || playable.status !== 'ready') return null;
   const set = new Set<string>();
-  for (const step of stepsForScenario(scenario)) {
+  for (const step of steps) {
     set.add(step.from);
     set.add(step.to);
     if (step.via) set.add(step.via);

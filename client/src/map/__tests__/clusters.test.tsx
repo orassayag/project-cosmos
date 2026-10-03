@@ -1,14 +1,17 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { CLUSTERS } from '../../scenarios/clusters';
-import { SERVICES_BY_ID } from '../../scenarios/data';
-import type { Cluster, Service } from '../../scenarios/types';
+import type { Cluster, Service } from '../../api/cosmos-api';
+import { indexCosmos } from '../../api/cosmosIndex';
+import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { ClusterBackdrop } from '../ClusterBackdrop';
+
+const CLUSTERS = COSMOS_FIXTURE.data.clusters;
+const SERVICES_BY_ID = indexCosmos(COSMOS_FIXTURE).servicesById;
 
 function renderBackdrop(cluster: Cluster, servicesById: Record<string, Service>) {
   return render(
     <svg>
-      <ClusterBackdrop cluster={cluster} servicesById={servicesById} />
+      <ClusterBackdrop cluster={cluster} servicesById={servicesById} palette={COSMOS_FIXTURE.data.palette} />
     </svg>,
   );
 }

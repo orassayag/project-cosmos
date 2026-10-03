@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { DOMAINS, INCIDENTS_BY_ID, SCENARIOS_BY_ID } from '../scenarios/data';
+import type { CosmosIndex } from '../api/cosmosIndex';
 
 interface DeepLinkState {
   domain: string | null;
@@ -7,6 +7,8 @@ interface DeepLinkState {
   /** Set instead of `scenario` when the active playable is a recorded incident. */
   incident: string | null;
   step: number | null;
+  /** The domain shown when the URL names none; null until the data has loaded. */
+  defaultDomainId: string | null;
 }
 
 /**
@@ -20,7 +22,7 @@ export function useDeepLink(state: DeepLinkState) {
     const url = new URL(window.location.href);
     const params = url.searchParams;
 
-    if (state.domain && state.domain !== DOMAINS[0].id) params.set('domain', state.domain);
+    if (state.domain && state.domain !== state.defaultDomainId) params.set('domain', state.domain);
     else params.delete('domain');
 
     if (state.incident) {
@@ -41,7 +43,7 @@ export function useDeepLink(state: DeepLinkState) {
     if (next === last.current) return;
     last.current = next;
     window.history.replaceState(null, '', next);
-  }, [state.domain, state.scenario, state.incident, state.step]);
+  }, [state.domain, state.scenario, state.incident, state.step, state.defaultDomainId]);
 }
 
 export interface InitialDeepLink {
@@ -64,8 +66,7 @@ export function readInitialDeepLink(): InitialDeepLink {
   };
 }
 
-export function resolvePlayableId(id: string | null | undefined): string | null {
+export function resolvePlayableId(id: string | null | undefined, index: CosmosIndex): string | null {
   if (!id) return null;
-  if (INCIDENTS_BY_ID[id] || SCENARIOS_BY_ID[id]) return id;
-  return null;
+  return index.playableById[id] ? id : null;
 }

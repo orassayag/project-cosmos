@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { motion, type Variants } from 'framer-motion';
 
 import { Starfield } from './Starfield';
-import { BRAND } from '../scenarios/brand';
 
 interface IntroOverlayProps {
+  /** The brand tagline; undefined while `/api/cosmos` is still loading (the intro shows before it). */
+  tagline?: string;
   /** Fires the moment the CTA is pressed — App kicks off the warp. */
   onStart: () => void;
   /** Fires after the intro's fade-out completes — App unmounts the intro. */
@@ -47,7 +48,7 @@ const RING_COLORS = [
  */
 const EXIT_MS = 2000;
 
-export function IntroOverlay({ onStart, onExitComplete }: IntroOverlayProps) {
+export function IntroOverlay({ tagline, onStart, onExitComplete }: IntroOverlayProps) {
   const [exiting, setExiting] = useState(false);
 
   const handleStart = () => {
@@ -159,7 +160,7 @@ export function IntroOverlay({ onStart, onExitComplete }: IntroOverlayProps) {
           <img className="lc-intro-wordmark" src={`${import.meta.env.BASE_URL}logo-wordmark.png`} alt="Project Cosmos" />
         </motion.h1>
         <motion.p className="lc-intro-sub" variants={child}>
-          {BRAND.tagline}
+          {tagline}
         </motion.p>
         <motion.div variants={child} className="lc-intro-cta-row">
           <button type="button" className="lc-intro-cta" data-demo-target="intro-start" onClick={handleStart} disabled={exiting}>

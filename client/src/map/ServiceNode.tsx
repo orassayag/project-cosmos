@@ -1,10 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import type { MouseEvent } from 'react';
 
-import type { Service, SubService } from '../scenarios/types';
-import type { DriftKind } from '../scenarios/drift';
-import { DRIFT_KIND_META } from '../scenarios/drift';
-import { paletteVar } from '../scenarios/palette';
+import type { DriftKind, Service, SubService } from '../api/cosmos-api';
+import { DRIFT_KIND_META, paletteVar } from '../theme/statusMeta';
 import { Planet } from './Planet';
 import { planetRadius } from './planetMorphology';
 

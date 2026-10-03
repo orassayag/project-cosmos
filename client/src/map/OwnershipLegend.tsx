@@ -1,4 +1,4 @@
-import type { TeamGroup } from '../scenarios/owners';
+import type { TeamGroup } from '../api/cosmos-api';
 import { PanelCloseButton } from '../components/PanelCloseButton';
 
 /** Stable key for a group — its team id, or a sentinel for the unowned bucket. */

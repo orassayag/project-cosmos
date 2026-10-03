@@ -1303,6 +1303,10 @@ body:has(.lc-map-stage[data-panning='true']) * {
 .lc-changelog-item--clickable:focus-visible {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-2) 40%, transparent);
 }
+.lc-changelog-item--focused {
+  background: color-mix(in srgb, var(--text-1) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--svc-cyan);
+}
 .lc-changelog-glyph { font-size: 12px; line-height: 1.4; flex-shrink: 0; }
 .lc-changelog-item-body { min-width: 0; }
 .lc-changelog-item-title {

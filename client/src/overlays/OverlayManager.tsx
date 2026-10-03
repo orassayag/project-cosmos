@@ -20,8 +20,11 @@ import { useViewport } from '../hooks/useViewport';
 export interface OverlayManager {
   /** The id of the single currently-open (top) overlay, or null when none is open. */
   active: string | null;
-  /** Open `id` on top — closing any other overlay on desktop, burying it on phones. */
-  open: (id: string) => void;
+  /**
+   * Open `id` on top — closing any other overlay on desktop, burying it on phones.
+   * `keepBeneath` buries it on desktop too, so closing `id` brings it back (Ask map actions keep the answer).
+   */
+  open: (id: string, options?: OpenOverlayOptions) => void;
   /** Remove `id` wherever it sits, revealing the overlay beneath it (phones). */
   close: (id: string) => void;
   /** Close `id` if it is the active one, otherwise open it. */
@@ -31,6 +34,10 @@ export interface OverlayManager {
   isStacked: (id: string) => boolean;
   /** Close every overlay (used by the "reset the galaxy" flow). */
   reset: () => void;
+}
+
+export interface OpenOverlayOptions {
+  keepBeneath?: boolean;
 }
 
 const OverlayContext = createContext<OverlayManager | null>(null);
@@ -48,11 +55,15 @@ export function useOverlayManager(): OverlayManager {
   }, [isMobile]);
 
   const pushOnTop = useCallback(
-    (current: string[], id: string) => (isMobile ? [...current.filter((entry) => entry !== id), id] : [id]),
+    (current: string[], id: string, keepBeneath = false) =>
+      isMobile || keepBeneath ? [...current.filter((entry) => entry !== id), id] : [id],
     [isMobile],
   );
   const open = useCallback(
-    (id: string) => setStack((current) => (current[current.length - 1] === id ? current : pushOnTop(current, id))),
+    (id: string, options?: OpenOverlayOptions) =>
+      setStack((current) =>
+        current[current.length - 1] === id ? current : pushOnTop(current, id, options?.keepBeneath),
+      ),
     [pushOnTop],
   );
   const close = useCallback(

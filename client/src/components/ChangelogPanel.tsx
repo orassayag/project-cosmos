@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  DRIFT_KIND_META,
-  SERVICES_BY_ID,
-  TOPICS_BY_ID,
-  driftBranch,
-  driftCommitUrl,
-  driftEntriesByRun,
-  driftEntryMatches,
-  driftPrUrl,
-} from '../scenarios/data';
-import type { DriftEntry } from '../scenarios/data';
+import type { DriftEntry } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { nodeKindOf, useCosmosIndex } from '../api/cosmosIndex';
+import type { CosmosIndex } from '../api/cosmosIndex';
+import { DRIFT_KIND_META } from '../theme/statusMeta';
+import { driftEntriesByRun } from '../theme/driftRuns';
 import type { SpotlightTarget } from './Spotlight';
 
 /** The commit context a clicked item warps the map into — shown by the title. */
@@ -23,6 +18,12 @@ export interface ProjectCosmosState {
   date: string;
   /** PR author, when the change carries one. */
   owner?: string;
+}
+
+/** An entry to scroll to and mark when the panel opens (an Ask map action); a new `requestId` repeats it. */
+export interface ChangelogFocus {
+  entryId: string;
+  requestId: number;
 }
 
 /** Payload emitted when a whole changelog item is clicked. */
@@ -42,6 +43,7 @@ interface ChangelogPanelProps {
   onSelectNode: (target: SpotlightTarget) => void;
   /** Warp to an item's affected node when the item itself is clicked. */
   onActivateItem: (activation: ChangelogActivation) => void;
+  focus?: ChangelogFocus | null;
 }
 
 /** How many items are shown before the "Load more" button appears. */
@@ -61,10 +63,10 @@ function runHeading(iso: string): string {
 
 /** The first affected node that resolves to a live service/topic — the target
  *  a whole-item click warps toward. Null if the entry touches no known node. */
-function primaryTarget(nodeIds: string[]): SpotlightTarget | null {
+function primaryTarget(nodeIds: string[], index: CosmosIndex): SpotlightTarget | null {
   for (const nodeId of nodeIds) {
-    if (SERVICES_BY_ID[nodeId]) return { id: nodeId, kind: 'service' };
-    if (TOPICS_BY_ID[nodeId]) return { id: nodeId, kind: 'topic' };
+    const kind = nodeKindOf(index, nodeId);
+    if (kind) return { id: nodeId, kind };
   }
   return null;
 }
@@ -75,7 +77,7 @@ export function projectCosmosStateFor(entry: DriftEntry): ProjectCosmosState | n
   return {
     repo: entry.source.repo,
     sha: entry.source.sha,
-    branch: driftBranch(entry),
+    branch: entry.source.branch ?? 'main',
     title: entry.title,
     date: entry.date,
     owner: entry.prOwner,
@@ -102,8 +104,11 @@ function groupByRun(items: DatedEntry[]): { date: string; entries: DriftEntry[] 
  * the affected node on the map. Searchable by keyword / tag / PR / owner, and
  * paginated so long histories load a page at a time.
  */
-export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivateItem }: ChangelogPanelProps) {
+export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivateItem, focus = null }: ChangelogPanelProps) {
+  const { data, derived } = useCosmos();
+  const index = useCosmosIndex();
   const [query, setQuery] = useState('');
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadTimer = useRef<number | null>(null);
@@ -123,6 +128,7 @@ export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivat
     if (stacked) return;
     setQuery('');
     setVisibleCount(PAGE_SIZE);
+    setFocusedEntryId(null);
   }, [stacked]);
 
   // Cancel any in-flight "load more" timer when the panel hides so it can't
@@ -138,10 +144,31 @@ export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivat
   // the search query. Pagination and the date-section grouping run over the
   // filtered result so a search always starts from the top.
   const flat = useMemo<DatedEntry[]>(
-    () => driftEntriesByRun().flatMap((run) => run.entries.map((entry) => ({ date: run.date, entry }))),
-    [],
+    () => driftEntriesByRun(data.drift.entries).flatMap((run) => run.entries.map((entry) => ({ date: run.date, entry }))),
+    [data.drift.entries],
   );
-  const filtered = useMemo(() => flat.filter((item) => driftEntryMatches(item.entry, query)), [flat, query]);
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return flat;
+    return flat.filter((item) => derived.driftSearchText[item.entry.id]?.includes(normalizedQuery));
+  }, [flat, query, derived.driftSearchText]);
+
+  // An Ask action names an entry: clear the search, page down to it and mark it.
+  useEffect(() => {
+    if (!focus) return;
+    const position = flat.findIndex((item) => item.entry.id === focus.entryId);
+    if (position < 0) return;
+    setQuery('');
+    setVisibleCount(Math.max(PAGE_SIZE, Math.ceil((position + 1) / PAGE_SIZE) * PAGE_SIZE));
+    setFocusedEntryId(focus.entryId);
+  }, [focus, flat]);
+  useEffect(() => {
+    if (!open || !focusedEntryId) return;
+    const focusedItem = [...document.querySelectorAll<HTMLElement>('[data-entry-id]')].find(
+      (item) => item.dataset.entryId === focusedEntryId,
+    );
+    focusedItem?.scrollIntoView?.({ block: 'center' });
+  }, [open, focusedEntryId]);
   const visibleRuns = useMemo(() => groupByRun(filtered.slice(0, visibleCount)), [filtered, visibleCount]);
   const hasMore = filtered.length > visibleCount;
 
@@ -212,16 +239,19 @@ export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivat
               <ul className="lc-changelog-list">
                 {run.entries.map((entry) => {
                   const meta = DRIFT_KIND_META[entry.kind];
-                  const prUrl = driftPrUrl(entry);
-                  const commitUrl = driftCommitUrl(entry);
-                  const target = primaryTarget(entry.nodeIds);
+                  const prUrl = derived.driftLinks[entry.id]?.prUrl ?? null;
+                  const commitUrl = derived.driftLinks[entry.id]?.commitUrl ?? null;
+                  const target = primaryTarget(entry.nodeIds, index);
+                  const isFocused = entry.id === focusedEntryId;
                   const activate = () => {
                     if (target) onActivateItem({ target, state: projectCosmosStateFor(entry), date: entry.date });
                   };
                   return (
                     <li
                       key={entry.id}
-                      className={`lc-changelog-item${target ? ' lc-changelog-item--clickable' : ''}`}
+                      data-entry-id={entry.id}
+                      aria-current={isFocused ? 'true' : undefined}
+                      className={`lc-changelog-item${target ? ' lc-changelog-item--clickable' : ''}${isFocused ? ' lc-changelog-item--focused' : ''}`}
                       role={target ? 'button' : undefined}
                       tabIndex={target ? 0 : undefined}
                       title={target ? 'Warp to this change on the map' : undefined}
@@ -248,8 +278,8 @@ export function ChangelogPanel({ open, stacked, onClose, onSelectNode, onActivat
                         <div className="lc-changelog-item-links">
                           <span className="lc-changelog-kind" style={{ color: meta.color }}>{meta.label}</span>
                           {entry.nodeIds.map((nodeId) => {
-                            const svc = SERVICES_BY_ID[nodeId];
-                            const topic = TOPICS_BY_ID[nodeId];
+                            const svc = index.servicesById[nodeId];
+                            const topic = index.topicsById[nodeId];
                             const node = svc ?? topic;
                             if (!node) return null;
                             return (

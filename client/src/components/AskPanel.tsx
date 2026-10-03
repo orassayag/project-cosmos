@@ -25,7 +25,12 @@ interface AskPanelProps {
 
 export type AskAction =
   | { type: 'action'; kind: 'highlight'; serviceIds: string[] }
-  | { type: 'action'; kind: 'playScenario'; scenarioId: string };
+  | { type: 'action'; kind: 'playScenario'; scenarioId: string }
+  | { type: 'action'; kind: 'showBlastRadius'; nodeId: string }
+  | { type: 'action'; kind: 'openPassport'; nodeId: string }
+  | { type: 'action'; kind: 'showHealth' }
+  | { type: 'action'; kind: 'showOwnership' }
+  | { type: 'action'; kind: 'openChangelogEntry'; entryId: string };
 
 // Same running joke, ten ways: this is a portfolio demo with no live model
 // wired up, so every "answer" is a self-aware placeholder.

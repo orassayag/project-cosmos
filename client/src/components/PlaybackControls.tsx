@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { RunnerApi } from '../scenarios/runner';
-import type { Step } from '../scenarios/types';
+import type { RunnerApi } from '../player/runner';
+import type { Step } from '../api/cosmos-api';
 
 interface PlaybackControlsProps {
   runner: RunnerApi;

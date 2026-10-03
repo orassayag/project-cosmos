@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { SERVICES, TOPICS, SCENARIOS } from '../scenarios/data';
-import type { Service, Topic, Scenario } from '../scenarios/types';
-import { paletteVar } from '../scenarios/palette';
+import type { CosmosData, Service, Topic, Scenario } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { paletteVar } from '../theme/statusMeta';
 
 type ResultKind = 'service' | 'topic' | 'scenario';
 
@@ -16,6 +16,8 @@ interface Result {
 export interface SpotlightTarget {
   id: string;
   kind: 'service' | 'topic';
+  /** Set by an Ask passport action: the answer stays open beside the inspector on desktop. */
+  keepAsk?: boolean;
 }
 
 interface SpotlightProps {
@@ -32,11 +34,11 @@ function score(text: string, query: string): number {
   return 0;
 }
 
-function search(query: string): Result[] {
+function search(query: string, { services, topics, scenarios }: CosmosData): Result[] {
   if (!query.trim()) return [];
   const q = query.toLowerCase();
 
-  const svcResults: (Result & { _score: number })[] = SERVICES
+  const svcResults: (Result & { _score: number })[] = services
     .map((s: Service) => {
       const sc = Math.max(score(s.name, q), score(s.role, q), score(s.id, q), s.team ? score(s.team, q) : 0);
       return { kind: 'service' as const, id: s.id, label: s.name, sub: s.role, color: paletteVar(s.palette), _score: sc };
@@ -45,7 +47,7 @@ function search(query: string): Result[] {
     .sort((a, b) => b._score - a._score)
     .slice(0, 5);
 
-  const topicResults: (Result & { _score: number })[] = TOPICS
+  const topicResults: (Result & { _score: number })[] = topics
     .map((t: Topic) => {
       const sc = Math.max(score(t.name, q), score(t.id, q));
       return { kind: 'topic' as const, id: t.id, label: t.name, sub: 'Kafka topic', color: t.color, _score: sc };
@@ -54,7 +56,7 @@ function search(query: string): Result[] {
     .sort((a, b) => b._score - a._score)
     .slice(0, 3);
 
-  const scenarioResults: (Result & { _score: number })[] = SCENARIOS
+  const scenarioResults: (Result & { _score: number })[] = scenarios
     .filter(s => s.status === 'ready')
     .map((s: Scenario) => {
       const sc = Math.max(score(s.label, q), score(s.domain, q), s.short ? score(s.short, q) : 0);
@@ -72,7 +74,8 @@ export function Spotlight({ onSelectScenario, onSelectNode }: SpotlightProps) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const results = search(query);
+  const { data } = useCosmos();
+  const results = search(query, data);
 
   const close = useCallback(() => { setOpen(false); setQuery(''); setCursor(0); }, []);
 

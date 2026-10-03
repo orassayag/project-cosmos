@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { INCIDENTS } from '../../incidents/data';
+import { indexCosmos, stepsFor } from '../../api/cosmosIndex';
 import { shotTimelineMs } from '../../map/CometPackets';
-import { PLAYABLE_BY_ID, stepsForScenario } from '../../scenarios/data';
+import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { typingDurationMs } from '../humanMotion';
 import { POINTER_MOVE_MS } from '../runDemo';
 import { DEMO_QUESTION, DEMO_SCRIPTED_ANSWER } from '../scriptedAnswer';
@@ -15,6 +15,8 @@ import {
 } from '../scripts';
 import { DEMO_TARGETS, type DemoModeName, type DemoScript, type DemoTarget } from '../types';
 
+const { playableById: PLAYABLE_BY_ID } = indexCosmos(COSMOS_FIXTURE);
+const INCIDENTS = COSMOS_FIXTURE.data.incidents;
 const MODES: DemoModeName[] = ['ai', 'all'];
 const LAYOUTS = [{ isPhone: false }, { isPhone: true }];
 const VARIANTS = MODES.flatMap((mode) => LAYOUTS.map((layout) => [mode, layout.isPhone ? 'phone' : 'desktop', buildDemoScript(mode, layout)] as const));
@@ -107,7 +109,7 @@ describe('demo=all script', () => {
   });
 
   it('sums every shot of the scenario into its playback length', () => {
-    const shotLengthsMs = stepsForScenario(PLAYABLE_BY_ID[ALL_DEMO_SCENARIO_ID])
+    const shotLengthsMs = stepsFor(COSMOS_FIXTURE, ALL_DEMO_SCENARIO_ID)
       .filter((step) => !step.parallel)
       .map((step) => shotTimelineMs([step]));
 

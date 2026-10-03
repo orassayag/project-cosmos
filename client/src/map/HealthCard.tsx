@@ -1,5 +1,6 @@
-import { HEALTH_BY_SERVICE, HEALTH_STATUS_META } from '../scenarios/health';
-import { SERVICES_BY_ID } from '../scenarios/data';
+import { useCosmos } from '../api/CosmosProvider';
+import { useCosmosIndex } from '../api/cosmosIndex';
+import { HEALTH_STATUS_META } from '../theme/statusMeta';
 
 interface HealthCardProps {
   serviceId: string;
@@ -43,8 +44,8 @@ function slackUrl(channel: string): string {
  * jump. Repo-less infra (an object store) has no health row, so nothing opens.
  */
 export function HealthCard({ serviceId, onClose }: HealthCardProps) {
-  const health = HEALTH_BY_SERVICE.get(serviceId);
-  const service = SERVICES_BY_ID[serviceId];
+  const health = useCosmos().derived.healthStatus.byService[serviceId];
+  const service = useCosmosIndex().servicesById[serviceId];
   if (!health || !service) return null;
 
   const meta = HEALTH_STATUS_META[health.status];

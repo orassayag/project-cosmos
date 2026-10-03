@@ -1,51 +1,37 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  PLAYABLE_BY_ID,
-  SERVICES,
-  SERVICES_BY_ID,
-  STEPS,
-  TOPICS,
-  TOPICS_BY_ID,
-  stepsForScenario,
-  INCIDENT_COMET_HEX,
-} from '../scenarios/data';
-import type { Service, Step, Topic } from '../scenarios/types';
-import type { Shot } from '../scenarios/runner';
+import type { DriftEntry, DriftKind, Service, Step, Topic } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
+import { nodeKindOf, nodeName, stepsFor, useCosmosIndex } from '../api/cosmosIndex';
+import type { Shot } from '../player/runner';
 import { useMapView } from '../hooks/useMapView';
 import type { BBox, FitPadding } from '../hooks/useMapView';
 import { useViewport } from '../hooks/useViewport';
-import { deriveEdges, activeNodeSet, shotNodeSet } from './edge-builder';
+import { buildEdges, activeNodeSet, shotNodeSet } from './edge-builder';
 import type { EdgeRecord, PosOverrides } from './edge-builder';
 
 import { Edge } from './Edge';
 import { ServiceNode } from './ServiceNode';
 import { StarExplosion } from './StarExplosion';
 import { TopicNode } from './TopicNode';
-import { CONNECTED_NODE_IDS, TOPIC_GROUPS, radialMemberPosition } from './topic-groups';
-import type { TopicGroup } from './topic-groups';
+import { layoutTopicGroups, radialMemberPosition } from './topicGroupLayout';
+import type { TopicGroupLayout } from './topicGroupLayout';
 import { ServicePanel } from './ServicePanel';
 import { OwnershipLegend, groupKey } from './OwnershipLegend';
-import { groupServicesByTeam } from '../scenarios/owners';
 import { TopicPanel } from './TopicPanel';
 import { SubServicePanel } from './SubServicePanel';
 import { DriftOverlay } from './DriftOverlay';
-import { LATEST_DRIFT_BY_NODE, LATEST_DRIFT_DATE, LATEST_DRIFT_ENTRIES, driftEntriesByRun } from '../scenarios/drift';
-import type { DriftEntry } from '../scenarios/drift';
-import type { DriftKind } from '../scenarios/drift';
+import { driftEntriesByRun } from '../theme/driftRuns';
 import { BlastLegend } from './BlastLegend';
 import { computeAskTouches } from './askTouches';
-import { computeBlastRadius, BLAST_LEVEL_META } from './blast-radius';
 import { HealthLegend } from './HealthLegend';
 import { HealthCard } from './HealthCard';
-import { HEALTH_BY_SERVICE, HEALTH_STATUS_META } from '../scenarios/health';
+import { BLAST_LEVEL_META, HEALTH_STATUS_META, INCIDENT_COMET_HEX, paletteVar } from '../theme/statusMeta';
 import { CometPackets } from './CometPackets';
 import { AmbientPackets } from './AmbientPackets';
 import { NebulaField } from './NebulaField';
 import { MapStepper } from './MapStepper';
 import { ClusterBackdrop } from './ClusterBackdrop';
-import { CLUSTERS } from '../scenarios/clusters';
-import { paletteVar } from '../scenarios/palette';
 import { buildEcosystemEdges, ecosystemDestinationIds, ecosystemPathSubIds } from './ecosystem';
 import { EdgeRegistryContext, createEdgeRegistry } from './edge-registry';
 import { publishParallaxPan } from './parallaxPan';
@@ -62,30 +48,30 @@ const GRAVITY_RADIUS = 340;      // world-unit reach of a hovered star's pull
 const GRAVITY_TOPIC_PULL = 16;   // max drift for a topic at closest range
 const GRAVITY_SERVICE_PULL = 8;  // heavier services move about half as far
 
-// Bbox of every service capsule, padded to cover topic fan-out rings and
-// cluster halos. Defines the home view: initial frame, reset target, and
-// the wheel-zoom-out floor.
 // service id → every topic it touches in any step (as producer, consumer,
 // or broadcast hop). Used to fan out the relevant topic groups on selection.
-const TOPICS_TOUCHING_SERVICE: Map<string, Set<string>> = (() => {
+function topicsTouchingService(steps: readonly Step[]): Map<string, Set<string>> {
   const m = new Map<string, Set<string>>();
   const add = (svc: string, topic: string) => {
     const set = m.get(svc) ?? new Set<string>();
     set.add(topic);
     m.set(svc, set);
   };
-  for (const s of STEPS) {
+  for (const s of steps) {
     if (!s.via) continue;
     add(s.from, s.via);
     add(s.to, s.via);
     if (s.through) add(s.through, s.via);
   }
   return m;
-})();
+}
 
-const HOME_BBOX: BBox = (() => {
+// Bbox of every service capsule, padded to cover topic fan-out rings and
+// cluster halos. Defines the home view: initial frame, reset target, and
+// the wheel-zoom-out floor.
+function homeBBox(services: readonly Service[]): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const s of SERVICES) {
+  for (const s of services) {
     minX = Math.min(minX, s.x - s.width / 2);
     minY = Math.min(minY, s.y - s.height / 2);
     maxX = Math.max(maxX, s.x + s.width / 2);
@@ -93,7 +79,7 @@ const HOME_BBOX: BBox = (() => {
   }
   const pad = 170;
   return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
-})();
+}
 
 const MOBILE_SHEET_SELECTOR = '.lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-health-card, .lc-map-panel, .lc-ask-panel';
 
@@ -116,9 +102,13 @@ interface MapProps {
   revealing?: boolean;
   /** Presentation mode — fattens the comets (chrome is hidden by App CSS). */
   presentation?: boolean;
-  /** Set by the spotlight to pan+select a node; cleared after consumption. */
-  spotlightTarget?: { id: string; kind: 'service' | 'topic' } | null;
+  /** Set by the spotlight to pan+select a node; cleared after consumption.
+   *  `keepAsk` (an Ask map action) leaves the answer open beside the inspector on desktop. */
+  spotlightTarget?: { id: string; kind: 'service' | 'topic'; keepAsk?: boolean } | null;
   onSpotlightConsumed?: () => void;
+  /** An Ask map action: open blast radius with this source picked; cleared after consumption. */
+  blastRequest?: { nodeId: string } | null;
+  onBlastRequestConsumed?: () => void;
   /** Incremented by the "Project Cosmos" reset — clears selection and reframes home. */
   resetNonce?: number;
   /** Nodes the Ask panel answer is about — while the panel is open the map
@@ -158,6 +148,8 @@ export function ProjectCosmosMap({
   presentation = false,
   spotlightTarget = null,
   onSpotlightConsumed,
+  blastRequest = null,
+  onBlastRequestConsumed,
   resetNonce = 0,
   askFocusIds = NO_ASK_FOCUS_IDS,
   incidentActive = false,
@@ -169,10 +161,28 @@ export function ProjectCosmosMap({
   onDriftSelect,
 }: MapProps) {
   const overlay = useOverlay();
+  const cosmos = useCosmos();
+  const { version, data, derived } = cosmos;
+  const index = useCosmosIndex();
+  const { servicesById, topicsById } = index;
+  /* eslint-disable react-hooks/exhaustive-deps -- layouts change only with a new response version */
+  const topicsTouching = useMemo(() => topicsTouchingService(data.steps), [version]);
+  const homeBox = useMemo(() => homeBBox(data.services), [version]);
+  const connectedNodeIds = useMemo(() => new Set(derived.connectedNodeIds), [version]);
+  const topicGroups = useMemo(() => layoutTopicGroups(derived.topicGroups, servicesById, topicsById), [version]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   const [selection, setSelection] = useState<Selection>(null);
   const expandedServiceId: string | null = null;
   const expandedEcosystemService: Service | null =
-    expandedServiceId && SERVICES_BY_ID[expandedServiceId]?.ecosystem?.expandable ? SERVICES_BY_ID[expandedServiceId] : null;
+    expandedServiceId && servicesById[expandedServiceId]?.ecosystem?.expandable ? servicesById[expandedServiceId] : null;
+
+  const activePlayable = activeScenarioId ? index.playableById[activeScenarioId] ?? null : null;
+  const activeSteps = useMemo(
+    () => (activeScenarioId ? stepsFor(cosmos, activeScenarioId) : []),
+    [cosmos, activeScenarioId],
+  );
+  // Topics on the active scenario's path show their labels even when not playing.
+  const scenarioNodeSet = useMemo(() => activeNodeSet(activePlayable, activeSteps), [activePlayable, activeSteps]);
 
   // Service currently under the cursor — the gravity well's source star.
   const [gravitySourceId, setGravitySourceId] = useState<string | null>(null);
@@ -199,21 +209,22 @@ export function ProjectCosmosMap({
   const layoutMode = overlay.isOpen(OVERLAY.mapLayout);
 
   // ── Drift overlay mode (F5 — "what changed last night") ─────
-  const hasDrift = LATEST_DRIFT_DATE != null && LATEST_DRIFT_ENTRIES.length > 0;
+  const latestDrift = derived.latestDrift;
+  const hasDrift = latestDrift.date != null && latestDrift.entries.length > 0;
   const driftHighlight = useMemo<Map<string, DriftKind> | null>(
-    () => (driftMode && hasDrift ? LATEST_DRIFT_BY_NODE : null),
-    [driftMode, hasDrift],
+    () => (driftMode && hasDrift ? new Map(Object.entries(latestDrift.byNode)) : null),
+    [driftMode, hasDrift, latestDrift],
   );
   // The Changes panel pages through every run, but never one newer than the
   // selected cursor — so a changelog pick (or a panel pick) hides the future.
   const driftRuns = useMemo(() => {
-    const all = driftEntriesByRun();
+    const all = driftEntriesByRun(data.drift.entries);
     return driftCursorDate ? all.filter((run) => run.date <= driftCursorDate) : all;
-  }, [driftCursorDate]);
+  }, [data.drift.entries, driftCursorDate]);
 
   // ── Ownership overlay mode ──────────────────────────────────
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
-  const ownerGroups = useMemo(() => groupServicesByTeam(SERVICES), []);
+  const ownerGroups = derived.ownership.teamGroups;
   const teamHighlightSet = useMemo<Set<string> | null>(() => {
     if (!ownershipMode || !ownerFilter) return null;
     const group = ownerGroups.find((g) => groupKey(g) === ownerFilter);
@@ -230,13 +241,10 @@ export function ProjectCosmosMap({
 
   // ── Blast-radius overlay mode (F14 — "what breaks if I change X") ──
   const [blastSourceId, setBlastSourceId] = useState<string | null>(null);
-  const blastResult = useMemo(
-    () => (blastMode && blastSourceId ? computeBlastRadius(blastSourceId) : null),
-    [blastMode, blastSourceId],
-  );
+  const blastResult = blastMode && blastSourceId ? derived.blastRadius[blastSourceId] ?? null : null;
   // With a source picked, dim every node outside its blast radius.
   const blastReach = useMemo<Set<string> | null>(
-    () => (blastResult ? new Set(blastResult.levels.keys()) : null),
+    () => (blastResult ? new Set(Object.keys(blastResult.levels)) : null),
     [blastResult],
   );
   const blastStacked = overlay.isStacked(OVERLAY.mapBlast);
@@ -255,11 +263,11 @@ export function ProjectCosmosMap({
   // health tint while the heat map is on. Null in every other mode.
   const accentRingFor = (id: string): string | null => {
     if (blastResult) {
-      const level = blastResult.levels.get(id);
+      const level = blastResult.levels[id];
       return level ? BLAST_LEVEL_META[level].hex : null;
     }
     if (healthMode) {
-      const health = HEALTH_BY_SERVICE.get(id);
+      const health = derived.healthStatus.byService[id];
       return health ? HEALTH_STATUS_META[health.status].hex : null;
     }
     return null;
@@ -318,31 +326,29 @@ export function ProjectCosmosMap({
   // broadcast to through it? Null when no scenario is active — then every
   // destination's outbound edge is shown.
   const ecosystemDestinations = useMemo<Map<string, Set<string>> | null>(() => {
-    if (!activeScenarioId) return null;
-    const scenario = PLAYABLE_BY_ID[activeScenarioId];
-    if (!scenario || scenario.status !== 'ready') return null;
+    if (!activePlayable || activePlayable.status !== 'ready') return null;
     const dests = new Map<string, Set<string>>();
-    for (const step of stepsForScenario(scenario)) {
+    for (const step of activeSteps) {
       if (!step.through) continue;
       const throughDests = dests.get(step.through) ?? new Set<string>();
       throughDests.add(step.to);
       dests.set(step.through, throughDests);
     }
     return dests;
-  }, [activeScenarioId]);
+  }, [activePlayable, activeSteps]);
 
   // Which sub-services of each ecosystem participate in the active
   // scenario's path? Out-of-band ones stay dimmed during a scenario.
   const ecosystemActiveSubs = useMemo<Map<string, Set<string>> | null>(() => {
     if (!activeScenarioId) return null;
     const activeSubs = new Map<string, Set<string>>();
-    for (const service of SERVICES) {
+    for (const service of data.services) {
       if (!service.ecosystem) continue;
       const isUsed = (ecosystemDestinations?.get(service.id)?.size ?? 0) > 0;
       activeSubs.set(service.id, isUsed ? ecosystemPathSubIds(service.ecosystem) : new Set());
     }
     return activeSubs;
-  }, [activeScenarioId, ecosystemDestinations]);
+  }, [activeScenarioId, ecosystemDestinations, data.services]);
 
   // Stable for the lifetime of this component — paths are mounted
   // by Edge children and read by CometPackets.
@@ -402,7 +408,7 @@ export function ProjectCosmosMap({
     // Low enough that a phone's home fit is never clamped; user zoom-out is
     // still floored at the home scale.
     minScale: 0.08,
-    homeBBox: HOME_BBOX,
+    homeBBox: homeBox,
     homePadding: mobileClearance,
   });
 
@@ -451,10 +457,10 @@ export function ProjectCosmosMap({
   // Pan to + select a single node, framing it together with all its
   // directly-connected neighbours. Shared by the spotlight (App-driven) and
   // the drift overlay's click-to-jump.
-  const focusNode = useCallback((id: string, kind: 'service' | 'topic') => {
+  const focusNode = useCallback((id: string, kind: 'service' | 'topic', keepAsk = false) => {
     // Collect every node ID that connects to this node across all steps.
     const connectedIds = new Set<string>([id]);
-    for (const s of STEPS) {
+    for (const s of data.steps) {
       const ids = [s.from, s.to, s.via, s.through].filter(Boolean) as string[];
       if (ids.includes(id)) ids.forEach(cid => connectedIds.add(cid));
     }
@@ -462,14 +468,14 @@ export function ProjectCosmosMap({
     // Expand bbox across all connected nodes.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const nid of connectedIds) {
-      const svc = SERVICES_BY_ID[nid];
+      const svc = servicesById[nid];
       if (svc) {
         minX = Math.min(minX, svc.x - svc.width / 2);
         minY = Math.min(minY, svc.y - svc.height / 2);
         maxX = Math.max(maxX, svc.x + svc.width / 2);
         maxY = Math.max(maxY, svc.y + svc.height / 2);
       }
-      const topic = TOPICS_BY_ID[nid];
+      const topic = topicsById[nid];
       if (topic) {
         minX = Math.min(minX, topic.x - 20);
         minY = Math.min(minY, topic.y - 20);
@@ -480,22 +486,33 @@ export function ProjectCosmosMap({
 
     if (!Number.isFinite(minX)) return;
 
-    if (!isMobile) overlay.close(OVERLAY.ask);
+    if (!isMobile && !keepAsk) overlay.close(OVERLAY.ask);
     setSelection(kind === 'service' ? { kind: 'service', id } : { kind: 'topic', id });
 
     const bbox = { minX, minY, maxX, maxY };
     focusTargetRef.current = { id, bbox };
     if (isMobile) return;
-    // Left padding reserves room for the service/topic inspector panel (~340px at left:14).
-    fitTo(bbox, { top: 100, right: 120, bottom: 100, left: 380 });
-  }, [fitTo, overlay, isMobile]);
+    // Left padding reserves room for the inspector (~340px at left:14), or for the
+    // Ask answer when the inspector sits on the right beside it.
+    fitTo(bbox, { top: 100, right: keepAsk ? 380 : 120, bottom: 100, left: 380 });
+  }, [fitTo, overlay, isMobile, data.steps, servicesById, topicsById]);
 
   // Spotlight: pan to + select the requested node, then signal consumed.
   useEffect(() => {
     if (!spotlightTarget) return;
-    focusNode(spotlightTarget.id, spotlightTarget.kind);
+    focusNode(spotlightTarget.id, spotlightTarget.kind, spotlightTarget.keepAsk);
     onSpotlightConsumed?.();
   }, [spotlightTarget, focusNode, onSpotlightConsumed]);
+
+  // Blast request (an Ask map action): open the overlay above the answer with the source picked.
+  const { open: openOverlayAbove } = overlay;
+  useEffect(() => {
+    if (!blastRequest) return;
+    openOverlayAbove(OVERLAY.mapBlast, { keepBeneath: true });
+    if (!isMobile) setSelection(null);
+    setBlastSourceId(blastRequest.nodeId);
+    onBlastRequestConsumed?.();
+  }, [blastRequest, openOverlayAbove, isMobile, onBlastRequestConsumed]);
 
   // "Project Cosmos" reset: drop the inspector selection and reframe to the home view.
   // Overlays are already closed by the manager (App calls overlay.reset()).
@@ -530,18 +547,20 @@ export function ProjectCosmosMap({
     else closeOverlay(OVERLAY.inspector);
   }, [isMobile, selectionKey, openOverlay, closeOverlay]);
   const inspectorVisible = !isMobile || overlay.isOpen(OVERLAY.inspector);
+  // Only an Ask passport action selects a node while the answer stays open on desktop.
+  const isAskBesideInspector = !isMobile && overlay.isOpen(OVERLAY.ask);
 
   useEffect(() => {
     if (!activeScenarioId) {
       reset();
       return;
     }
-    const ids = activeNodeSet(activeScenarioId);
+    const ids = scenarioNodeSet;
     if (!ids || ids.size === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const id of ids) {
-      const svc = SERVICES_BY_ID[id];
+      const svc = servicesById[id];
       if (svc) {
         minX = Math.min(minX, svc.x - svc.width / 2);
         minY = Math.min(minY, svc.y - svc.height / 2);
@@ -549,7 +568,7 @@ export function ProjectCosmosMap({
         maxY = Math.max(maxY, svc.y + svc.height / 2);
         continue;
       }
-      const topic = TOPICS_BY_ID[id];
+      const topic = topicsById[id];
       if (topic) {
         const r = 24; // include the dashed orbital ring + label
         minX = Math.min(minX, topic.x - r);
@@ -572,18 +591,12 @@ export function ProjectCosmosMap({
       // smaller margin so scenario nodes hug the visible center-left.
       { top: 70, right: 440, bottom: 90, left: 80 },
     );
-  }, [activeScenarioId, fitTo, reset, isMobile, mobileClearance]);
+  }, [activeScenarioId, scenarioNodeSet, servicesById, topicsById, fitTo, reset, isMobile, mobileClearance]);
 
-  // Topic side panel still summarises producers/consumers from the global
-  // STEP list. (Service panel no longer shows integrations.)
-  const allTouches = useMemo<Step[]>(() => STEPS, []);
+  // Topic side panel still summarises producers/consumers from the scenario steps.
+  const allTouches: Step[] = data.steps;
 
-  const scenarioActiveSet = useMemo(
-    () => (isolate ? activeNodeSet(activeScenarioId) : null),
-    [activeScenarioId, isolate],
-  );
-  // Topics on the active scenario's path show their labels even when not playing.
-  const scenarioNodeSet = useMemo(() => activeNodeSet(activeScenarioId), [activeScenarioId]);
+  const scenarioActiveSet = isolate ? scenarioNodeSet : null;
   const currentShotSet = useMemo(() => shotNodeSet(shot), [shot]);
 
   // World-space viewport containment — the world group transform is
@@ -603,7 +616,7 @@ export function ProjectCosmosMap({
 
   // A prefix group splits into individual topics when zoomed into its area,
   // or whenever a member participates in the active scenario / shot / selection.
-  const isGroupExpanded = (g: TopicGroup): boolean => {
+  const isGroupExpanded = (g: TopicGroupLayout): boolean => {
     if (view.scale >= 2.2 && inViewport(g.cx, g.cy, 160)) return true;
     if (scenarioNodeSet && g.members.some((m) => scenarioNodeSet.has(m.id))) return true;
     if (g.members.some((m) => currentShotSet.has(m.id))) return true;
@@ -612,12 +625,12 @@ export function ProjectCosmosMap({
       if (g.serviceId === selection.id) return true;
       // Also fan out groups holding topics this service produces to /
       // consumes from — otherwise its edges end at a collapsed card.
-      const touched = TOPICS_TOUCHING_SERVICE.get(selection.id);
+      const touched = topicsTouching.get(selection.id);
       if (touched && g.members.some((m) => touched.has(m.id))) return true;
     }
     return false;
   };
-  const collapsedGroups = TOPIC_GROUPS.filter((g) => !isGroupExpanded(g));
+  const collapsedGroups = topicGroups.filter((g) => !isGroupExpanded(g));
   const collapsedMemberIds = new Set(collapsedGroups.flatMap((g) => [...g.memberIds]));
   const collapsedKey = collapsedGroups.map((g) => g.id).join(',');
   // Owned topics never sit at their hand-placed coords: collapsed they
@@ -626,7 +639,7 @@ export function ProjectCosmosMap({
   // keys stay per-topic either way, so packet animations keep working.
   const groupOverrides = useMemo<PosOverrides>(() => {
     const out: PosOverrides = {};
-    for (const g of TOPIC_GROUPS) {
+    for (const g of topicGroups) {
       const collapsed = collapsedMemberIds.has(g.members[0].id);
       // Follow the owner service if it's been dragged in layout mode.
       const cx = overrides[g.serviceId]?.x ?? g.cx;
@@ -644,13 +657,13 @@ export function ProjectCosmosMap({
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by which groups are collapsed + dragged positions
-  }, [collapsedKey, overrides]);
+  }, [collapsedKey, overrides, topicGroups]);
 
   // Per-member fan-out meta for expanded groups: ring index (animation
   // stagger), hemisphere (label side), and the hub offset (pop origin).
   const expandedMemberMeta = useMemo(() => {
     const meta = new Map<string, { idx: number; above: boolean; dx: number; dy: number }>();
-    for (const g of TOPIC_GROUPS) {
+    for (const g of topicGroups) {
       if (collapsedMemberIds.has(g.members[0].id)) continue;
       g.members.forEach((m, i) => {
         // Members pop out from the owner to wherever they actually land:
@@ -675,7 +688,7 @@ export function ProjectCosmosMap({
     }
     return meta;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by which groups are collapsed + dragged positions
-  }, [collapsedKey, overrides]);
+  }, [collapsedKey, overrides, topicGroups]);
 
   // Collapsed topic count per owner service — shown as a card badge.
   const collapsedCountByService = useMemo(() => {
@@ -689,7 +702,7 @@ export function ProjectCosmosMap({
     () => ({ ...overrides, ...groupOverrides }),
     [overrides, groupOverrides],
   );
-  const edges = useMemo(() => deriveEdges(mergedOverrides), [mergedOverrides]);
+  const edges = useMemo(() => buildEdges(derived.edges, index, mergedOverrides), [derived.edges, index, mergedOverrides]);
   const selectedTouches = useMemo<Set<string> | null>(() => {
     if (!selection) return null;
     // Sub-service selection doesn't drive map dimming — the parent
@@ -735,12 +748,12 @@ export function ProjectCosmosMap({
 
   // Merged display arrays — original data with any dragged-position overrides applied.
   const displayServices = useMemo(
-    () => SERVICES.map(s => { const o = overrides[s.id]; return o ? { ...s, x: o.x, y: o.y } : s; }),
-    [overrides],
+    () => data.services.map(s => { const o = overrides[s.id]; return o ? { ...s, x: o.x, y: o.y } : s; }),
+    [data.services, overrides],
   );
   const displayTopics = useMemo(
-    () => TOPICS.map(t => { const o = mergedOverrides[t.id]; return o ? { ...t, x: o.x, y: o.y } : t; }),
-    [mergedOverrides],
+    () => data.topics.map(t => { const o = mergedOverrides[t.id]; return o ? { ...t, x: o.x, y: o.y } : t; }),
+    [data.topics, mergedOverrides],
   );
 
   // The gravity well is meaningless while a scenario is playing (nodes are
@@ -846,7 +859,7 @@ export function ProjectCosmosMap({
     const lines = Object.entries(overridesRef.current)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([id, { x, y }]) => {
-        const isTopic = !!TOPICS_BY_ID[id];
+        const isTopic = !!topicsById[id];
         return `'${id}': x=${x}, y=${y}${isTopic ? '  (topic — also set pinned: true so the fan-out uses these coords)' : ''}`;
       })
       .join('\n');
@@ -856,9 +869,9 @@ export function ProjectCosmosMap({
   }
 
   const resolveService = (id: string): Service | undefined =>
-    displayServices.find(s => s.id === id) ?? SERVICES_BY_ID[id];
+    displayServices.find(s => s.id === id) ?? servicesById[id];
   const resolveTopic = (id: string): Topic | undefined =>
-    displayTopics.find(t => t.id === id) ?? TOPICS_BY_ID[id];
+    displayTopics.find(t => t.id === id) ?? topicsById[id];
 
   const stepsTouchingTopic = (id: string) =>
     allTouches.filter((s) => s.via === id);
@@ -899,7 +912,7 @@ export function ProjectCosmosMap({
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            {[...SERVICES, ...TOPICS].map((n) => (
+            {[...data.services, ...data.topics].map((n) => (
               <radialGradient key={n.id} id={`cosmos-star-${n.id}`} cx="0.5" cy="0.5" r="0.5">
                 <stop offset="0%" stopColor="#FFFFFF" stopOpacity={1} />
                 <stop offset="35%" stopColor={n.hex} stopOpacity={0.95} />
@@ -924,8 +937,14 @@ export function ProjectCosmosMap({
             />
 
             {/* Cluster backdrops — sit behind everything. */}
-            {CLUSTERS.map((cluster) => (
-              <ClusterBackdrop key={cluster.id} cluster={cluster} servicesById={SERVICES_BY_ID} activeNodes={scenarioActiveSet} />
+            {data.clusters.map((cluster) => (
+              <ClusterBackdrop
+                key={cluster.id}
+                cluster={cluster}
+                servicesById={servicesById}
+                palette={data.palette}
+                activeNodes={scenarioActiveSet}
+              />
             ))}
 
             {/* Edges — when a service's ecosystem is expanded, hide the
@@ -950,7 +969,7 @@ export function ProjectCosmosMap({
               const ecosystem = expandedEcosystemService.ecosystem;
               const destinationIds =
                 ecosystemDestinations?.get(expandedEcosystemService.id) ??
-                (ecosystemDestinations ? new Set<string>() : ecosystemDestinationIds(expandedEcosystemService.id));
+                (ecosystemDestinations ? new Set<string>() : ecosystemDestinationIds(expandedEcosystemService.id, index.allSteps));
               const internalEdges = buildEcosystemEdges(
                 expandedEcosystemService,
                 ecosystem,
@@ -1036,7 +1055,7 @@ export function ProjectCosmosMap({
             {/* Topics */}
             <g>
               {displayTopics
-                .filter((t) => CONNECTED_NODE_IDS.has(t.id) && !collapsedMemberIds.has(t.id))
+                .filter((t) => connectedNodeIds.has(t.id) && !collapsedMemberIds.has(t.id))
                 .map((t) => {
                 const meta = expandedMemberMeta.get(t.id);
                 return (
@@ -1198,12 +1217,12 @@ export function ProjectCosmosMap({
           />
         )}
 
-        {driftMode && !layoutMode && hasDrift && LATEST_DRIFT_DATE && (
+        {driftMode && !layoutMode && hasDrift && (
           <DriftOverlay
             runs={driftRuns}
             onSelect={(entry) => {
               const nodeId = entry.nodeIds[0];
-              focusNode(nodeId, TOPICS_BY_ID[nodeId] ? 'topic' : 'service');
+              focusNode(nodeId, nodeKindOf(index, nodeId) === 'topic' ? 'topic' : 'service');
               onDriftSelect?.(entry);
             }}
             onClose={() => overlay.close(OVERLAY.mapChanges)}
@@ -1213,8 +1232,8 @@ export function ProjectCosmosMap({
         {blastMode && !layoutMode && (
           <BlastLegend
             result={blastResult}
-            sourceName={blastSourceId ? SERVICES_BY_ID[blastSourceId]?.name ?? TOPICS_BY_ID[blastSourceId]?.name ?? blastSourceId : null}
-            onFocus={(nodeId) => focusNode(nodeId, TOPICS_BY_ID[nodeId] ? 'topic' : 'service')}
+            sourceName={blastSourceId ? nodeName(index, blastSourceId) : null}
+            onFocus={(nodeId) => focusNode(nodeId, nodeKindOf(index, nodeId) === 'topic' ? 'topic' : 'service')}
             onClear={() => setBlastSourceId(null)}
             onClose={() => overlay.close(OVERLAY.mapBlast)}
           />
@@ -1231,7 +1250,7 @@ export function ProjectCosmosMap({
 
         {selection && !blastMode && !healthMode && inspectorVisible && (
           <div
-            className={`lc-map-panel lc-map-panel--${selection.kind}${driftMode || ownershipMode ? ' lc-map-panel--right' : ''}`}
+            className={`lc-map-panel lc-map-panel--${selection.kind}${driftMode || ownershipMode || isAskBesideInspector ? ' lc-map-panel--right' : ''}`}
             data-no-pan="true"
             onClick={(e) => e.stopPropagation()}
           >

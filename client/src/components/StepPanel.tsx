@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { SERVICES_BY_ID, TOPICS_BY_ID } from '../scenarios/data';
-import type { Scenario, Step } from '../scenarios/types';
+import type { Scenario, Step } from '../api/cosmos-api';
+import { nodeName, useCosmosIndex } from '../api/cosmosIndex';
+import type { CosmosIndex } from '../api/cosmosIndex';
 import { parsePayload } from './payload-parser';
 
 interface StepPanelProps {
@@ -17,15 +18,11 @@ interface StepPanelProps {
 
 const PROTO_LABEL = { http: 'HTTP', ws: 'WebSocket', kafka: 'Kafka', internal: 'Internal' } as const;
 
-function nodeLabel(id: string): string {
-  return SERVICES_BY_ID[id]?.name ?? TOPICS_BY_ID[id]?.name ?? id;
-}
-
-function stepPath(step: Step): string {
-  const parts = [nodeLabel(step.from)];
-  if (step.via) parts.push(nodeLabel(step.via));
-  if (step.through) parts.push(nodeLabel(step.through));
-  parts.push(nodeLabel(step.to));
+function stepPath(step: Step, index: CosmosIndex): string {
+  const parts = [nodeName(index, step.from)];
+  if (step.via) parts.push(nodeName(index, step.via));
+  if (step.through) parts.push(nodeName(index, step.through));
+  parts.push(nodeName(index, step.to));
   return parts.join(' → ');
 }
 
@@ -36,6 +33,7 @@ function stepPath(step: Step): string {
  * stable so the eye doesn't have to track a full re-entry every step.
  */
 export function StepPanel({ scenario, steps, idx, open, onPrev, onNext, onClose }: StepPanelProps) {
+  const index = useCosmosIndex();
   const step = idx >= 0 && idx < steps.length ? steps[idx] : null;
   const visible = open && !!scenario && !!step;
   const showPrev = idx > 0;
@@ -83,7 +81,7 @@ export function StepPanel({ scenario, steps, idx, open, onPrev, onNext, onClose 
               <h3 className="lc-step-panel-title">{step.title}</h3>
               <div className="lc-step-panel-sub">
                 <span className={`lc-step-panel-proto p-${step.type}`}>{protoLabel}</span>
-                <span className="lc-step-panel-path">{stepPath(step)}</span>
+                <span className="lc-step-panel-path">{stepPath(step, index)}</span>
               </div>
               <p className="lc-step-panel-desc">{step.plain}</p>
               {step.payload && (

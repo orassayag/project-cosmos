@@ -1,10 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import {
-  DOMAINS,
-  scenariosForDomain,
-  stepsForScenario,
-} from '../scenarios/data';
+import { useCosmos } from '../api/CosmosProvider';
+import { stepsFor } from '../api/cosmosIndex';
 import type { DemoTarget } from '../demo/types';
 
 interface DomainBarProps {
@@ -34,6 +31,9 @@ export function DomainBar({
   resetNonce = 0,
   inline = false,
 }: DomainBarProps) {
+  const cosmos = useCosmos();
+  const { domains, scenarios: allScenarios } = cosmos.data;
+  const scenariosForDomain = (domainId: string) => allScenarios.filter((scenario) => scenario.domain === domainId);
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -98,7 +98,7 @@ export function DomainBar({
       )}
       {scenarios.map((s) => {
         const isReady = s.status === 'ready';
-        const stepCount = isReady ? stepsForScenario(s).length : 0;
+        const stepCount = isReady ? stepsFor(cosmos, s.id).length : 0;
         const isActiveScenario = s.id === activeScenarioId;
         return (
           <button
@@ -135,7 +135,7 @@ export function DomainBar({
   return (
     <div className="lc-domain-bar" ref={wrapRef}>
       <div className="lc-domain-tabs" role="tablist">
-        {DOMAINS.map((d) => {
+        {domains.map((d) => {
           const total = scenariosForDomain(d.id).length;
           const isActive = active === d.id;
           return (

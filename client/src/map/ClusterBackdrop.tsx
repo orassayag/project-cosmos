@@ -1,5 +1,4 @@
-import { PALETTE } from '../scenarios/palette';
-import type { Cluster, Service } from '../scenarios/types';
+import type { Cluster, PaletteKey, Service } from '../api/cosmos-api';
 
 interface GradientStop {
   offset: string;
@@ -73,11 +72,11 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${channels.join(', ')}, ${alpha})`;
 }
 
-function styleFor(cluster: Cluster): ClusterStyle {
+function styleFor(cluster: Cluster, palette: Record<PaletteKey, string>): ClusterStyle {
   const known = CLUSTER_STYLES[cluster.id];
   if (known) return known;
-  const base = PALETTE[cluster.nebula.base];
-  const hot = PALETTE[cluster.nebula.hot];
+  const base = palette[cluster.nebula.base];
+  const hot = palette[cluster.nebula.hot];
   return {
     padX: 100,
     padY: 100,
@@ -95,6 +94,7 @@ function styleFor(cluster: Cluster): ClusterStyle {
 interface ClusterBackdropProps {
   cluster: Cluster;
   servicesById: Record<string, Service>;
+  palette: Record<PaletteKey, string>;
   activeNodes?: Set<string> | null;
 }
 
@@ -103,12 +103,12 @@ interface ClusterBackdropProps {
  * boundary and a big watermark label. Pure decoration — pointer-events
  * disabled, lives in the world transform group so it pans/zooms with the map.
  */
-export function ClusterBackdrop({ cluster, servicesById, activeNodes = null }: ClusterBackdropProps) {
+export function ClusterBackdrop({ cluster, servicesById, palette, activeNodes = null }: ClusterBackdropProps) {
   const nodes = cluster.serviceIds.map((id) => servicesById[id]).filter(Boolean);
   const isActive = activeNodes === null;
   if (nodes.length === 0) return null;
 
-  const style = styleFor(cluster);
+  const style = styleFor(cluster, palette);
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const n of nodes) {
     minX = Math.min(minX, n.x - n.width / 2);

@@ -4,6 +4,7 @@ import type { CosmosResponse } from '../api/cosmos-api';
 import { CosmosFetchError, startCosmosFetch } from '../api/cosmosClient';
 import { INTRO_SEEN_STORAGE_KEY } from '../demo/demoMode';
 import { App } from '../App';
+import { COSMOS_FIXTURE } from './renderWithCosmos';
 
 vi.mock('../api/cosmosClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/cosmosClient')>()),
@@ -25,7 +26,7 @@ vi.mock('../components/IntroOverlay', () => ({
   ),
 }));
 
-const FAKE_RESPONSE = { version: 'test', data: {}, derived: {} } as unknown as CosmosResponse;
+const FAKE_RESPONSE = COSMOS_FIXTURE;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

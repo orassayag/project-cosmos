@@ -1,6 +1,6 @@
-import type { BlastResult } from './blast-radius';
-import { BLAST_LEVEL_META } from './blast-radius';
-import { SERVICES_BY_ID, TOPICS_BY_ID } from '../scenarios/data';
+import type { BlastResult } from '../api/cosmos-api';
+import { useCosmosIndex } from '../api/cosmosIndex';
+import { BLAST_LEVEL_META } from '../theme/statusMeta';
 import { PanelCloseButton } from '../components/PanelCloseButton';
 
 interface BlastLegendProps {
@@ -23,6 +23,7 @@ interface BlastLegendProps {
  * matching severity color while this overlay is active.
  */
 export function BlastLegend({ result, sourceName, onFocus, onClear, onClose }: BlastLegendProps) {
+  const { servicesById, topicsById } = useCosmosIndex();
   return (
     <div className="lc-blast-legend" data-no-pan="true" onClick={(e) => e.stopPropagation()}>
       {onClose && <PanelCloseButton onClose={onClose} label="Close blast radius" />}
@@ -55,8 +56,8 @@ export function BlastLegend({ result, sourceName, onFocus, onClear, onClose }: B
               </div>
               <ul className="lc-blast-legend-list">
                 {result.dependents.map((node) => {
-                  const isTopic = !!TOPICS_BY_ID[node.id];
-                  const sub = SERVICES_BY_ID[node.id]?.role ?? (isTopic ? 'Kafka topic' : '');
+                  const isTopic = !!topicsById[node.id];
+                  const sub = servicesById[node.id]?.role ?? (isTopic ? 'Kafka topic' : '');
                   return (
                     <li key={node.id}>
                       <button

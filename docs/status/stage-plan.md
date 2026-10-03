@@ -16,6 +16,6 @@ Generated: 2026-10-02
 - Stage 5: COMMITTED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
 - Stage 6: COMMITTED — P6: agents on getCosmosView(), digest additions, read tools, new map actions, unknown-action test, agent eval suite ⚠ large (~900 LOC)
 - Stage 7: COMMITTED — P7: no-account dev loop, cosmosClient (retry-safe), CosmosProvider, loading gate + error/Retry, A1 Playwright E2E + CI job ⚠ large (~850 LOC)
-- Stage 8: PLANNED — P8: migrate every client feature to useCosmos(), renderWithCosmos fixture, Ask map-action handlers ⚠ large (~1,400 LOC)
+- Stage 8: COMMITTED — P8: migrate every client feature to useCosmos(), renderWithCosmos fixture, Ask map-action handlers ⚠ large (~1,400 LOC)
 - Stage 9: PLANNED — P9+P10: drift/health source + demo data server-side, demo scripts rewrite, retarget Drift Sync/validate/fresh/skills/record-demo ⚠ large (~900 LOC)
 - Stage 10: PLANNED — P11+P12: delete client data copies + snapshot tooling, docs (README/CLAUDE.md/CONTRIBUTING/decision record), dev live polling + tests ⚠ large (~2,300 LOC, mostly deletions)

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 
-import type { Protocol } from '../scenarios/types';
+import type { Protocol } from '../api/cosmos-api';
 import { useEdgeRegistry } from './edge-registry';
 
 interface EdgeProps {

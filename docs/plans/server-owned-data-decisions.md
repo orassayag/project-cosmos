@@ -601,3 +601,84 @@ two comments that named services (`HealthCard.tsx`, `SubServicePanel.tsx`) were 
   - Determinism: `npm run parity:screens` green 16/16 on 4 consecutive runs (3 with `--skip-build`, 1 with a fresh
     build). With live animations (no freeze, no fake clock) and CPU throttling ×1, ×4 and ×8, the world transform is
     identical for `/?scenario=shopping.place-order` (`scale 1.42787`) and for `/` (`scale 1.27376`).
+
+## Phase 8 — Migrate every client feature (2026-10-03)
+
+### How components read the data
+
+- Inside the shell, components call `useCosmos()` (the response) or `useCosmosIndex()` (`client/src/api/cosmosIndex.ts`:
+  id lookups `servicesById`, `topicsById`, `scenariosById`, `incidentsById`, `playableById`, plus `allSteps`). The
+  index is indexing only, cached per response object; no system fact is computed client-side.
+- `App` sits above `CosmosProvider` (it owns the load state), so it reads the ready response straight from
+  `useCosmosLoad()` and builds the same index. The runner moved to `client/src/player/runner.ts` and takes the response
+  (`useScenarioRunner(response | null)`); its steps come from `derived.playable.stepsById`.
+- The active domain is `null` until the visitor picks one and resolves to the first `data.domains` entry once data is
+  loaded — the old `DOMAINS[0]` default, without reading the client copy before the response exists.
+- Presentation tables that stay client-side moved out of `client/src/scenarios/` into `client/src/theme/statusMeta.ts`
+  (`paletteVar`, `DRIFT_KIND_META`, `HEALTH_STATUS_META`, `BLAST_LEVEL_META`, `INCIDENT_COMET_HEX`) and
+  `client/src/theme/driftRuns.ts` (`driftRunDateTime`, `driftEntriesByRun` — run grouping for the changelog and the
+  Changes panel, which Phase 3 kept client-side).
+
+### Deleted, not converted
+
+- `client/src/map/topic-groups.ts` → ring geometry only, in `client/src/map/topicGroupLayout.ts`, over
+  `derived.topicGroups`; `CONNECTED_NODE_IDS` → `derived.connectedNodeIds`.
+- `client/src/map/blast-radius.ts` → `derived.blastRadius` (covers all 20 nodes). `levels` is a record now.
+- `deriveEdges` → `buildEdges(derived.edges, …)`: geometry only. The bend side is the edge's index in `derived.edges`;
+  checked once that the server's edge order equals the old client order and that no hop was skipped for an unknown
+  node, so every curve is the same.
+- `driftEntryMatches` → the changelog substring-filters `derived.driftSearchText`; PR/commit links come from
+  `derived.driftLinks`. Health, ownership and team groups read `derived.healthStatus` / `derived.ownership`.
+- `scripts/dump-baseline.ts` and `npm run baseline:dump`: the oracle generator imported the deleted client
+  derivations. `baseline-full.json` and `baseline-cosmos-map.json` stay as frozen fixtures; nothing regenerates them.
+
+### Kept client-side on purpose (smaller change)
+
+- Map's `TOPICS_TOUCHING_SERVICE` (which topic groups fan out when a service is selected) and the home bbox became
+  `useMemo` keyed on `version`. `TOPICS_TOUCHING_SERVICE` is not `serviceLinks`: it also counts the final receiver of
+  a `through` step (the storefront for `hub-broadcasts`), so swapping it would change which groups fan out.
+- `TopicPanel` still lists producers/consumers from `data.steps` in first-seen order. `derived.topicLinks` holds the
+  same sets but sorted, which would reorder two topics' lists (`orders.cancelled`, `hub-broadcasts`).
+- Quick search keeps searching services, topics and ready scenarios only; the plan's table also lists incidents, but
+  adding them would change search results.
+- The intro shows before the data arrives, so its tagline is a prop: empty until `/api/cosmos` answers.
+
+### Fixture and tests
+
+- `client/src/__tests__/fixtures/cosmos-response.json` is written by `npm run fixture:cosmos`
+  (`scripts/dump-cosmos-response.ts`, `app.request('/api/cosmos')`). `scripts/__tests__/cosmosResponseFixture.test.ts`
+  (part of `npm test`) fails when it is stale.
+- Moved onto the fixture: `clusters.test.tsx`, `demoMode.test.ts`, `scriptedAnswer.test.ts`, `scripts.test.ts`,
+  `demoTargets.test.tsx` (renders inside `renderWithCosmos`) and `loadingGate.test.tsx` (its empty fake response
+  could no longer render the shell). The client parity twin keeps importing the old files until Phase 11.
+
+### Ask map actions
+
+- The five Phase 6 kinds now parse (`askStream.ts`) and run in `App.handleAskAction`; unknown kinds and ids the map
+  does not have are still no-ops (`askUnknownAction.test.ts`).
+- Each action does what the visitor's own gesture does — `B` + click, a node click, `H`, `O`, the Changelog button —
+  except that the opened surface goes **above** the answer instead of replacing it: `overlay.open(id, { keepBeneath:
+  true })`. On phones that is the existing stack (one panel at a time; closing the surface brings the answer back).
+  On desktop the Ask panel would otherwise unmount and abort the stream the moment the agent called a tool, so it is
+  buried the same way and returns when the surface closes.
+- `openPassport` on desktop opens the inspector on the right (`lc-map-panel--right`) beside the answer instead of
+  closing it; on phones the inspector joins the stack as before.
+- `openChangelogEntry` opens the changelog, clears its search, pages down to the entry and marks it
+  (`aria-current`, `.lc-changelog-item--focused`).
+- `demo=ai` is unchanged; see the stage-8 open question (the scripted answer's actions fire as typing starts, so any
+  surface action would cover the answer during the tour).
+
+### Phase 8 grep
+
+- `cosmos:check` phase 8 excludes `client/src/demo/`, like the Phase 2 grep: `demo/scripts.ts` still reads
+  `incidents/data` and `scenarios/data` until Phase 9 rewrites it to `data.demo`. So the client bundle still contains
+  the old data copy until then.
+
+### Owner decisions at the Phase 8 review (2026-10-03)
+
+- **`demo=ai` tour:** the five new Ask map actions are not added to the tour yet. Phase 9 rewrites the tour data
+  (`data.demo.aiTour`), so the action joins the tour there. Until then, the CLAUDE.md rule "every AI change is
+  reflected in `demo=ai`" is knowingly deferred.
+- **Desktop behaviour of view-opening actions:** kept as built. Blast radius, health, ownership and changelog open
+  above the Ask panel (`keepBeneath`), and the answer returns when the view closes. `openPassport` opens beside the
+  answer.

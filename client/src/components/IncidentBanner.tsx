@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 
-import type { Incident } from '../scenarios/data';
-import type { Step } from '../scenarios/types';
+import type { Incident, Step } from '../api/cosmos-api';
 import { PanelCloseButton } from './PanelCloseButton';
 
 interface IncidentBannerProps {

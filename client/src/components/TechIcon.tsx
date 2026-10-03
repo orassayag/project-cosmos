@@ -1,4 +1,4 @@
-import type { Tech } from '../scenarios/types';
+import type { Tech } from '../api/cosmos-api';
 
 interface TechMeta {
   label: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { AskAgent } from '../../components/AskAgent';
 import { ConnectAgentModal } from '../../components/ConnectAgentModal';
 import { DomainBar } from '../../components/DomainBar';
@@ -9,8 +9,9 @@ import { MobileMenu } from '../../components/MobileMenu';
 import { PlaybackControls } from '../../components/PlaybackControls';
 import { ProjectCosmosMap } from '../../map/Map';
 import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
-import type { RunnerApi } from '../../scenarios/runner';
-import type { Scenario, Step } from '../../scenarios/types';
+import type { RunnerApi } from '../../player/runner';
+import type { Scenario, Step } from '../../api/cosmos-api';
+import { renderWithCosmos } from '../../__tests__/renderWithCosmos';
 import { buildDemoScript } from '../scripts';
 import { DEMO_TARGETS } from '../types';
 
@@ -60,7 +61,7 @@ function DemoSurfaces() {
 
 function renderDemoSurfaces() {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  render(<DemoSurfaces />);
+  renderWithCosmos(<DemoSurfaces />);
   fireEvent.click(screen.getByRole('button', { name: 'Open connect' }));
   // The menus and the Ask footer only render once opened, as they do for the demo's own clicks.
   fireEvent.click(findTargets('domain-shopping')[0]);

@@ -1,4 +1,4 @@
-import { BRAND } from '../scenarios/brand';
+import { useCosmos } from '../api/CosmosProvider';
 
 /**
  * Small status pill linking to the nightly Drift Sync workflow — the
@@ -6,10 +6,11 @@ import { BRAND } from '../scenarios/brand';
  * it opens the latest run summary on GitHub Actions.
  */
 export function DriftFooter() {
+  const { brand } = useCosmos().data;
   return (
     <a
       className="lc-drift-footer"
-      href={BRAND.driftSyncUrl}
+      href={brand.driftSyncUrl}
       target="_blank"
       rel="noopener noreferrer"
       title="Open the latest Drift Sync run on GitHub Actions"

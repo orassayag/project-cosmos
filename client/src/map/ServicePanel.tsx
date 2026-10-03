@@ -1,8 +1,7 @@
-import type { Service } from '../scenarios/types';
+import type { Service } from '../api/cosmos-api';
+import { useCosmos } from '../api/CosmosProvider';
 import { TechChip } from '../components/TechIcon';
-import { BRAND } from '../scenarios/brand';
-import { paletteVar } from '../scenarios/palette';
-import { resolveOwner } from '../scenarios/owners';
+import { paletteVar } from '../theme/statusMeta';
 
 interface ServicePanelProps {
   service: Service;
@@ -16,7 +15,8 @@ function githubTeamUrl(githubTeam: string): string | null {
 }
 
 export function ServicePanel({ service }: ServicePanelProps) {
-  const owner = resolveOwner(service);
+  const { data, derived } = useCosmos();
+  const owner = derived.ownership.byService[service.id];
   const teamUrl = owner.githubTeam ? githubTeamUrl(owner.githubTeam) : null;
 
   return (
@@ -33,7 +33,7 @@ export function ServicePanel({ service }: ServicePanelProps) {
         {service.repo && (
           <a
             className="lc-map-panel-repo"
-            href={`${BRAND.repoBaseUrl}/${service.repo}`}
+            href={`${data.brand.repoBaseUrl}/${service.repo}`}
             target="_blank"
             rel="noopener noreferrer"
             title="Open on GitHub"

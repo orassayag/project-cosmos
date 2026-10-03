@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { DemoTarget } from '../demo/types';
-import { INCIDENTS, stepsForScenario } from '../scenarios/data';
+import { useCosmos } from '../api/CosmosProvider';
+import { stepsFor } from '../api/cosmosIndex';
 
 interface IncidentBarProps {
   /** Currently selected playable id — highlights the active incident. */
@@ -13,11 +14,13 @@ interface IncidentBarProps {
 
 /**
  * "Incidents" trigger + dropdown. Lists every recorded incident newest-first
- * (INCIDENTS is pre-sorted); picking one loads it into the shared player via
+ * (the server sends them newest first); picking one loads it into the shared player via
  * the same path a scenario takes. Styled to match the DomainBar menu so an
  * incident feels like a sibling of a scenario, not a separate tool.
  */
 export function IncidentBar({ activeScenarioId, onPickIncident, resetNonce = 0 }: IncidentBarProps) {
+  const cosmos = useCosmos();
+  const { incidents } = cosmos.data;
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +46,7 @@ export function IncidentBar({ activeScenarioId, onPickIncident, resetNonce = 0 }
     };
   }, [open]);
 
-  const activeIsIncident = INCIDENTS.some((i) => i.id === activeScenarioId);
+  const activeIsIncident = incidents.some((i) => i.id === activeScenarioId);
 
   return (
     <div className="lc-domain-bar lc-incident-bar" ref={wrapRef}>
@@ -66,13 +69,13 @@ export function IncidentBar({ activeScenarioId, onPickIncident, resetNonce = 0 }
       {open && (
         <div className="lc-domain-menu lc-incident-menu" role="menu" style={{ left: 0, minWidth: 300 }}>
           <div className="lc-picker-menu-hdr">
-            {INCIDENTS.length} recorded incident{INCIDENTS.length === 1 ? '' : 's'}
+            {incidents.length} recorded incident{incidents.length === 1 ? '' : 's'}
           </div>
-          {INCIDENTS.length === 0 && (
+          {incidents.length === 0 && (
             <div className="lc-picker-menu-empty">No incidents recorded yet.</div>
           )}
-          {INCIDENTS.map((incident) => {
-            const stepCount = stepsForScenario(incident).length;
+          {incidents.map((incident) => {
+            const stepCount = stepsFor(cosmos, incident.id).length;
             const isActive = incident.id === activeScenarioId;
             return (
               <button
