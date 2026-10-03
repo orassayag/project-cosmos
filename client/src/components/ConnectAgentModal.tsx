@@ -13,7 +13,7 @@ const REASON_LINES = {
 } as const;
 
 /** Visibility and every open/close go through the overlay manager, so on phones it
- *  stacks over the answer panel and closing it brings that panel back intact. */
+ *  stacks over the agent chat and closing it brings the chat back intact. */
 export function ConnectAgentModal({ status }: ConnectAgentModalProps) {
   const overlay = useOverlay();
   if (!overlay.isOpen(OVERLAY.connect)) return null;

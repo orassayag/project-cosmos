@@ -100,7 +100,7 @@ Run from the repo root — it is a pnpm workspace root (`client/`, `server/`).
 | `pnpm typecheck` | Type-checks every workspace, no emit |
 | `pnpm lint` | ESLint over `client/`, `server/`, `drift-sync/`, `scripts/` |
 | `pnpm test` | Vitest in the client and server workspaces, plus the `scripts/` tests (`pnpm test:scripts`) |
-| `pnpm test:e2e` | Playwright: boots `pnpm dev` and loads the map through `/api/cosmos` in Chromium (first time: `pnpm exec playwright install chromium`; `BASE_URL` reuses an app that is already running) |
+| `pnpm test:e2e` | Playwright: boots `pnpm dev`, loads the map through `/api/cosmos`, and drives the agent chat (desktop and phone, with a faked agent) and the `?demo=ai` tour in Chromium (first time: `pnpm exec playwright install chromium`; `BASE_URL` reuses an app that is already running) |
 | `pnpm types:emit` | Copies the API response types (`server/src/cosmos/apiTypes.ts`) to `client/src/api/cosmos-api.ts` — run after editing them; CI fails on a stale copy |
 | `pnpm validate` | Data sanity over `server/src/cosmos/data/` (`validateCosmos()`): ids resolve, `phaseId`s unique, spacing, palette, clusters, demo tours; `--source-check` also greps your cloned repos |
 | `pnpm fixture:cosmos` | Rewrites the client test fixture `client/src/__tests__/fixtures/cosmos-response.json` from the real `/api/cosmos` route — run after a data change; `pnpm test` fails on a stale copy |
@@ -231,7 +231,7 @@ The app is built mobile-first and verified on a ~390px-wide phone first, then on
 
 - **Phone-class** means `max-width: 768px` **or** `max-height: 480px` (landscape phones); the `useViewport` hook mirrors this onto `<html data-viewport data-touch>` so CSS and JS agree.
 - On phones the topbar collapses into a slide-over **drawer** (domain and incident pickers, changelog, presentation, help), and every floating panel docks as a **bottom sheet** clear of notches and home indicators.
-- **One panel at a time** — panels never stack: a detail card (inspector, ask, health card) hides the context panels behind it.
+- **One panel at a time** — panels never stack: a detail card (inspector, agent chat, health card) hides the context panels behind it.
 - **Every panel has a close button** in its top-right corner on phones.
 - Touch gestures: drag to pan, two-finger pinch to zoom.
 
@@ -393,8 +393,8 @@ The old GitHub Pages address now serves only a redirect page (`pages-redirect/`)
 
 ## Testing and CI
 
-- **Vitest** in both workspaces (`pnpm test`): the client suite covers the agent button, the setup window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, the local-only agent config, the loopback dev server, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
-- **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `pnpm test:e2e` (Playwright) loads the map through `/api/cosmos`, and `pnpm parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
+- **Vitest** in both workspaces (`pnpm test`): the client suite covers the agent button, the agent chat, the setup window, the answer stream, the demo runner, human-like motion, and that every element a demo tour clicks really exists; the server suite covers the routes, the local-only agent config, the loopback dev server, JEV triage, the local fallback, routing, the agent graph, and provider-error mapping.
+- **Data and screens**: the server suite pins the data to `server/src/__tests__/fixtures/baseline-full.json` (`cosmosParity.test.ts`), so a deliberate data change updates that fixture in the same PR; `pnpm test:e2e` (Playwright) loads the map through `/api/cosmos` and drives the agent chat and the `?demo=ai` tour end to end (the agent's replies are faked in the browser, so no key is needed), and `pnpm parity:screens` compares 16 map views with `docs/plans/baseline-screens/`.
 - **CI** (`.github/workflows/validate-on-pr.yml`) runs lint, the client API-types freshness check (`pnpm types:emit` + `git diff`), build, the drift-sync type-check, `pnpm test`, and `pnpm validate` on every PR and push to `main`.
 
 ## Versioning
