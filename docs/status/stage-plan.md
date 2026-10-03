@@ -11,7 +11,7 @@ Generated: 2026-10-03T08:13:56Z
 ## Stages
 - Stage 1: COMMITTED — Keyless server: agentConfig, loopback-only dev server, /ai/status + /ai/ask on env keys, cookie/connect removal (1.1, server half of 1.4)
 - Stage 2: COMMITTED — Client entry point: drop top-bar/drawer inputs, AgentButton (red/green, phone-first), useAiConnection status reasons, client leftovers + interim errors (1.2, client half of 1.4, 1.5)
-- Stage 3: PLANNED — Keyless setup window by reason + billing note, A-key toggle + help, .env.example / fresh-start / README (1.3, A2, A5, docs of 1.4)
+- Stage 3: COMMITTED — Keyless setup window by reason + billing note, A-key toggle + help, .env.example / fresh-start / README (1.3, A2, A5, docs of 1.4)
 - Stage 4: PLANNED — Chat request contract + client trimming, follow-up-aware routing, fixed off-topic reply, 13-tool allow-list (2.1, 2.2, 2.3)
 - Stage 5: PLANNED — useAgentChat hook: in-flight ownership, stop marker, new-chat abort, errors + token usage, askStream { messages } (2.4)
 - Stage 6: PLANNED — AgentChat panel: phone sheet / desktop dock, collapse-after-answer layout, Stop/New chat, thinking dots, counter, follow-up chips ⚠ large (~700 LOC) (2.5, 2.6, 2.7, A3, A4)
