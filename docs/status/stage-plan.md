@@ -1,21 +1,19 @@
 # Master Stage Plan
-Plan: docs/plans/server-owned-data-migration-plan.md
-Branch: feature/add-ai
+Plan: docs/plans/ai-refactor.md
+Branch: feature/ai-refactor
 Split: medium (cap 10 stages, ~450 LOC/stage target)
 Review budget: 120 minutes
-Generated: 2026-10-02
+Generated: 2026-10-03T08:13:56Z
 
 ## Scope estimate
-~9,500 changed LOC (≈2,100 data lines copied server-side, ≈2,000 deleted in Phase 11, the rest new server/derive/route/agent/client/test/tooling code) across ~140 files → ceil(9500 / 450) = 22, clamped to the 10-stage cap; stages grow (~950 LOC avg), plan phases strictly in order.
+~3300 LOC estimated (incl. tests) across ~45 files → ceil(3300 / 450) = 8 stages, ~410 LOC/stage.
 
 ## Stages
-- Stage 1: COMMITTED — P0: baseline gates, Drift Sync pause, decisions log, dump-baseline fixtures, parity:screens + baseline screenshots, cosmos:check runner ⚠ large (~900 LOC + generated fixtures/PNGs)
-- Stage 2: COMMITTED — P1: server/src/cosmos data copy, apiTypes/types, Zod schema, validateCosmos(), schema/validate/parity tests ⚠ large (~2,600 LOC, mostly copied data)
-- Stage 3: COMMITTED — P2: palette, groupServiceId, clusters/nebula, ecosystem/role fields + component refactors, fixture regen, equivalence + clusters tests ⚠ large (~900 LOC)
-- Stage 4: COMMITTED — P3: derive/* modules (graph, blastRadius, ownership, health, topicGroups, drift, playable) + getCosmosView() + derived parity ⚠ large (~900 LOC)
-- Stage 5: COMMITTED — P4+P5: GET /api/cosmos (ETag/304/cache), lazy AI imports, print-cosmos-version, types:emit + CI diff, route/isolation/emit tests ⚠ large (~750 LOC)
-- Stage 6: COMMITTED — P6: agents on getCosmosView(), digest additions, read tools, new map actions, unknown-action test, agent eval suite ⚠ large (~900 LOC)
-- Stage 7: COMMITTED — P7: no-account dev loop, cosmosClient (retry-safe), CosmosProvider, loading gate + error/Retry, A1 Playwright E2E + CI job ⚠ large (~850 LOC)
-- Stage 8: COMMITTED — P8: migrate every client feature to useCosmos(), renderWithCosmos fixture, Ask map-action handlers ⚠ large (~1,400 LOC)
-- Stage 9: COMMITTED — P9+P10: drift/health source + demo data server-side, demo scripts rewrite, retarget Drift Sync/validate/fresh/skills/record-demo ⚠ large (~900 LOC)
-- Stage 10: COMMITTED — P11+P12: delete client data copies + snapshot tooling, docs (README/CLAUDE.md/CONTRIBUTING/decision record), dev live polling + tests ⚠ large (~2,300 LOC, mostly deletions)
+- Stage 1: COMMITTED — Keyless server: agentConfig, loopback-only dev server, /ai/status + /ai/ask on env keys, cookie/connect removal (1.1, server half of 1.4)
+- Stage 2: PLANNED — Client entry point: drop top-bar/drawer inputs, AgentButton (red/green, phone-first), useAiConnection status reasons, client leftovers + interim errors (1.2, client half of 1.4, 1.5)
+- Stage 3: PLANNED — Keyless setup window by reason + billing note, A-key toggle + help, .env.example / fresh-start / README (1.3, A2, A5, docs of 1.4)
+- Stage 4: PLANNED — Chat request contract + client trimming, follow-up-aware routing, fixed off-topic reply, 13-tool allow-list (2.1, 2.2, 2.3)
+- Stage 5: PLANNED — useAgentChat hook: in-flight ownership, stop marker, new-chat abort, errors + token usage, askStream { messages } (2.4)
+- Stage 6: PLANNED — AgentChat panel: phone sheet / desktop dock, collapse-after-answer layout, Stop/New chat, thinking dots, counter, follow-up chips ⚠ large (~700 LOC) (2.5, 2.6, 2.7, A3, A4)
+- Stage 7: PLANNED — Scripted demo turns: aiTour.turns data + validator + schema/types/fixtures, scripted answering, demo scripts on new targets (2.8)
+- Stage 8: PLANNED — Playwright agent-chat spec (demo, chat, phone) + final README/acceptance pass (2.9, A1)
