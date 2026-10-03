@@ -1,4 +1,4 @@
-import { toRequestMessages } from '../api/chatHistory';
+import { toRequestMessages, type ChatMessage } from '../api/chatHistory';
 import type { AskAction } from './AskPanel';
 
 export type AskStreamEvent =
@@ -135,14 +135,22 @@ async function readErrorCode(response: Response): Promise<string> {
   return 'PROVIDER_ERROR';
 }
 
+export function streamAskAnswer(
+  question: string,
+  signal: AbortSignal,
+  onEvent: (event: AskStreamEvent) => void,
+): Promise<void> {
+  return streamAskMessages(toRequestMessages([], question), signal, onEvent);
+}
+
 /**
- * POSTs the question and relays each NDJSON event. A pre-stream HTTP failure or
+ * POSTs the chat messages and relays each NDJSON event. A pre-stream HTTP failure or
  * a network failure (also mid-stream) is folded into an `error` event; only the
  * first `error` is relayed, and every call that is not aborted ends with exactly
  * one `done`. Once `signal` aborts, nothing more is emitted.
  */
-export async function streamAskAnswer(
-  question: string,
+export async function streamAskMessages(
+  messages: ChatMessage[],
   signal: AbortSignal,
   onEvent: (event: AskStreamEvent) => void,
 ): Promise<void> {
@@ -162,7 +170,7 @@ export async function streamAskAnswer(
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: toRequestMessages([], question) }),
+      body: JSON.stringify({ messages }),
       signal,
     });
     if (!response.ok || !response.body) {
