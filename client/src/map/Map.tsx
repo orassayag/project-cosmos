@@ -81,7 +81,7 @@ function homeBBox(services: readonly Service[]): BBox {
   return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
 }
 
-const MOBILE_SHEET_SELECTOR = '.lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-health-card, .lc-map-panel, .lc-ask-panel';
+const MOBILE_SHEET_SELECTOR = '.lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend, .lc-health-card, .lc-map-panel, .lc-chat-panel';
 
 type Selection =
   | { kind: 'service'; id: string }
@@ -102,17 +102,16 @@ interface MapProps {
   revealing?: boolean;
   /** Presentation mode — fattens the comets (chrome is hidden by App CSS). */
   presentation?: boolean;
-  /** Set by the spotlight to pan+select a node; cleared after consumption.
-   *  `keepAsk` (an Ask map action) leaves the answer open beside the inspector on desktop. */
-  spotlightTarget?: { id: string; kind: 'service' | 'topic'; keepAsk?: boolean } | null;
+  /** Set by the spotlight to pan+select a node; cleared after consumption. */
+  spotlightTarget?: { id: string; kind: 'service' | 'topic' } | null;
   onSpotlightConsumed?: () => void;
   /** An Ask map action: open blast radius with this source picked; cleared after consumption. */
   blastRequest?: { nodeId: string } | null;
   onBlastRequestConsumed?: () => void;
   /** Incremented by the "Project Cosmos" reset — clears selection and reframes home. */
   resetNonce?: number;
-  /** Nodes the Ask panel answer is about — while the panel is open the map
-   *  dims down to every one of them plus their immediate neighbours. */
+  /** Nodes the agent's answer is about — the map dims down to every one of them plus
+   *  their immediate neighbours. App passes none while the chat is out of view. */
   askFocusIds?: readonly string[];
   /** True when the active playable is a recorded incident — tints the comet
    *  the incident colour so a historical replay never reads as live traffic. */
@@ -133,6 +132,11 @@ interface MapProps {
   driftCursorDate?: string | null;
   /** A Changes-panel entry was clicked — stamp it as the "current time". */
   onDriftSelect?: (entry: DriftEntry) => void;
+  /** Desktop: the agent chat is docked open on the right, so the inspector stays left and the health card waits. */
+  chatDocked?: boolean;
+  /** Bumped when the chat reopens over the health card: the card closes, health mode stays. */
+  healthCardCloseNonce?: number;
+  onHealthCardChange?: (isOpen: boolean) => void;
 }
 
 
@@ -159,6 +163,9 @@ export function ProjectCosmosMap({
   activeDomain = null,
   driftCursorDate = null,
   onDriftSelect,
+  chatDocked = false,
+  healthCardCloseNonce = 0,
+  onHealthCardChange,
 }: MapProps) {
   const overlay = useOverlay();
   const cosmos = useCosmos();
@@ -258,6 +265,16 @@ export function ProjectCosmosMap({
   useEffect(() => {
     if (!healthStacked) setHealthSelectedId(null);
   }, [healthStacked]);
+  const handledHealthCardCloseNonceRef = useRef(healthCardCloseNonce);
+  useEffect(() => {
+    if (healthCardCloseNonce === handledHealthCardCloseNonceRef.current) return;
+    handledHealthCardCloseNonceRef.current = healthCardCloseNonce;
+    setHealthSelectedId(null);
+  }, [healthCardCloseNonce]);
+  const isHealthCardOpen = healthMode && healthSelectedId !== null;
+  useEffect(() => {
+    onHealthCardChange?.(isHealthCardOpen);
+  }, [isHealthCardOpen, onHealthCardChange]);
 
   // Per-node overlay halo color: blast-severity while a source is picked,
   // health tint while the heat map is on. Null in every other mode.
@@ -457,7 +474,7 @@ export function ProjectCosmosMap({
   // Pan to + select a single node, framing it together with all its
   // directly-connected neighbours. Shared by the spotlight (App-driven) and
   // the drift overlay's click-to-jump.
-  const focusNode = useCallback((id: string, kind: 'service' | 'topic', keepAsk = false) => {
+  const focusNode = useCallback((id: string, kind: 'service' | 'topic') => {
     // Collect every node ID that connects to this node across all steps.
     const connectedIds = new Set<string>([id]);
     for (const s of data.steps) {
@@ -486,21 +503,19 @@ export function ProjectCosmosMap({
 
     if (!Number.isFinite(minX)) return;
 
-    if (!isMobile && !keepAsk) overlay.close(OVERLAY.ask);
     setSelection(kind === 'service' ? { kind: 'service', id } : { kind: 'topic', id });
 
     const bbox = { minX, minY, maxX, maxY };
     focusTargetRef.current = { id, bbox };
     if (isMobile) return;
-    // Left padding reserves room for the inspector (~340px at left:14), or for the
-    // Ask answer when the inspector sits on the right beside it.
-    fitTo(bbox, { top: 100, right: keepAsk ? 380 : 120, bottom: 100, left: 380 });
-  }, [fitTo, overlay, isMobile, data.steps, servicesById, topicsById]);
+    // Left padding reserves room for the inspector (~340px at left:14); right, for the docked chat.
+    fitTo(bbox, { top: 100, right: chatDocked ? 380 : 120, bottom: 100, left: 380 });
+  }, [fitTo, isMobile, chatDocked, data.steps, servicesById, topicsById]);
 
   // Spotlight: pan to + select the requested node, then signal consumed.
   useEffect(() => {
     if (!spotlightTarget) return;
-    focusNode(spotlightTarget.id, spotlightTarget.kind, spotlightTarget.keepAsk);
+    focusNode(spotlightTarget.id, spotlightTarget.kind);
     onSpotlightConsumed?.();
   }, [spotlightTarget, focusNode, onSpotlightConsumed]);
 
@@ -528,18 +543,8 @@ export function ProjectCosmosMap({
     reset();
   }, [resetNonce, reset]);
 
-  // The Ask panel and the star inspector both anchor to the left edge — never
-  // let them stack. Opening Ask drops any lingering selection. The reverse
-  // (a node click closing Ask) is done in the click handlers, not an effect on
-  // `selection`, so a selection left over when Ask opens can't race the effect
-  // above and close the panel the same tick it appears.
-  // On phones neither closes the other: the inspector joins the overlay stack
-  // (below), so each buries the other and closing the top one brings back the
-  // one beneath it.
-  useEffect(() => {
-    if (!isMobile && overlay.isOpen(OVERLAY.ask)) setSelection(null);
-  }, [overlay, isMobile]);
-
+  // On phones the inspector joins the overlay stack, so it and the chat bury each other
+  // and closing the top one brings back the one beneath it.
   const selectionKey = selection ? JSON.stringify(selection) : null;
   const { open: openOverlay, close: closeOverlay } = overlay;
   useLayoutEffect(() => {
@@ -547,8 +552,8 @@ export function ProjectCosmosMap({
     else closeOverlay(OVERLAY.inspector);
   }, [isMobile, selectionKey, openOverlay, closeOverlay]);
   const inspectorVisible = !isMobile || overlay.isOpen(OVERLAY.inspector);
-  // Only an Ask passport action selects a node while the answer stays open on desktop.
-  const isAskBesideInspector = !isMobile && overlay.isOpen(OVERLAY.ask);
+  // The inspector normally moves right of a left legend; the docked chat owns the right, so it stays left then.
+  const isInspectorOnRight = (driftMode || ownershipMode) && !chatDocked;
 
   useEffect(() => {
     if (!activeScenarioId) {
@@ -719,10 +724,7 @@ export function ProjectCosmosMap({
     return ids;
   }, [selection, edges]);
 
-  const askTouches = useMemo<Set<string> | null>(
-    () => (overlay.isOpen(OVERLAY.ask) ? computeAskTouches(askFocusIds, edges) : null),
-    [overlay, askFocusIds, edges],
-  );
+  const askTouches = useMemo<Set<string> | null>(() => computeAskTouches(askFocusIds, edges), [askFocusIds, edges]);
 
   // Priority: ask focus > scenario > blast radius > selection > drift > ownership.
   // Health is a heat map — it tints every node and never dims.
@@ -1027,7 +1029,6 @@ export function ProjectCosmosMap({
                       if (blastMode) { setBlastSourceId((prev) => (prev === id ? null : id)); return; }
                       if (healthMode) { setHealthSelectedId((prev) => (prev === id ? null : id)); return; }
                       exitOwnership();
-                      if (!isMobile) overlay.close(OVERLAY.ask);
                       setSelection((prev) =>
                         prev?.kind === 'service' && prev.id === id ? null : { kind: 'service', id },
                       );
@@ -1035,7 +1036,6 @@ export function ProjectCosmosMap({
                     onSubServiceClick={(serviceId, subId) => {
                       if (layoutMode) return;
                       exitOwnership();
-                      if (!isMobile) overlay.close(OVERLAY.ask);
                       setSelection((prev) =>
                         prev?.kind === 'sub-service' && prev.subId === subId
                           ? null
@@ -1091,8 +1091,7 @@ export function ProjectCosmosMap({
                         if (blastMode) { setBlastSourceId((prev) => (prev === id ? null : id)); return; }
                         if (healthMode) return;
                         exitOwnership();
-                        if (!isMobile) overlay.close(OVERLAY.ask);
-                        setSelection((prev) =>
+                          setSelection((prev) =>
                           prev?.kind === 'topic' && prev.id === id ? null : { kind: 'topic', id },
                         );
                       }}
@@ -1246,7 +1245,7 @@ export function ProjectCosmosMap({
         {healthMode && !layoutMode && (
           <>
             <HealthLegend onClose={() => overlay.close(OVERLAY.mapHealth)} />
-            {healthSelectedId && (
+            {healthSelectedId && !chatDocked && (
               <HealthCard serviceId={healthSelectedId} onClose={() => setHealthSelectedId(null)} />
             )}
           </>
@@ -1254,7 +1253,7 @@ export function ProjectCosmosMap({
 
         {selection && !blastMode && !healthMode && inspectorVisible && (
           <div
-            className={`lc-map-panel lc-map-panel--${selection.kind}${driftMode || ownershipMode || isAskBesideInspector ? ' lc-map-panel--right' : ''}`}
+            className={`lc-map-panel lc-map-panel--${selection.kind}${isInspectorOnRight ? ' lc-map-panel--right' : ''}`}
             data-no-pan="true"
             onClick={(e) => e.stopPropagation()}
           >

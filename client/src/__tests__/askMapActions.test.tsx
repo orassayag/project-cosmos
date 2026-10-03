@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { startCosmosFetch } from '../api/cosmosClient';
-import type { AskAction } from '../components/AskPanel';
+import type { AskAction } from '../components/askStream';
 import { INTRO_SEEN_STORAGE_KEY } from '../demo/demoMode';
 import { MOBILE_QUERY } from '../hooks/useViewport';
 import { App } from '../App';
@@ -23,7 +23,7 @@ const TOPIC = data.topics.find((topic) => derived.connectedNodeIds.includes(topi
 const OLDEST_DRIFT_ENTRY = [...data.drift.entries].sort((first, second) => first.date.localeCompare(second.date))[0];
 
 const SURFACE_SELECTORS = {
-  ask: '.lc-ask-panel',
+  ask: '.lc-chat-panel',
   blast: '.lc-blast-legend',
   passport: '.lc-map-panel',
   health: '.lc-health-legend',
@@ -189,19 +189,19 @@ describe('Ask map actions', () => {
   describe('on desktop', () => {
     beforeEach(() => stubViewport(false));
 
-    it('keeps the answer beneath the blast radius and brings it back when the overlay closes', async () => {
+    it('keeps the chat docked beside the blast radius and after the overlay closes', async () => {
       await askWithAgentAction({ type: 'action', kind: 'showBlastRadius', nodeId: SERVICE.id });
 
-      expect(visibleSurfaces()).toEqual(['blast']);
+      expect(visibleSurfaces()).toEqual(['ask', 'blast']);
       fireEvent.keyDown(document.body, { key: 'b' });
       expect(visibleSurfaces()).toEqual(['ask']);
     });
 
-    it('opens the passport beside the answer', async () => {
+    it('opens the passport on the left, beside the docked chat', async () => {
       await askWithAgentAction({ type: 'action', kind: 'openPassport', nodeId: SERVICE.id });
 
       expect(visibleSurfaces()).toEqual(['ask', 'passport']);
-      expect(document.querySelector('.lc-map-panel')?.classList.contains('lc-map-panel--right')).toBe(true);
+      expect(document.querySelector('.lc-map-panel')?.classList.contains('lc-map-panel--right')).toBe(false);
     });
   });
 });

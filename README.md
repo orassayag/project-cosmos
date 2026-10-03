@@ -61,7 +61,7 @@ Every architecture diagram starts dying the moment it's born. The wiki page is f
 
 ### AI
 
-- 💬 **Ask the agent** — a natural-language question box over the whole architecture, backed by a real LangChain + LangGraph agent. Run the project locally with a Claude or OpenAI key in `server/.env` and the bot in the bottom-right corner turns green; the answer streams in word by word, with a token count, and the agent can light up every service it mentions and start playing the matching scenario. No visitor ever types a key: on the live site the bot stays red and explains how to run the agent locally. See [Ask the agent (AI)](#ask-the-agent-ai).
+- 💬 **Ask the agent** — a multi-turn chat over the whole architecture, backed by a real LangChain + LangGraph agent. Run the project locally with a Claude or OpenAI key in `server/.env` and the bot in the bottom-right corner turns green; each answer streams in word by word, with a token count and suggested follow-up questions, and the agent can light up every service it mentions and start playing the matching scenario. No visitor ever types a key: on the live site the bot stays red and explains how to run the agent locally. See [Ask the agent (AI)](#ask-the-agent-ai).
 - 🌙 **Drift Sync** — the nightly honesty robot. Diffs every tracked repo against a baseline SHA, filters noise with cheap regexes, asks an AI agent "does the map still tell the truth?", and opens one tidy PR per team with file:line evidence.
 - 🤖 **Two Claude skills** — `/add-service` and `/add-scenario` teach [Claude Code](https://claude.com/claude-code) to interrogate your repos and grow the map for you: who do you call, what do you produce, to which topic, what database are you hiding.
 
@@ -137,7 +137,7 @@ Everything the map does is reachable without the mouse:
 | `Space` | Play / pause the current scenario |
 | `←` `→` | Previous / next step |
 | `P` | Presentation mode — hide the chrome for a talk |
-| `A` | Open / close the agent (the answer panel when the bot is green, the setup window when it is red) |
+| `A` | Open / close the agent (the chat when the bot is green, the setup window when it is red) |
 | `B` | Blast radius |
 | `H` | Service health heat map |
 | `O` | Ownership view |
@@ -151,13 +151,19 @@ Mouse equivalents: drag the background to pan, scroll to zoom around the cursor,
 
 ## Ask the agent (AI)
 
-The agent answers questions about the architecture — *"What happens when a payment fails?"*, *"Which team owns checkout?"*, *"Play the order flow"*. Open it with the bot button in the bottom-right corner (or press `A`), type a question in the answer panel and press Search.
+The agent answers questions about the architecture — *"What happens when a payment fails?"*, *"Which team owns checkout?"*, *"Play the order flow"*. Open it with the bot button in the bottom-right corner (or press `A`) and ask in the chat. It is a conversation: follow-up questions keep the earlier turns.
+
+- **On a phone** the chat is a bottom sheet with its own close button; the question box stays pinned at its bottom.
+- **On desktop** it docks on the right. If a right-side panel (step panel, on-call card, changelog) opens while an answer is still coming in, the chat stays open and folds into a small tab only once the answer ends; the tab shows the latest line and a dot for an unread answer. Clicking the tab (or pressing `A`) reopens the chat and closes that panel — a playing scenario keeps playing. A service card opened from the chat sits on the left.
+- Three dots show while the agent is thinking. **Stop** ends an answer early (the cut-off reply stays, marked as stopped) and **New chat** starts over. Closing the chat never cuts an answer short.
+- An empty chat offers example questions; after each answer, up to three follow-up chips (*"Who owns …?"*, *"What breaks if … fails?"*, *"Play …"*) are built from the services and scenarios that answer touched.
+- Questions are capped at 500 characters; a counter appears past 400 and Send is disabled at the limit.
 
 ### Connecting
 
 The bot button's light shows whether the agent is available. The page asks `GET /api/ai/status` once on load:
 
-- **Green** — the local dev server has a model key. Clicking the bot (or `A`) opens the answer panel.
+- **Green** — the local dev server has a model key. Clicking the bot (or `A`) opens the chat.
 - **Red** — clicking it opens a setup window whose first line says why:
   - on the live site (or anywhere but the local dev server): *"Live answers are only available when running the project locally."*
   - locally without a key: *"No AI key is set yet."*
@@ -165,7 +171,7 @@ The bot button's light shows whether the agent is available. The page asks `GET 
   Then the numbered steps: copy `server/.env.example` to `server/.env`, set `ANTHROPIC_API_KEY` *or* `OPENAI_API_KEY` (optionally `AI_GATEWAY_API_KEY` for JEV), and run `pnpm dev`. Questions are billed to the AI account whose key you set.
 - **Grey** — the status has not answered yet; clicking it shows the same setup window with the live-site wording.
 
-The page never asks for, sends or stores a key. The server reads the keys from its own env, and only when the local dev script started it (bound to `127.0.0.1`); a deployed server never enables the agent. A provider error (for example a refused key) shows in the answer panel and the bot stays green.
+The page never asks for, sends or stores a key. The server reads the keys from its own env, and only when the local dev script started it (bound to `127.0.0.1`); a deployed server never enables the agent. A provider error (for example a refused key) shows as a message in the chat, with a *Try again* button, and the bot stays green.
 
 ### How a question is answered
 
@@ -361,7 +367,7 @@ Merging the PR bumps the baseline inside the same PR — merge means caught-up, 
 client/                 Vite + React app (the map)
   src/api/              the /api/cosmos client, CosmosProvider, emitted API types
   src/map/              SVG map rendering, edges, planets, insight views
-  src/components/       UI shell: intro, playback, step panel, agent button, answer panel, setup window
+  src/components/       UI shell: intro, playback, step panel, agent button, agent chat, setup window
   src/demo/             self-playing demo tours
   src/hooks/            viewport, deep links, map view, AI connection
   src/overlays/         overlay manager (one panel at a time)

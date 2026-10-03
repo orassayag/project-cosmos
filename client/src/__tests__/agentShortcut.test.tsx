@@ -26,7 +26,7 @@ async function renderApp(expectedButtonClass: string) {
 }
 
 function isAnswerPanelVisible() {
-  const panel = document.querySelector<HTMLElement>('.lc-ask-panel');
+  const panel = document.querySelector<HTMLElement>('.lc-chat-panel');
   return panel !== null && !panel.hidden;
 }
 
@@ -57,7 +57,7 @@ describe('A key toggles the agent', () => {
     vi.unstubAllGlobals();
   });
 
-  it('opens and closes the answer panel when the agent is connected', async () => {
+  it('opens and closes the chat when the agent is connected', async () => {
     stubStatus(() => Response.json({ connected: true, provider: 'anthropic' }));
     await renderApp('lc-agent-button--on');
 
