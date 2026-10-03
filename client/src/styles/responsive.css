@@ -15,6 +15,18 @@
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
+/* ── Agent bot: bottom-right on every size ─────────────────────
+   --playback-h is the height of whatever owns the stage's bottom-right edge
+   (the zoom stepper on the idle map, the transport bar while playing on a
+   phone), so the bot always sits 12px above it. Idle desktop: 14px inset +
+   three 30px zoom buttons + 2px border. */
+.lc-stage { --playback-h: 106px; }
+.lc-agent-button {
+  right: calc(14px + var(--safe-right));
+  bottom: calc(var(--playback-h) + 12px + var(--safe-bottom));
+}
+.lc-app[data-presentation='true'] .lc-agent-button { display: none; }
+
 /* Touch devices: the map owns every gesture inside its stage, so the
    browser must not steal pinch/drag for scroll-zoom. The app shell is
    position:fixed and never scrolls, so this is safe app-wide. */
@@ -240,7 +252,6 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-cosmos-state { order: 1; margin-left: 0; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-domain-bar { order: 2; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-incident-bar { order: 3; }
-  .lc-topbar:not(.lc-topbar--mobile) .lc-ask { order: 4; margin-left: auto; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-scenario-status {
     order: 6;
     /* Zero basis so the pill never pushes row 2 onto a third line; it grows back to its content when there is room. */
@@ -257,6 +268,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
 /* Desktop: the step panel (right column, 360px + 14px inset) used to cover the map steppers. */
 @media (min-width: 769px) and (min-height: 481px) {
   .lc-stage:has(.lc-step-panel) .lc-map-stepper--zoom { right: 388px; }
+  .lc-stage:has(.lc-step-panel) .lc-agent-button { right: 388px; }
   .lc-stage:has(.lc-step-panel) .lc-map-stepper--traffic { right: 430px; }
 }
 /* Compact desktop while a scenario is loaded: the centred 640px transport no longer
@@ -273,6 +285,8 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
     max-height: 160px;
   }
   .lc-stage:has(.lc-controls) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { bottom: var(--lc-transport-clearance); }
+  /* The zoom stepper (92px) now sits on the transport band, so the bot clears both. */
+  .lc-stage:has(.lc-controls) { --playback-h: calc(var(--lc-transport-clearance) + 92px); }
 }
 /* No room for the steppers beside the view chips while playing; wheel and pinch still zoom. */
 @media (max-width: 1100px) and (min-width: 769px) and (min-height: 481px) {
@@ -286,9 +300,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
 @media (max-width: 884px) and (min-width: 769px) and (min-height: 481px) {
   .lc-stage:has(.lc-controls):has(.lc-step-panel) .lc-activity { bottom: calc(var(--lc-transport-clearance) + 76px); }
 }
-/* Too narrow for Explore beside the domains: it joins row 2 and the status pill ellipsizes. */
 @media (max-width: 900px) and (min-width: 769px) and (min-height: 481px) {
-  .lc-topbar:not(.lc-topbar--mobile) .lc-ask { order: 6; }
   .lc-topbar:not(.lc-topbar--mobile) .lc-drift-footer { margin-left: 0; }
 }
 
@@ -358,17 +370,6 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
     font-size: 9px;
     letter-spacing: 0.12em;
   }
-  .lc-topbar-search { padding: 0 14px 10px; }
-  /* In flow, not absolute, so the header grows and shrinks with the field. */
-  .lc-topbar-search .lc-ask { width: 100%; height: auto; }
-  .lc-topbar-search .lc-ask-shell { position: relative; width: 100%; height: 34px; border-radius: 17px; }
-  .lc-topbar-search .lc-ask--expanded .lc-ask-shell { height: 150px; }
-  .lc-topbar-search .lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 230px; }
-  .lc-ask-starter { min-height: 40px; padding: 6px 14px; font-size: 12px; }
-  .lc-ask-starters { gap: 6px; }
-  .lc-ask-connect { min-height: 40px; }
-  .lc-topbar-search .lc-ask-icon { top: 11px; }
-  .lc-topbar-search .lc-ask-field { padding-top: 8px; }
   /* The commit/branch pill can eat the whole row — let it wrap under brand. */
   .lc-cosmos-state { display: none; }
 
@@ -388,6 +389,14 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-map-zoom-btn { width: 38px; height: 34px; font-size: 13px; }
   /* Transport owns the bottom while playing, so hand it the stepper corner. */
   .lc-stage:has(.lc-controls) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
+
+  /* Agent bot: a 48px tap target lined up with the zoom column (8px edge +
+     three 34px buttons + 2px border), or above the transport bar while playing. */
+  .lc-stage { --playback-h: 112px; }
+  .lc-stage:has(.lc-controls) { --playback-h: calc(var(--lc-controls-h, 150px) + 10px); }
+  .lc-agent-button { right: calc(8px + var(--safe-right)); }
+  /* Below 16px iOS zooms the page in when the field takes focus. */
+  .lc-ask-composer-field { font-size: 16px; }
 
   /* Map-view toggles (Changes / Ownership / Blast / Health / Edit) become a
      horizontally-scrollable chip strip pinned to the top of the stage. */
@@ -456,6 +465,13 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
     .lc-map-panel, .lc-ask-panel, .lc-health-card, .lc-step-panel, .lc-owner-legend,
     .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
   ) :is(.lc-map-stepper--zoom, .lc-map-stepper--traffic) { display: none; }
+  /* The bot would float over any bottom sheet or narration strip, so it waits
+     behind them like the steppers. A buried ask panel ([hidden]) does not count. */
+  .lc-stage:has(
+    .lc-map-panel, .lc-ask-panel:not([hidden]), .lc-health-card, .lc-step-panel, .lc-incident-panel,
+    .lc-owner-legend, .lc-drift-overlay, .lc-blast-legend, .lc-health-legend
+  ) .lc-agent-button,
+  body:has(.lc-connect-overlay) .lc-agent-button { display: none; }
 
   /* Live activity log is supplementary — hide it to keep the map clear. */
   .lc-activity { display: none; }
@@ -573,10 +589,7 @@ html[data-touch='true'] .lc-demo-pointer { display: none; }
   .lc-present-exit { width: 40px; height: 40px; opacity: 0.85; }
 }
 
-/* Landscape phones fit the starter chips on one or two rows — don't spend
-   scarce height on the portrait card size. */
 @media (max-height: 480px) {
-  .lc-topbar-search .lc-ask--starters.lc-ask--expanded .lc-ask-shell { height: 190px; }
   /* The intro is taller than a landscape phone: scroll it, and keep "Jump in" reachable. */
   .lc-intro { overflow-y: auto; place-items: safe center; }
   .lc-intro-inner { padding-block: 16px; }

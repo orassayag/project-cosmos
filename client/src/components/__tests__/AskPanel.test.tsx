@@ -3,61 +3,36 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react';
 import { AskPanel } from '../AskPanel';
 import type { AskAction } from '../AskPanel';
-import { OVERLAY, OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import { useAiConnection } from '../../hooks/useAiConnection';
 
-const CONNECT_PROMPT = 'Connect an AI agent for real answers.';
+describe('AskPanel (question box)', () => {
+  it('shows only the question box before anything is asked, and never fetches', () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    render(<AskPanel question="" onAsk={vi.fn()} onClose={() => undefined} />);
 
-function Harness({ showConnectPrompt }: { showConnectPrompt: boolean }) {
-  const overlay = useOverlayManager();
-  return (
-    <OverlayProvider value={overlay}>
-      <output data-testid="active-overlay">{overlay.active ?? 'none'}</output>
-      <AskPanel
-        question="Which team owns checkout?"
-        onClose={() => overlay.close(OVERLAY.ask)}
-        showConnectPrompt={showConnectPrompt}
-        onConnectRequest={() => overlay.open(OVERLAY.connect)}
-      />
-    </OverlayProvider>
-  );
-}
-
-function finishJokeAnswer() {
-  for (let tick = 0; tick < 200; tick += 1) {
-    act(() => {
-      vi.advanceTimersByTime(100);
-    });
-  }
-}
-
-describe('AskPanel', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toBeTruthy();
+    expect(document.querySelector('.lc-ask-panel-question')).toBeNull();
+    expect(screen.queryByLabelText('Thinking')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  it('asks the trimmed question on Search and on Enter, and ignores a blank one', () => {
+    const onAsk = vi.fn();
+    render(<AskPanel question="" onAsk={onAsk} onClose={() => undefined} />);
+    const field = screen.getByRole('textbox', { name: 'Your question' });
 
-  it('ends the joke answer with a Connect prompt that opens the connect modal', () => {
-    render(<Harness showConnectPrompt />);
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    expect(onAsk).not.toHaveBeenCalled();
 
-    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
-    finishJokeAnswer();
+    fireEvent.change(field, { target: { value: '  Who owns checkout?  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    fireEvent.keyDown(field, { key: 'Enter' });
 
-    fireEvent.click(screen.getByRole('button', { name: CONNECT_PROMPT }));
-
-    expect(screen.getByTestId('active-overlay').textContent).toBe(OVERLAY.connect);
-  });
-
-  it('shows no Connect prompt when an agent is connected', () => {
-    render(<Harness showConnectPrompt={false} />);
-
-    finishJokeAnswer();
-
-    expect(screen.getByText(/./, { selector: '.lc-ask-answer' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
+    expect(onAsk).toHaveBeenCalledTimes(2);
+    expect(onAsk).toHaveBeenNthCalledWith(1, 'Who owns checkout?');
+    expect(onAsk).toHaveBeenNthCalledWith(2, 'Who owns checkout?');
   });
 });
 
@@ -79,7 +54,6 @@ function stubAiServer(askLines: object[]) {
   const fetchMock = vi.fn(async (input: FetchInput, init?: FetchInit) => {
     const url = String(input);
     if (url === '/api/ai/status') return Response.json({ connected: true, provider: 'anthropic' });
-    if (url === '/api/ai/disconnect' && init?.method === 'POST') return Response.json({ connected: false });
     if (url === '/api/ai/ask' && init?.method === 'POST') return ndjsonResponse(askLines);
     throw new Error(`Unexpected fetch ${url}`);
   });
@@ -103,75 +77,28 @@ function ConnectedHarness({ onAction, onAnswerStart }: { onAction?: (action: Ask
       {hasAsked && (
         <AskPanel
           question="What happens when a payment fails?"
+          onAsk={() => undefined}
           onClose={() => undefined}
-          isAiConnected={aiConnection.status === 'connected'}
-          showConnectPrompt={aiConnection.status === 'disconnected'}
-          onConnectRequest={() => undefined}
           onAnswerStart={onAnswerStart}
           onAction={onAction}
-          onKeyRejected={() => void aiConnection.disconnect()}
         />
       )}
     </>
   );
 }
 
-function StatusDrivenHarness() {
-  const aiConnection = useAiConnection();
-  const overlay = useOverlayManager();
-  if (aiConnection.status === 'unknown') return null;
-  return (
-    <OverlayProvider value={overlay}>
-      <AskPanel
-        question="Which team owns checkout?"
-        onClose={() => undefined}
-        isAiConnected={aiConnection.status === 'connected'}
-        showConnectPrompt={aiConnection.status === 'disconnected'}
-        onConnectRequest={() => overlay.open(OVERLAY.connect)}
-      />
-    </OverlayProvider>
-  );
-}
-
-describe('AskPanel (AI not configured)', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
-
-  it('gives the joke answer with no Connect prompt when the server reports AI_NOT_CONFIGURED', async () => {
-    const fetchMock = vi.fn(async (input: FetchInput) => {
-      if (String(input) === '/api/ai/status') return Response.json({ errorCode: 'AI_NOT_CONFIGURED' }, { status: 503 });
-      throw new Error(`Unexpected fetch ${String(input)}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    vi.useFakeTimers();
-    render(<StatusDrivenHarness />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(document.querySelector('.lc-ask-panel')).not.toBeNull();
-
-    finishJokeAnswer();
-
-    expect(document.querySelector('.lc-ask-answer')?.textContent?.length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-});
-
 describe('AskPanel (connected)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('logs out exactly once when the stream reports INVALID_KEY', async () => {
+  it('shows the "key was refused" text and stays connected when the provider rejects the key', async () => {
     const fetchMock = stubAiServer([{ type: 'error', errorCode: 'INVALID_KEY' }, { type: 'done' }]);
     render(<ConnectedHarness />);
 
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Your key no longer works.');
-    await waitFor(() => expect(screen.getByTestId('ai-status').textContent).toBe('disconnected'));
-    expect(callsTo(fetchMock, '/api/ai/disconnect')).toHaveLength(1);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/refused the key/);
+    expect(screen.getByTestId('ai-status').textContent).toBe('connected');
+    expect(callsTo(fetchMock, '/api/ai/status')).toHaveLength(1);
     expect(callsTo(fetchMock, '/api/ai/ask')).toHaveLength(1);
   });
 
@@ -197,7 +124,6 @@ describe('AskPanel (connected)', () => {
     expect(onAnswerStart).toHaveBeenCalledTimes(1);
     const [, askInit] = callsTo(fetchMock, '/api/ai/ask')[0];
     expect(JSON.parse(String(askInit?.body))).toEqual({ question: 'What happens when a payment fails?' });
-    expect(callsTo(fetchMock, '/api/ai/disconnect')).toHaveLength(0);
   });
 
   it('shows no usage line for an off-topic reply', async () => {
@@ -207,7 +133,6 @@ describe('AskPanel (connected)', () => {
     expect(await screen.findByText('I only know about this map, sorry!')).toBeTruthy();
     await waitFor(() => expect(document.querySelector('.lc-ask-caret')).toBeNull());
     expect(document.querySelector('.lc-ask-usage')).toBeNull();
-    expect(screen.queryByText(/Connect an AI agent/)).toBeNull();
   });
 });
 
@@ -244,10 +169,8 @@ describe('AskPanel (scripted answer)', () => {
     render(
       <AskPanel
         question="What happens when a payment fails?"
+        onAsk={() => undefined}
         onClose={() => undefined}
-        isAiConnected
-        showConnectPrompt
-        onConnectRequest={() => undefined}
         onAction={onAction}
         onAnswerStart={onAnswerStart}
         scriptedAnswer={scriptedAnswer}
@@ -271,7 +194,6 @@ describe('AskPanel (scripted answer)', () => {
     expect(answer?.textContent).toBe('Checkout calls the Payments Gateway first.');
     expect(answer?.querySelector('em')?.textContent).toBe('Payments Gateway');
     expect(document.querySelector('.lc-ask-caret')).toBeNull();
-    expect(screen.queryByRole('button', { name: CONNECT_PROMPT })).toBeNull();
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -279,7 +201,7 @@ describe('AskPanel (scripted answer)', () => {
   it('stops the scripted answer when unmounted mid-answer', () => {
     const onAction = vi.fn();
     const { unmount } = render(
-      <AskPanel question="Q" onClose={() => undefined} onAction={onAction} scriptedAnswer={scriptedAnswer} />,
+      <AskPanel question="Q" onAsk={() => undefined} onClose={() => undefined} onAction={onAction} scriptedAnswer={scriptedAnswer} />,
     );
     advance(scriptedAnswer.thinkingMs / 2);
     unmount();

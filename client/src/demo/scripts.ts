@@ -6,10 +6,6 @@ import { typingDurationMs } from './humanMotion';
 import { POINTER_MOVE_MS } from './runDemo';
 import type { DemoModeName, DemoScript, DemoScriptedAnswer, DemoStep } from './types';
 
-/** Obviously fake keys: the demo pastes them for real, but the demo connection never sends them. */
-const DEMO_CLAUDE_KEY = 'sk-ant-demo-astromart-0000';
-const DEMO_JEV_KEY = 'jev-demo-astromart-0000';
-
 /** Allowance for the React commits between one shot's timeline ending and the next one starting. */
 const SHOT_HANDOFF_MS = 100;
 
@@ -59,17 +55,12 @@ function closeDrawer({ isPhone }: DemoLayout): DemoStep[] {
   return isPhone ? [{ kind: 'click', target: 'menu-close', durationMs: 900 }] : [];
 }
 
-/** Opens Connect from the Ask box, pastes the fake keys, connects, then types the question and searches. */
-function connectAndAskSteps(response: CosmosResponse, layout: DemoLayout): DemoStep[] {
+/** Opens the green agent bot, types the question into its panel and searches. */
+function askAgentSteps(response: CosmosResponse, layout: DemoLayout): DemoStep[] {
   const { aiTour } = response.data.demo;
   const answerMs = Math.ceil(scriptedAnswerDurationMs(buildDemoScriptedAnswer(aiTour, layout)) / 100) * 100;
   return [
-    { kind: 'click', target: 'ask-input', durationMs: 1000, caption: 'Connecting an AI agent' },
-    { kind: 'click', target: 'connect-open', durationMs: 1100 },
-    { kind: 'click', target: 'connect-provider-anthropic', durationMs: 800 },
-    { kind: 'paste', target: 'connect-provider-key', text: DEMO_CLAUDE_KEY, durationMs: 1100, caption: 'Pasting a Claude key' },
-    { kind: 'paste', target: 'connect-jev-key', text: DEMO_JEV_KEY, durationMs: 1100, caption: 'Adding an optional Vercel AI Gateway key for the question classifier' },
-    { kind: 'click', target: 'connect-submit', durationMs: 2800, caption: 'Connecting…' },
+    { kind: 'click', target: 'connect-open', durationMs: 1100, caption: 'Opening the AI agent' },
     { kind: 'click', target: 'ask-input', durationMs: 900, caption: 'Asking the map a question' },
     { kind: 'type', target: 'ask-input', text: aiTour.question, durationMs: POINTER_MOVE_MS + typingDurationMs(aiTour.question) + 300 },
     { kind: 'click', target: 'ask-search', durationMs: 800 },
@@ -88,7 +79,7 @@ export function buildAiDemoScript(response: CosmosResponse, layout: DemoLayout):
     ...openDrawer(layout),
     { kind: 'click', target: `domain-${domainId}`, durationMs: 1400, caption: `Exploring the ${domainLabel(response, domainId)} domain` },
     ...closeDrawer(layout),
-    ...connectAndAskSteps(response, layout),
+    ...askAgentSteps(response, layout),
     { kind: 'wait', durationMs: 3000 },
   ];
 }
@@ -122,7 +113,7 @@ export function buildAllDemoScript(response: CosmosResponse, layout: DemoLayout)
     { kind: 'click', target: 'galaxy-reset', durationMs: 1200, caption: 'Back to the whole galaxy' },
     { kind: 'click', target: 'legend-ownership', durationMs: 5500, caption: 'Who owns what' },
     { kind: 'click', target: 'legend-ownership', durationMs: 1500 },
-    ...connectAndAskSteps(response, layout),
+    ...askAgentSteps(response, layout),
     { kind: 'wait', durationMs: 2000 },
   ];
 }

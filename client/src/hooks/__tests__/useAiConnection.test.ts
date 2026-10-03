@@ -3,7 +3,9 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useAiConnection } from '../useAiConnection';
 
 function stubStatus(response: () => Response | Promise<Response>) {
-  vi.stubGlobal('fetch', vi.fn(async () => response()));
+  const fetchMock = vi.fn(async () => response());
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
 }
 
 async function settledStatus() {
@@ -17,6 +19,15 @@ describe('useAiConnection', () => {
     vi.unstubAllGlobals();
   });
 
+  it('reports notLocal when the status route answers 503 AI_NOT_LOCAL', async () => {
+    stubStatus(() => Response.json({ errorCode: 'AI_NOT_LOCAL' }, { status: 503 }));
+
+    const connection = await settledStatus();
+
+    expect(connection.status).toBe('notLocal');
+    expect(connection.provider).toBeNull();
+  });
+
   it('reports notConfigured when the status route answers 503 AI_NOT_CONFIGURED', async () => {
     stubStatus(() => Response.json({ errorCode: 'AI_NOT_CONFIGURED' }, { status: 503 }));
 
@@ -26,7 +37,7 @@ describe('useAiConnection', () => {
     expect(connection.provider).toBeNull();
   });
 
-  it('reports connected with the provider from a connected status', async () => {
+  it('reports connected with the provider from a 200 status', async () => {
     stubStatus(() => Response.json({ connected: true, provider: 'openai' }));
 
     const connection = await settledStatus();
@@ -35,60 +46,40 @@ describe('useAiConnection', () => {
     expect(connection.provider).toBe('openai');
   });
 
-  it('reports disconnected for a not-connected status', async () => {
-    stubStatus(() => Response.json({ connected: false }));
-
-    expect((await settledStatus()).status).toBe('disconnected');
-  });
-
-  it('reports disconnected for any other failure', async () => {
+  it('reports notLocal for any other failure', async () => {
     stubStatus(() => Response.json({ errorCode: 'NOT_FOUND' }, { status: 404 }));
-    expect((await settledStatus()).status).toBe('disconnected');
+    expect((await settledStatus()).status).toBe('notLocal');
   });
 
-  it('reports disconnected when the request fails', async () => {
+  it('reports notLocal when the request fails', async () => {
     stubStatus(() => Promise.reject(new TypeError('offline')));
-    expect((await settledStatus()).status).toBe('disconnected');
+    expect((await settledStatus()).status).toBe('notLocal');
   });
 
-  it('posts the optional gateway key only when one is given', async () => {
-    const fetchMock = vi.fn(async (url: string) =>
-      url === '/api/ai/connect'
-        ? Response.json({ connected: true, provider: 'anthropic' })
-        : Response.json({ connected: false }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    const { result } = renderHook(() => useAiConnection());
-    await waitFor(() => expect(result.current.status).toBe('disconnected'));
+  it('only ever asks the status route and offers no connect or disconnect', async () => {
+    const fetchMock = stubStatus(() => Response.json({ connected: true, provider: 'anthropic' }));
 
-    await result.current.connect('anthropic', 'sk-ant-key', 'vck-gateway-key');
-    await result.current.connect('anthropic', 'sk-ant-key');
+    const connection = await settledStatus();
 
-    const connectBodies = fetchMock.mock.calls
-      .filter(([url]) => url === '/api/ai/connect')
-      .map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
-    expect(connectBodies).toEqual([
-      { provider: 'anthropic', apiKey: 'sk-ant-key', gatewayApiKey: 'vck-gateway-key' },
-      { provider: 'anthropic', apiKey: 'sk-ant-key' },
-    ]);
+    expect(Object.keys(connection).sort()).toEqual(['provider', 'status']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/status', expect.anything());
   });
 
   describe('when disabled', () => {
-    it('never calls fetch and reports disconnected', async () => {
-      const fetchMock = vi.fn(async () => Response.json({ connected: true, provider: 'openai' }));
-      vi.stubGlobal('fetch', fetchMock);
+    it('never calls fetch and reports notLocal', async () => {
+      const fetchMock = stubStatus(() => Response.json({ connected: true, provider: 'openai' }));
 
       const { result } = renderHook(() => useAiConnection({ enabled: false }));
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(fetchMock).not.toHaveBeenCalled();
-      expect(result.current.status).toBe('disconnected');
+      expect(result.current.status).toBe('notLocal');
       expect(result.current.provider).toBeNull();
     });
 
     it('re-checks the status once enabled again', async () => {
-      const fetchMock = vi.fn(async () => Response.json({ connected: true, provider: 'anthropic' }));
-      vi.stubGlobal('fetch', fetchMock);
+      const fetchMock = stubStatus(() => Response.json({ connected: true, provider: 'anthropic' }));
 
       const { result, rerender } = renderHook(({ enabled }) => useAiConnection({ enabled }), {
         initialProps: { enabled: false },
@@ -99,7 +90,6 @@ describe('useAiConnection', () => {
 
       await waitFor(() => expect(result.current.status).toBe('connected'));
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock).toHaveBeenCalledWith('/api/ai/status', expect.anything());
       expect(result.current.provider).toBe('anthropic');
     });
   });
