@@ -599,12 +599,23 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [presentation]);
 
-  // Keyboard: P toggles presentation; arrows / space drive playback so the
+  // Same surface the bot opens: the answer panel when connected, the setup window otherwise.
+  const toggleAgent = useCallback(() => {
+    if (aiConnection.status === 'connected') {
+      if (overlay.isOpen(OVERLAY.ask)) overlay.close(OVERLAY.ask);
+      else onOpenAgentChat();
+    } else {
+      overlay.toggle(OVERLAY.connect);
+    }
+  }, [aiConnection.status, overlay, onOpenAgentChat]);
+
+  // Keyboard: P toggles presentation, A the agent; arrows / space drive playback so the
   // deck is navigable once the on-screen controls are hidden.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target && (e.target as HTMLElement).matches('input, textarea, [contenteditable="true"]')) return;
       if (e.key === 'p' || e.key === 'P') { setPresentation((v) => !v); return; }
+      if ((e.key === 'a' || e.key === 'A') && !e.metaKey && !e.ctrlKey && !e.altKey) { toggleAgent(); return; }
       if (!state.scenarioId) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); navNext(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); navPrev(); }
@@ -616,7 +627,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [state.scenarioId, state.playing, navNext, navPrev, navPlay, runner]);
+  }, [state.scenarioId, state.playing, navNext, navPrev, navPlay, runner, toggleAgent]);
 
   return (
     <div
@@ -885,7 +896,7 @@ function ProjectCosmosShell(p: ProjectCosmosShellProps) {
 
       <HelpModal open={overlay.isOpen(OVERLAY.help)} onClose={closeHelp} />
 
-      <ConnectAgentModal />
+      <ConnectAgentModal status={aiConnection.status} />
 
       <ChangelogPanel
         open={overlay.isOpen(OVERLAY.changelog) && !warping}
