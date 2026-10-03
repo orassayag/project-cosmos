@@ -112,34 +112,20 @@ Run from the repo root — it is a pnpm workspace root (`client/`, `server/`).
 
 ### Run with AI locally
 
-`pnpm dev` already serves the AI routes. They need the variables below; the dev server reads them from `.env.local` at the repo root, then `server/.env` (no Vercel account needed):
+The AI agent runs only on the local dev server (`pnpm dev`, bound to `127.0.0.1`); a deployed site never enables it. Put a provider key in `server/.env` (or `.env.local` at the repo root) and start the app:
 
 ```bash
-cp server/.env.example server/.env   # then fill in the keys
+echo 'ANTHROPIC_API_KEY=<your key>' >> server/.env
 pnpm dev
-```
-
-Or run everything on one origin through the [Vercel CLI](https://vercel.com/docs/cli), linking the project and pulling its environment variables:
-
-```bash
-vercel link
-vercel env pull
-vercel dev
-```
-
-To run without logging in to Vercel, copy the example env file, fill in the keys by hand, and start local-only mode:
-
-```bash
-cp server/.env.example server/.env
-vercel dev -L
 ```
 
 | Variable | Required | What it does |
 |---|---|---|
-| `AI_COOKIE_SECRET` | For AI | 32 random bytes, base64 (`openssl rand -base64 32`). Seals the visitor's key cookie. Without it the AI routes answer `503 AI_NOT_CONFIGURED` and the Ask box shows "No AI agent connected". |
+| `ANTHROPIC_API_KEY` | One of these two | Runs the agent on Claude. |
+| `OPENAI_API_KEY` | One of these two | Runs the agent on OpenAI. |
 | `AI_GATEWAY_API_KEY` | No | Vercel AI Gateway key used by JEV to triage questions. Without it, triage falls back to a free local keyword check. |
 
-A visitor can also paste their own Vercel AI Gateway key in the Connect window (the optional JEV field); it is sealed in the same encrypted cookie and used for question triage instead of the site's key.
+Without a provider key the AI routes answer `503 AI_NOT_CONFIGURED`; anywhere other than the local dev server they answer `503 AI_NOT_LOCAL`. The rest of the map works either way.
 
 ### Driving it from the keyboard
 
