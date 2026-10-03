@@ -10,4 +10,4 @@ labels: bug
 
 **Repro steps** (URL if it's the demo — deep links encode domain/scenario/step)
 
-**Environment** (browser, or `npm run dev` locally)
+**Environment** (browser, or `pnpm dev` locally)

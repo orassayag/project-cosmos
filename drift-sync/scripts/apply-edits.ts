@@ -4,12 +4,12 @@
  * to Project Cosmos files, with the validator running in-loop as a safety net.
  *
  * Usage:
- *   npm run sync:apply -- --input <verdicts.json> --team <team>            # apply for real
- *   npm run sync:apply -- --input <verdicts.json> --team <team> --dry-run  # apply, capture diff, revert
+ *   pnpm sync:apply --input <verdicts.json> --team <team>            # apply for real
+ *   pnpm sync:apply --input <verdicts.json> --team <team> --dry-run  # apply, capture diff, revert
  *
  * Reads a verdict bundle (JSON array of Verdict objects), filters by team,
  * invokes Claude with read_file / write_file / run_command tools, applies
- * the proposed Project Cosmos edits, and runs `npm run validate` after each
+ * the proposed Project Cosmos edits, and runs `pnpm validate` after each
  * substantive change.
  *
  * Pre-conditions:
@@ -42,7 +42,7 @@ const dryRun = args.includes('--dry-run');
 const verbose = args.includes('--verbose');
 
 if (inputIdx < 0) {
-  console.error('Usage: npm run sync:apply -- --input <verdicts.json> [--team <team>] [--dry-run] [--output-json <path>]');
+  console.error('Usage: pnpm sync:apply --input <verdicts.json> [--team <team>] [--dry-run] [--output-json <path>]');
   process.exit(1);
 }
 
@@ -122,7 +122,7 @@ Example correct sequence:
 - Turn 1: text "Reading types" + tool_use:read_file
 - Turn 2: text "Reading topics" + tool_use:read_file
 - Turn 3: text "Now writing the new topic" + tool_use:write_file
-- Turn 4: text "Verifying" + tool_use:run_command (npm run validate)
+- Turn 4: text "Verifying" + tool_use:run_command (pnpm validate)
 - Turn 5: final JSON report (no tool_use)
 
 If you emit a turn with ONLY text and no tool_use BEFORE the final JSON, you have failed. NEVER do this. Keep calling tools until all edits are applied and validate passes.
@@ -156,7 +156,7 @@ write_file rejects every path outside server/src/cosmos/data/ with an error.
    b. read_file to see the current content.
    c. Apply the smallest possible edit that satisfies the verdict.
    d. write_file with the full new content. Preserve exact formatting (indentation, quotes, trailing commas).
-3. After applying ALL edits, run \`npm run validate\` via run_command.
+3. After applying ALL edits, run \`pnpm validate\` via run_command.
 4. If validator fails (errors > 0): inspect the output, fix, re-run.
 5. When validator passes, emit the final JSON report.
 
@@ -181,7 +181,7 @@ Output a single JSON object in a markdown code block tagged 'json':
 
 const userPrompt = `# Verdict bundle (team: ${team ?? 'any'})
 
-${items.length} drift verdict(s) to apply. Apply each one to Project Cosmos files, then run \`npm run validate\` to confirm.
+${items.length} drift verdict(s) to apply. Apply each one to Project Cosmos files, then run \`pnpm validate\` to confirm.
 
 \`\`\`json
 ${JSON.stringify(items, null, 2)}
@@ -210,7 +210,7 @@ const result = await runAgent({
   tools: APPLIER_TOOL_DEFS,
   writeRoot: projectCosmosRoot,
   runCommandRoot: projectCosmosRoot,
-  runCommandAllowed: ['npm run validate'],
+  runCommandAllowed: ['pnpm validate'],
   requireJsonReport: true,
   // Applier writes full-file content via write_file — Project Cosmos files can be
   // 200+ lines, well above the default 4096-token budget. 16k is the

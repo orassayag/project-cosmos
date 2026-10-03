@@ -3,7 +3,7 @@
  * fresh-start — replace the AstroMart demo universe with a minimal
  * two-star starter cosmos, ready for your own services.
  *
- *   npm run fresh
+ *   pnpm fresh
  *
  * Overwrites the server-owned data in server/src/cosmos/data/ (brand, domains, clusters,
  * services, topics, scenarios, owners, steps/, incidents/, demo tours, and empty drift and
@@ -223,11 +223,11 @@ const narrowTeamIds = (relativePath, pattern, replacement) => {
 narrowTeamIds('apiTypes.ts', /export type TeamId = [^;]*;/, "export type TeamId = 'team-core';");
 narrowTeamIds('schema.ts', /export const TeamIdSchema = z\.enum\(\[[^\]]*\]\)/, "export const TeamIdSchema = z.enum(['team-core'])");
 
-execFileSync('npm', ['run', 'types:emit'], { cwd: root, stdio: 'inherit' });
+execFileSync('pnpm', ['types:emit'], { cwd: root, stdio: 'inherit' });
 
 console.log(`✦ Fresh cosmos ready: 2 services, 1 scenario ("Hello, cosmos").
   Next:
     server/src/cosmos/data/brand.ts  # name your universe + set your GitHub org
-    npm run validate                 # check the data's invariants
-    npm run dev                      # see your minimal galaxy
+    pnpm validate                    # check the data's invariants
+    pnpm dev                         # see your minimal galaxy
     /add-service <name>              # grow it with Claude Code`);

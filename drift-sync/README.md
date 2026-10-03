@@ -21,13 +21,13 @@ drift-sync/
 ├── cosmos-confirmed.json           optional: suppressions with evidence trails
 ├── dry-runs/                       runtime reports (.md + .html), gitignored
 └── scripts/
-    ├── validate.ts                 internal consistency check  → `npm run validate`
-    ├── bootstrap-state.ts          snapshot baseline SHAs      → `npm run sync:bootstrap`
-    ├── sync.ts                     investigate-topic <id>      → `npm run sync`
-    ├── diff-repo.ts                per-repo drift verdict      → `npm run sync:diff-repo`
-    ├── apply-edits.ts              applier agent (writes fixes)→ `npm run sync:apply`
-    ├── sync-nightly.ts             orchestrator (the cron)     → `npm run sync:nightly`
-    ├── clone-repos.ts              CI helper (smart-clone)     → `npm run sync:clone-repos`
+    ├── validate.ts                 internal consistency check  → `pnpm validate`
+    ├── bootstrap-state.ts          snapshot baseline SHAs      → `pnpm sync:bootstrap`
+    ├── sync.ts                     investigate-topic <id>      → `pnpm sync`
+    ├── diff-repo.ts                per-repo drift verdict      → `pnpm sync:diff-repo`
+    ├── apply-edits.ts              applier agent (writes fixes)→ `pnpm sync:apply`
+    ├── sync-nightly.ts             orchestrator (the cron)     → `pnpm sync:nightly`
+    ├── clone-repos.ts              CI helper (smart-clone)     → `pnpm sync:clone-repos`
     └── lib/
         ├── config.ts               typed config loader (config.json + env overrides)
         ├── agent.ts                Claude tool-use loop (read_file, write_file, grep, run_command)
@@ -62,7 +62,7 @@ bucket by team (Service.team from the map)
       │
       ▼
 apply-edits (per team): Claude agent edits server/src/cosmos/data/** (any other path is rejected),
-      runs `npm run validate` in-loop until it passes
+      runs `pnpm validate` in-loop until it passes
       │
       ▼
 one draft PR per team
@@ -108,8 +108,8 @@ Team ownership (who reviews each team's PRs) is part of the map itself: `server/
 ```bash
 # Clone (or already have) your source repos as siblings of this repo,
 # make sure the map (server/src/cosmos/data/) reflects reality as of today, then:
-npm run sync:bootstrap            # snapshots origin/<defaultBranch> HEAD per repo
-npm run sync:bootstrap -- --dry-run   # preview without writing
+pnpm sync:bootstrap            # snapshots origin/<defaultBranch> HEAD per repo
+pnpm sync:bootstrap --dry-run   # preview without writing
 ```
 
 The repo list is derived from the map (`Service.repo` + `SubService.repo` in `server/src/cosmos/data/services.ts`) — there is no second list to maintain. Commit the resulting `state.json`. See `state.example.json` for the shape.
@@ -157,28 +157,28 @@ Every run writes a condensed report (bucket counts, per-team breakdown with PR l
 
 ### Local
 
-All scripts run from the repo root via npm:
+All scripts run from the repo root via pnpm:
 
 ```bash
-npm run validate                        # map self-consistency check
-npm run validate -- --source-check      # + cross-repo greps (needs local clones)
+pnpm validate                        # map self-consistency check
+pnpm validate --source-check      # + cross-repo greps (needs local clones)
 
-npm run sync:bootstrap                  # (re)snapshot every baseline SHA
+pnpm sync:bootstrap                  # (re)snapshot every baseline SHA
 
-npm run sync -- investigate-topic <topic-id>   # ad-hoc: Claude audits one topic
+pnpm sync investigate-topic <topic-id>   # ad-hoc: Claude audits one topic
 
-npm run sync:diff-repo -- <repo>                 # one repo: baseline → origin HEAD
-npm run sync:diff-repo -- <repo> --from <sha>    # explicit range
-npm run sync:diff-repo -- <repo> --verbose       # show every agent turn + tool call
+pnpm sync:diff-repo <repo>                 # one repo: baseline → origin HEAD
+pnpm sync:diff-repo <repo> --from <sha>    # explicit range
+pnpm sync:diff-repo <repo> --verbose       # show every agent turn + tool call
 
-npm run sync:nightly                    # full sweep, dry-run report only
-npm run sync:nightly -- --live-pr       # full loop: edits + PRs + Slack
-npm run sync:nightly -- --only <repo>   # restrict to one repo
-npm run sync:nightly -- --skip-applier  # verdicts only
+pnpm sync:nightly                    # full sweep, dry-run report only
+pnpm sync:nightly --live-pr       # full loop: edits + PRs + Slack
+pnpm sync:nightly --only <repo>   # restrict to one repo
+pnpm sync:nightly --skip-applier  # verdicts only
 
-npm run sync:apply -- --input <verdicts.json> --team <team>   # applier in isolation
+pnpm sync:apply --input <verdicts.json> --team <team>   # applier in isolation
 
-REPOS_ROOT=/tmp/source-repos npm run sync:clone-repos   # what CI runs before the sweep
+REPOS_ROOT=/tmp/source-repos pnpm sync:clone-repos   # what CI runs before the sweep
 ```
 
 Reports land in `drift-sync/dry-runs/<date>.{md,html}`. Environment comes from `.env` / `.env.local` at the repo root (`ANTHROPIC_API_KEY` required for the agent steps).
@@ -206,8 +206,8 @@ One PR per team, driven by `Service.team` in the map; reviewers come from `serve
 | Workflow fails at "Clone source repos" | `COSMOS_SYNC_PAT` is missing, lacks `repo` scope, or isn't authorized for SAML SSO. Test with `curl -H "Authorization: token ghp_xxx" https://api.github.com/repos/<org>/<repo>` — 200 = good, 403 = SSO not authorized, 404 = no access. The clone step fails loudly if *every* clone fails, so a dead PAT can't masquerade as an all-clear. |
 | "No GitHub org configured" | Set `githubOrg` in `drift-sync/config.json` (or the `GITHUB_ORG` env var). |
 | Workflow finishes but artifact is empty | The `path:` glob in the workflow must match where sync-nightly writes — `drift-sync/dry-runs/**`. |
-| Local `npm run validate` fails | A recent map edit broke internal consistency (unknown topic id in a step, etc.). The output names the exact finding. |
-| A drift PR's CI fails in `npm test` | Two tests pin the data and fail on any real edit until updated in the same PR: the client fixture freshness test (run `npm run fixture:cosmos` and commit `client/src/__tests__/fixtures/cosmos-response.json`) and `server/src/__tests__/cosmosParity.test.ts`, which deep-compares the data with the frozen `server/src/__tests__/fixtures/baseline-full.json` (update the changed entries there by hand). The applier does neither yet. |
+| Local `pnpm validate` fails | A recent map edit broke internal consistency (unknown topic id in a step, etc.). The output names the exact finding. |
+| A drift PR's CI fails in `pnpm test` | Two tests pin the data and fail on any real edit until updated in the same PR: the client fixture freshness test (run `pnpm fixture:cosmos` and commit `client/src/__tests__/fixtures/cosmos-response.json`) and `server/src/__tests__/cosmosParity.test.ts`, which deep-compares the data with the frozen `server/src/__tests__/fixtures/baseline-full.json` (update the changed entries there by hand). The applier does neither yet. |
 | A drift PR opens but the proposed diff is wrong | Close it with the `not-drift` label, then improve the applier prompt (`apply-edits.ts`) or the prefilter (`lib/prefilter.ts`). |
 | Applier emits an empty diff | Re-run with `--verbose` to see the agent trace. Common cause: the model announced an edit without calling `write_file`; the nudge in `lib/agent.ts` (`requireJsonReport`) usually catches this — raise `--max-iterations` if needed. |
 | No Slack messages | The webhook env var (default `SLACK_WEBHOOK_COSMOS`) isn't set — pings are then skipped silently by design. Group @-mentions additionally need `slackTeamGroups` in config (or `SLACK_GROUP_ID_<TEAM>` env). |

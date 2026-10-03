@@ -1,5 +1,5 @@
-// GENERATED from server/src/cosmos/apiTypes.ts by npm run types:emit — do not edit.
-// Must stay self-contained (no imports, no runtime code): `npm run types:emit` copies it verbatim to client/src/api/cosmos-api.ts.
+// GENERATED from server/src/cosmos/apiTypes.ts by pnpm types:emit — do not edit.
+// Must stay self-contained (no imports, no runtime code): `pnpm types:emit` copies it verbatim to client/src/api/cosmos-api.ts.
 
 export type Protocol = 'http' | 'ws' | 'kafka' | 'internal';
 

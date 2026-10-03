@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const GENERATED_HEADER =
-  '// GENERATED from server/src/cosmos/apiTypes.ts by npm run types:emit — do not edit.\n';
+  '// GENERATED from server/src/cosmos/apiTypes.ts by pnpm types:emit — do not edit.\n';
 
 const SOURCE_PATH = fileURLToPath(new URL('../src/cosmos/apiTypes.ts', import.meta.url));
 const OUTPUT_PATH = fileURLToPath(new URL('../../client/src/api/cosmos-api.ts', import.meta.url));
