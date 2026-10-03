@@ -109,6 +109,28 @@ describe('AgentChat', () => {
     expect(onSend).toHaveBeenCalledWith(`Who owns ${SERVICE.name}?`);
   });
 
+  it('offers exactly a scripted reply\'s own follow-ups instead of suggesting chips', () => {
+    renderChat([
+      QUESTION,
+      reply({
+        content: 'Here it is.',
+        status: 'done',
+        actions: [{ type: 'action', kind: 'highlight', serviceIds: [SERVICE.id] }],
+        followUps: ['Who owns shipping?'],
+      }),
+    ]);
+
+    const chips = screen.getByRole('group', { name: 'Suggested follow-ups' }).querySelectorAll('button');
+    expect([...chips].map((chip) => chip.textContent)).toEqual(['Who owns shipping?']);
+    expect(chips[0].getAttribute('data-demo-target')).toBe('agent-followup-0');
+  });
+
+  it('shows no follow-up chips after a scripted reply that offers none', () => {
+    renderChat([QUESTION, reply({ content: 'Done.', status: 'done', followUps: [] })]);
+
+    expect(screen.queryByRole('group', { name: 'Suggested follow-ups' })).toBeNull();
+  });
+
   it('folds into a tab with the latest line and the unread dot', () => {
     const onExpand = vi.fn();
     renderWithCosmos(

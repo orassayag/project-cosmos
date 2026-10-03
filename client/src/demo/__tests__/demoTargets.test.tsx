@@ -10,12 +10,28 @@ import { PlaybackControls } from '../../components/PlaybackControls';
 import { ProjectCosmosMap } from '../../map/Map';
 import { OverlayProvider, useOverlayManager } from '../../overlays/OverlayManager';
 import type { RunnerApi } from '../../player/runner';
+import type { AgentChatMessage } from '../../hooks/useAgentChat';
 import type { Scenario, Step } from '../../api/cosmos-api';
 import { COSMOS_FIXTURE, renderWithCosmos } from '../../__tests__/renderWithCosmos';
 import { buildDemoScript } from '../scripts';
 import { DEMO_TARGETS } from '../types';
 
 const STUB_STEPS = [{ label: 'First' }, { label: 'Second' }, { label: 'Third' }] as Step[];
+
+const [FIRST_TURN] = COSMOS_FIXTURE.data.demo.aiTour.turns;
+
+const SCRIPTED_EXCHANGE: AgentChatMessage[] = [
+  { id: 'chat-1', role: 'user', content: FIRST_TURN.question },
+  {
+    id: 'chat-2',
+    role: 'assistant',
+    content: FIRST_TURN.scriptedAnswer.text,
+    status: 'done',
+    usage: null,
+    actions: FIRST_TURN.actions,
+    followUps: FIRST_TURN.followUps,
+  },
+];
 
 const STUB_RUNNER = {
   state: { scenarioId: 'shopping.place-order', idx: 1, playing: false, speed: 1, loop: false },
@@ -37,9 +53,9 @@ function DemoSurfaces() {
       <DomainBar active="shopping" activeScenarioId={null} onPickDomain={vi.fn()} onPickScenario={vi.fn()} />
       <IncidentBar activeScenarioId={null} onPickIncident={vi.fn()} />
       <AgentButton status="connected" provider="anthropic" onOpenChat={vi.fn()} onOpenSetup={vi.fn()} />
-      {/* The panel the green bot opens, before anything is asked. */}
+      {/* The panel the green bot opens, after the demo's first scripted reply has finished. */}
       <AgentChat
-        messages={[]}
+        messages={SCRIPTED_EXCHANGE}
         isStreaming={false}
         view="open"
         onSend={vi.fn()}
@@ -105,12 +121,20 @@ describe('data-demo-target attributes', () => {
     for (const domain of COSMOS_FIXTURE.data.domains) expect(findTargets(`domain-${domain.id}`), domain.id).toHaveLength(1);
   });
 
+  it('puts the follow-up target on the chip that asks the next scripted question', () => {
+    renderDemoSurfaces();
+
+    const [, secondTurn] = COSMOS_FIXTURE.data.demo.aiTour.turns;
+    expect(findTargets('agent-followup-0')[0].textContent).toBe(secondTurn.question);
+  });
+
   it('gives the agent bot and each domain button its own id', () => {
     renderDemoSurfaces();
 
-    expect(findTargets('connect-open')[0].getAttribute('aria-label')).toBe('Open the agent chat');
+    expect(findTargets('agent-button')[0].getAttribute('aria-label')).toBe('Open the agent chat');
     expect(findTargets('domain-fulfillment')[0].textContent).toContain('Fulfillment');
-    expect(findTargets('ask-search')[0].getAttribute('aria-label')).toBe('Send');
+    expect(findTargets('agent-send')[0].getAttribute('aria-label')).toBe('Send');
+    expect(findTargets('agent-composer')[0].getAttribute('aria-label')).toBe('Your question');
     expect(findTargets('legend-ownership')[0].textContent).toBe('Ownership');
   });
 });

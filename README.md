@@ -211,10 +211,10 @@ The agent reads the same view `GET /api/cosmos` serves (`getCosmosView()`), so i
 
 Open the site with `?demo=ai` (≤60 s) or `?demo=all` (≤120 s) and it plays a scripted tour of itself; add `&speed=2` (up to 8) to fast-forward. Any click or key press stops it.
 
-- **`demo=ai`** opens the Fulfillment domain, opens the (already green) agent, types a question and shows the answer lighting up the map.
+- **`demo=ai`** opens the Fulfillment domain, opens the (already green) agent chat, types a question and shows the answer lighting up the map, then taps the suggested follow-up ("Who owns shipping?") for a second answer.
 - **`demo=all`** tours the whole app: the intro, domains, playing and stepping a scenario, replaying an incident, the ownership view, and the AI agent.
 
-The tours drive the **real UI**: a human-like pointer glides along curved paths, overshoots and settles, and types with natural rhythm, dispatching the same pointer, mouse and keyboard events a person would. Only the AI connection and the answer are faked, so a tour never contacts a real AI service. On phones the pointer is hidden and the tours open the menu drawer when they need it.
+The tours drive the **real UI**: a human-like pointer glides along curved paths, overshoots and settles, and types with natural rhythm, dispatching the same pointer, mouse and keyboard events a person would. Only the AI connection and the answers are faked: during a tour the chat answers from the scripted turns in `demo.ts` (`aiTour.turns` — each with its question, answer, map actions and follow-up chips), so a tour never contacts a real AI service and the live site needs no AI key. `pnpm validate` checks that every turn's ids exist and that each reply's first chip asks the next turn's question. On phones the pointer is hidden and the tours open the menu drawer when they need it.
 
 Record a tour to video (with the dev server running):
 

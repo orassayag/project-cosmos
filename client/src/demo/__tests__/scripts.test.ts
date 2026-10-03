@@ -4,13 +4,12 @@ import { shotTimelineMs } from '../../map/CometPackets';
 import { COSMOS_FIXTURE } from '../../__tests__/renderWithCosmos';
 import { typingDurationMs } from '../humanMotion';
 import { POINTER_MOVE_MS } from '../runDemo';
-import { buildDemoScriptedAnswer } from '../scriptedAnswer';
+import { scriptedAnswerDurationMs } from '../scriptedAnswer';
 import {
   buildDemoScript as buildDemoScriptFor,
   DEMO_TIME_LIMITS_MS,
   playbackDurationMs as playbackDurationMsFor,
   scriptDurationMs,
-  scriptedAnswerDurationMs,
 } from '../scripts';
 import { DEMO_TARGETS, type DemoModeName, type DemoScript, type DemoTarget } from '../types';
 import type { DemoLayout } from '../scripts';
@@ -58,18 +57,34 @@ describe('demo scripts', () => {
     }
   });
 
-  it.each(VARIANTS)('opens the agent bot, types the question and searches in the %s demo (%s)', (_mode, layout, script) => {
+  it.each(VARIANTS)('opens the agent bot, types the first question and sends it in the %s demo (%s)', (_mode, _layout, script) => {
     const targets = targetsOf(script);
     const typeStep = script.find((step) => step.kind === 'type');
-    const searchIndex = script.findIndex((step) => step.kind === 'click' && step.target === 'ask-search');
+    const sendIndex = script.findIndex((step) => step.kind === 'click' && step.target === 'agent-send');
 
-    expect(targets.indexOf('connect-open')).toBeGreaterThan(-1);
-    expect(targets.indexOf('connect-open')).toBeLessThan(targets.indexOf('ask-input'));
+    expect(targets.indexOf('agent-button')).toBeGreaterThan(-1);
+    expect(targets.indexOf('agent-button')).toBeLessThan(targets.indexOf('agent-composer'));
     expect(script.some((step) => step.kind === 'paste')).toBe(false);
-    expect(typeStep).toMatchObject({ target: 'ask-input', text: aiTour.question });
-    expect(script[searchIndex + 1]).toMatchObject({ kind: 'wait' });
-    const answer = buildDemoScriptedAnswer(aiTour, { isPhone: layout === 'phone' });
-    expect(script[searchIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(answer));
+    expect(typeStep).toMatchObject({ target: 'agent-composer', text: aiTour.turns[0].question });
+    expect(script[sendIndex + 1]).toMatchObject({ kind: 'wait' });
+    expect(script[sendIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(aiTour.turns[0].scriptedAnswer));
+  });
+
+  it.each(VARIANTS)('taps the first follow-up chip once per later turn and waits out each answer in the %s demo (%s)', (_mode, _layout, script) => {
+    const chipIndexes = script.flatMap((step, index) => (step.kind === 'click' && step.target === 'agent-followup-0' ? [index] : []));
+
+    expect(chipIndexes).toHaveLength(aiTour.turns.length - 1);
+    expect(chipIndexes[0]).toBeGreaterThan(script.findIndex((step) => step.kind === 'click' && step.target === 'agent-send'));
+    chipIndexes.forEach((chipIndex, turnOffset) => {
+      const answer = aiTour.turns[turnOffset + 1].scriptedAnswer;
+      expect(script[chipIndex + 1]).toMatchObject({ kind: 'wait' });
+      expect(script[chipIndex + 1].durationMs).toBeGreaterThanOrEqual(scriptedAnswerDurationMs(answer));
+    });
+  });
+
+  it.each(VARIANTS)('never reaches for a Connect or paste-key step in the %s demo (%s)', (_mode, _layout, script) => {
+    expect(script.filter((step) => step.kind === 'paste')).toEqual([]);
+    expect(targetsOf(script).filter((target) => /connect|key/.test(target))).toEqual([]);
   });
 
   it.each(MODES)('opens the phone drawer before the %s demo reaches for a domain', (mode) => {
