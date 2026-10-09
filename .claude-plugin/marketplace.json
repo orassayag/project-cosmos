@@ -1,6 +1,6 @@
 {
   "name": "project-cosmos",
-  "description": "Project Cosmos — a living map of your architecture. Skills that grow and maintain it.",
+  "description": "Project Cosmos — A living map of your architecture. Skills that grow and maintain it.",
   "owner": { "name": "Or Assayag" },
   "plugins": [
     {
