@@ -18,13 +18,15 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO" || exit 0
 
 VERSIONS_DIR="versions"
-NOTE_FILE=".git/version-note.md"
-LOCK=".git/version-bump.lock"
+# In a linked worktree .git is a file, not a directory; ask git for the real one.
+GIT_DIR="$(git rev-parse --git-dir)"
+NOTE_FILE="$GIT_DIR/version-note.md"
+LOCK="$GIT_DIR/version-bump.lock"
 
 # --- guards -------------------------------------------------------------------
 [ -f "$LOCK" ] && exit 0
 [ -d "$VERSIONS_DIR" ] || exit 0
-{ [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ] || [ -f ".git/MERGE_HEAD" ]; } && exit 0
+{ [ -d "$GIT_DIR/rebase-merge" ] || [ -d "$GIT_DIR/rebase-apply" ] || [ -f "$GIT_DIR/MERGE_HEAD" ]; } && exit 0
 
 SUBJECT="$(git log -1 --format=%s)"
 BODY="$(git log -1 --format=%b)"
