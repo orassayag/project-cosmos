@@ -21,7 +21,7 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO" || exit 2
 
-NOTE_FILE=".git/version-note.md"
+NOTE_FILE="$(git rev-parse --git-dir)/version-note.md"
 MODE="${1:-}"
 
 usage() {

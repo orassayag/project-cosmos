@@ -4,7 +4,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-hook="$REPO/.git/hooks/post-commit"
+HOOKS_DIR="$(cd "$REPO" && cd "$(git rev-parse --git-path hooks)" && pwd)"
+hook="$HOOKS_DIR/post-commit"
 
 cat > "$hook" <<'EOF'
 #!/usr/bin/env bash
@@ -14,7 +15,7 @@ exec "$(git rev-parse --show-toplevel)/scripts/version-bump.sh"
 EOF
 chmod +x "$hook"
 
-commitMsgHook="$REPO/.git/hooks/commit-msg"
+commitMsgHook="$HOOKS_DIR/commit-msg"
 
 cat > "$commitMsgHook" <<'EOF'
 #!/usr/bin/env bash
