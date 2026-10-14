@@ -167,8 +167,8 @@ importers:
   .:
     devDependencies:
       '@anthropic-ai/sdk':
-        specifier: ^0.133.0
-        version: 0.133.0(zod@4.6.5)
+        specifier: ^0.134.0
+        version: 0.134.0(zod@4.6.5)
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.12.0(supports-color@10.2.2))
@@ -176,8 +176,8 @@ importers:
         specifier: ^2.1.5
         version: 2.1.5(hono@4.13.9)
       '@playwright/test':
-        specifier: ~1.64.0
-        version: 1.64.0
+        specifier: ~1.64.1
+        version: 1.64.1
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
@@ -194,8 +194,8 @@ importers:
         specifier: ^8.0.0
         version: 8.0.0
       playwright:
-        specifier: ^1.64.0
-        version: 1.64.0
+        specifier: ^1.64.1
+        version: 1.64.1
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
@@ -250,22 +250,22 @@ importers:
         version: 8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
       vitest:
         specifier: ^5.0.2
-        version: 5.0.2(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
   server:
     dependencies:
       '@langchain/anthropic':
         specifier: 1.5.11
-        version: 1.5.11(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))
+        version: 1.5.11(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))
       '@langchain/core':
         specifier: 1.2.12
-        version: 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+        version: 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
       '@langchain/langgraph':
         specifier: 1.4.18
-        version: 1.4.18(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
+        version: 1.4.18(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
       '@langchain/openai':
         specifier: 1.5.13
-        version: 1.5.13(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(undici@8.11.2)
+        version: 1.5.13(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(undici@8.11.2)
       ai:
         specifier: ^7.0.116
         version: 7.0.116(zod@4.6.5)
@@ -284,7 +284,7 @@ importers:
         version: 4.23.15
       vitest:
         specifier: ^5.0.2
-        version: 5.0.2(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+        version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
 packages:
 
@@ -313,8 +313,8 @@ packages:
       zod:
         optional: true
 
-  '@anthropic-ai/sdk@0.133.0':
-    resolution: {integrity: sha512-jlqUN8p8ESTJj+GJnA4KjzbEfF1waEoGzRT8jwytlYGFFgv+/DUQOxlYGvYw10UzhD1kwLqYzxvA3FrTB2YWuQ==}
+  '@anthropic-ai/sdk@0.134.0':
+    resolution: {integrity: sha512-j0DNXXKUKkr3kKyVR/I3pPWVv93g7vgHjgGYgh9uCXv5IKoXZPWmTwXKiVq/SZSbhBaD3KmtKhIszzt8dBnzog==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -755,14 +755,18 @@ packages:
   '@langchain/protocol@0.0.19':
     resolution: {integrity: sha512-9hKcRrH7cBX6gfutdfXPoft1OCchHe4FEpALoDJMl5Qu+n/YG5ynZmyu8+8cxORlPwHBoKTxggvXz+76M1yX1Q==}
 
+  '@opentelemetry/api@1.9.1':
+    resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
+    engines: {node: '>=8.0.0'}
+
   '@oxc-project/types@0.150.0':
     resolution: {integrity: sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw==}
 
   '@oxc-project/types@0.153.0':
     resolution: {integrity: sha512-jSNrRIyvPVLL5E1z/tS5zLAprosGz/FuI1PWwEOz59j3E4TTTzSpqKb/RDGqJhhW0QHYISGXxq582wGx6T11Tw==}
 
-  '@playwright/test@1.64.0':
-    resolution: {integrity: sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==}
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -1853,13 +1857,13 @@ packages:
     resolution: {integrity: sha512-cIqOLfh5k52us715qf3B3+kTOxZv+WDv77HN7xokLScYQGYQHi4m/ynoDIPpvF2LvCyUJGyvzY64i0QCXtzu1g==}
     hasBin: true
 
-  playwright-core@1.64.0:
-    resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.64.0:
-    resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
+  playwright@1.64.1:
+    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -2287,8 +2291,9 @@ snapshots:
     optionalDependencies:
       zod: 4.6.5
 
-  '@anthropic-ai/sdk@0.133.0(zod@4.6.5)':
+  '@anthropic-ai/sdk@0.134.0(zod@4.6.5)':
     dependencies:
+      '@opentelemetry/api': 1.9.1
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.1.1
     optionalDependencies:
@@ -2618,18 +2623,18 @@ snapshots:
 
   '@keyv/serialize@1.1.1': {}
 
-  '@langchain/anthropic@1.5.11(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))':
+  '@langchain/anthropic@1.5.11(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))':
     dependencies:
       '@anthropic-ai/sdk': 0.122.0(zod@4.6.5)
-      '@langchain/core': 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      '@langchain/core': 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
       zod: 4.6.5
 
-  '@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))':
+  '@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
       js-tiktoken: 1.0.21
-      langsmith: 0.10.5(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      langsmith: 0.10.5(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 4.6.5
@@ -2640,13 +2645,13 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/langgraph-checkpoint@1.1.5(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))':
+  '@langchain/langgraph-checkpoint@1.1.5(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))':
     dependencies:
-      '@langchain/core': 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      '@langchain/core': 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
 
-  '@langchain/langgraph-sdk@1.12.0(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@langchain/langgraph-sdk@1.12.0(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@langchain/core': 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      '@langchain/core': 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
       '@langchain/protocol': 0.0.19
       '@types/json-schema': 7.0.15
       p-queue: 9.3.3
@@ -2655,11 +2660,11 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@langchain/langgraph@1.4.18(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)':
+  '@langchain/langgraph@1.4.18(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)':
     dependencies:
-      '@langchain/core': 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
-      '@langchain/langgraph-checkpoint': 1.1.5(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))
-      '@langchain/langgraph-sdk': 1.12.0(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@langchain/core': 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      '@langchain/langgraph-checkpoint': 1.1.5(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))
+      '@langchain/langgraph-sdk': 1.12.0(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@langchain/protocol': 0.0.19
       '@standard-schema/spec': 1.1.0
       zod: 4.6.5
@@ -2667,9 +2672,9 @@ snapshots:
       - react
       - react-dom
 
-  '@langchain/openai@1.5.13(@langchain/core@1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(undici@8.11.2)':
+  '@langchain/openai@1.5.13(@langchain/core@1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)))(undici@8.11.2)':
     dependencies:
-      '@langchain/core': 1.2.12(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
+      '@langchain/core': 1.2.12(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5))
       js-tiktoken: 1.0.21
       openai: 7.23.0(undici@8.11.2)(zod@4.6.5)
       zod: 4.6.5
@@ -2682,13 +2687,15 @@ snapshots:
 
   '@langchain/protocol@0.0.19': {}
 
+  '@opentelemetry/api@1.9.1': {}
+
   '@oxc-project/types@0.150.0': {}
 
   '@oxc-project/types@0.153.0': {}
 
-  '@playwright/test@1.64.0':
+  '@playwright/test@1.64.1':
     dependencies:
-      playwright: 1.64.0
+      playwright: 1.64.1
 
   '@rolldown/binding-android-arm-eabi@1.2.13':
     optional: true
@@ -3408,10 +3415,11 @@ snapshots:
     dependencies:
       '@keyv/serialize': 1.1.1
 
-  langsmith@0.10.5(openai@7.23.0(undici@8.11.2)(zod@4.6.5)):
+  langsmith@0.10.5(@opentelemetry/api@1.9.1)(openai@7.23.0(undici@8.11.2)(zod@4.6.5)):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:
+      '@opentelemetry/api': 1.9.1
       openai: 7.23.0(undici@8.11.2)(zod@4.6.5)
 
   levn@0.4.1:
@@ -3568,11 +3576,11 @@ snapshots:
     dependencies:
       pngjs: 7.0.0
 
-  playwright-core@1.64.0: {}
+  playwright-core@1.64.1: {}
 
-  playwright@1.64.0:
+  playwright@1.64.1:
     dependencies:
-      playwright-core: 1.64.0
+      playwright-core: 1.64.1
 
   pngjs@7.0.0: {}
 
@@ -3819,7 +3827,7 @@ snapshots:
       fsevents: 2.3.3
       tsx: 4.23.15
 
-  vitest@5.0.2(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)):
+  vitest@5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.2(vite@8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
@@ -3836,12 +3844,13 @@ snapshots:
       vite: 8.3.0(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
       why-is-node-running: 3.2.2
     optionalDependencies:
+      '@opentelemetry/api': 1.9.1
       '@types/node': 26.6.5
       jsdom: 30.1.1
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.2(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)):
+  vitest@5.0.2(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.1)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.2(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
@@ -3858,6 +3867,7 @@ snapshots:
       vite: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
       why-is-node-running: 3.2.2
     optionalDependencies:
+      '@opentelemetry/api': 1.9.1
       '@types/node': 26.6.5
       jsdom: 30.1.1
     transitivePeerDependencies:
