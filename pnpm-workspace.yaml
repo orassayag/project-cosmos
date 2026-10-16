@@ -4,4 +4,4 @@ packages:
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
-  - '@anthropic-ai/sdk@0.135.0'
+  - eslint@10.13.0
